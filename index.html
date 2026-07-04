@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>FreeTranslate - Free Language Translator | Speak, Type & Translate</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="FreeTranslate is a free multilingual speech and text translation web app. Translate between 30+ languages including Kinyarwanda, Kirundi, Swahili, and more. Perfect for students, travelers, and global communication.">
+    <meta name="keywords" content="free translator, translate, language translator, speech translator, Kinyarwanda translator, Kirundi translator, Swahili translator, African languages, free translation, text to speech">
+    <meta name="author" content="Ornella Mutuyimana">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:title" content="FreeTranslate - Free Language Translator">
+    <meta property="og:description" content="Translate between 30+ languages including African languages. Speech & text translation for students, travelers, and global communication.">
+    <meta property="og:url" content="https://m-nella.github.io/freetranslate/">
+    <meta property="og:type" content="website">
+    
+    <link rel="icon" type="image/png" href="FreeTranslateeFavicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <img src="FreeTranslateeFavicon.png" alt="FreeTranslate" height="40">
+                <span class="logo-text">FreeTranslate</span>
+            </div>
+            <div class="nav-controls">
+                <button id="themeToggle" class="theme-btn" title="Toggle Theme">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button id="aboutNavBtn" class="theme-btn" title="About Us">
+                    <i class="fas fa-info-circle"></i> About
+                </button>
+                <button id="authBtn" class="auth-btn">
+                    <i class="fas fa-user"></i> Sign In
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Notification Container -->
+    <div id="notificationContainer" class="notification-container"></div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <div class="translator-card">
+            <h1 class="app-title">
+                <i class="fas fa-language"></i> 
+                FreeTranslate
+                <span class="subtitle">Break language barriers instantly</span>
+            </h1>
+
+            <!-- Language Selection -->
+            <div class="language-selector">
+                <div class="lang-group">
+                    <label for="sourceLang">From</label>
+                    <select id="sourceLang" class="lang-select">
+                        <!-- Added by JavaScript -->
+                    </select>
+                </div>
+
+                <button id="swapLang" class="swap-btn" title="Swap languages">
+                    <i class="fas fa-arrow-right-arrow-left"></i>
+                </button>
+
+                <div class="lang-group">
+                    <label for="targetLang">To</label>
+                    <select id="targetLang" class="lang-select">
+                        <!-- Added by JavaScript -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- Translation Area - Side by Side -->
+            <div class="translation-area side-by-side">
+                <!-- Input Box -->
+                <div class="input-box">
+                    <div class="box-header">
+                        <span class="box-label">
+                            <i class="fas fa-pencil-alt"></i> Type or Speak
+                        </span>
+                        <div class="box-actions">
+                            <button id="clearInput" class="action-btn" title="Clear text">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="inputText" placeholder="Type your text here..." rows="4"></textarea>
+                    <div class="input-tools">
+                        <button id="micBtn" class="tool-btn mic-btn">
+                            <i class="fas fa-microphone"></i>
+                            <span>Speak</span>
+                        </button>
+                        <span id="recordingStatus" class="recording-status">Click mic to start</span>
+                    </div>
+                </div>
+
+                <!-- Translate Button (center) -->
+                <button id="translateBtn" class="translate-btn">
+                    <i class="fas fa-arrow-right"></i> Translate
+                </button>
+
+                <!-- Output Box -->
+                <div class="output-box">
+                    <div class="box-header">
+                        <span class="box-label">
+                            <i class="fas fa-copy"></i> Translation
+                        </span>
+                        <div class="box-actions">
+                            <button id="copyOutput" class="action-btn" title="Copy translation">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            <button id="speakOutput" class="action-btn" title="Listen to translation">
+                                <i class="fas fa-volume-up"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="outputText" class="output-text">
+                        <span class="placeholder">Translation will appear here...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Section -->
+            <div id="historySection" class="history-section" style="display: none;">
+                <div class="history-header">
+                    <h3><i class="fas fa-history"></i> Translation History</h3>
+                    <div class="history-actions">
+                        <button id="deleteAllHistory" class="btn-danger-sm" title="Delete all history">
+                            <i class="fas fa-trash"></i> Delete All
+                        </button>
+                        <span id="autoDeleteNotice" class="auto-delete-notice">
+                            ⚠️ History auto-deletes after 30 days
+                        </span>
+                    </div>
+                </div>
+                <div id="historyList" class="history-list">
+                    <p class="empty-history">Sign in to see your translation history.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>© 2026 FreeTranslate | Built by Ornella Mutuyimana for Global Communication</p>
+        <div class="footer-links">
+            <a href="https://github.com/m-nella/freetranslate" target="_blank"><i class="fab fa-github"></i></a>
+            <a href="https://x.com/m_ornella_nella" target="_blank"><i class="fab fa-twitter"></i></a>
+            <a href="mailto:mutuyimanaornella00@gmail.com"><i class="fas fa-envelope"></i></a>
+        </div>
+    </footer>
+
+    <!-- Auth Modal -->
+    <div id="authModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" id="closeAuthModal">&times;</span>
+            <h2 id="authModalTitle">Sign In</h2>
+            <form id="authForm">
+                <div id="authFields">
+                    <!-- Dynamic fields inserted by JS -->
+                </div>
+                <div id="forgotPasswordLink" style="text-align: right; margin-top: 8px; display: none;">
+                    <a href="#" id="forgotPasswordBtn" style="color: var(--accent); font-size: 0.85rem; cursor: pointer;">Forgot Password?</a>
+                </div>
+                <button type="submit" id="authSubmitBtn" class="auth-submit-btn">
+                    Sign In
+                </button>
+            </form>
+            <p id="authSwitchText" class="auth-switch">
+                Don't have an account? <a href="#" id="authSwitchLink">Sign Up</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Verification Modal -->
+    <div id="verificationModal" class="modal">
+        <div class="modal-content verification-content">
+            <span class="close-modal close-verification">&times;</span>
+            <h2 id="verificationModalTitle">Verify Your Email</h2>
+            <p id="verificationDescription" class="verification-desc">
+                Enter the 6-digit code sent to your email. Also check in SPAM/JUNK folder.
+            </p>
+            <form id="verificationForm">
+                <div id="verificationFields">
+                    <input type="text" id="verificationCode" placeholder="Enter 6-digit code" maxlength="6" required>
+                    <div id="verificationExtraFields" style="display: none;">
+                        <!-- For password reset: new password fields -->
+                    </div>
+                </div>
+                <button type="submit" id="verificationSubmitBtn" class="auth-submit-btn">
+                    Verify
+                </button>
+            </form>
+            <p id="verificationSwitchText" class="auth-switch">
+                Didn't receive code? <a href="#" id="resendCodeBtn">Resend Code</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- About Us Modal -->
+    <div id="aboutModal" class="modal">
+        <div class="modal-content about-content">
+            <span class="close-modal" id="closeAboutModal">&times;</span>
+            <h2><i class="fas fa-info-circle"></i> About Us</h2>
+            <div class="about-body">
+                <p>FreeTranslate is a free multilingual speech and text translation web app built by <strong>Ornella Mutuyimana</strong> to help people communicate across different languages.</p>
+                <p>We support <strong>30+ languages</strong> including African languages like Kinyarwanda, Kirundi, Swahili, Zulu, Yoruba, and more.</p>
+                
+                <div class="about-contact">
+                    <h3>Contact Information</h3>
+                    <div class="contact-item">
+                        <i class="fas fa-envelope"></i>
+                        <a href="mailto:mutuyimanaornella00@gmail.com">mutuyimanaornella00@gmail.com</a>
+                    </div>
+                    <div class="contact-item">
+                        <i class="fab fa-twitter"></i>
+                        <a href="https://x.com/m_ornella_nella" target="_blank">@m_ornella_nella</a>
+                    </div>
+                    <div class="contact-item">
+                        <i class="fab fa-github"></i>
+                        <a href="https://github.com/m-nella/freetranslate" target="_blank">github.com/m-nella/freetranslate</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/11.5.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/11.5.0/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/11.5.0/firebase-firestore-compat.min.js"></script>
+
+
+    <!-- Load config.js FIRST (private config) -->
+    <script src="config.js"></script>
+
+    <!-- Then load script.js -->
+    <script src="script.js"></script>
+    
+</body>
+</html>
