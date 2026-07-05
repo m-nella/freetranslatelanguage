@@ -663,7 +663,7 @@ function openAccountSettings() {
 }
 
 // ============================================================
-// OPEN AUTH MODAL
+// OPEN AUTH MODAL - FIXED
 // ============================================================
 function openModal(mode) {
     currentMode = mode;
@@ -729,11 +729,16 @@ function openModal(mode) {
         forgotPasswordLink.style.display = 'none';
     }
     
+    // FIX: Correct switch link logic
     const switchLink = document.getElementById('authSwitchLink');
     if (switchLink) {
         switchLink.addEventListener('click', (e) => {
             e.preventDefault();
-            openModal(mode === 'login' || mode === 'reset' ? 'signup' : 'login');
+            if (mode === 'login' || mode === 'reset') {
+                openModal('signup');
+            } else {
+                openModal('login');
+            }
         });
     }
 }
@@ -880,6 +885,7 @@ authForm.addEventListener('submit', async (e) => {
             authSubmitBtn.textContent = 'Creating account...';
             
             try {
+                // Check if email already exists
                 const methods = await auth.fetchSignInMethodsForEmail(email);
                 if (methods.length > 0) {
                     showNotification('❌ Email already registered. Redirecting to Sign In...', 'error');
@@ -889,22 +895,32 @@ authForm.addEventListener('submit', async (e) => {
                     return;
                 }
                 
+                // FIX: Create account with email and password
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                
+                // FIX: ALWAYS require verification code for sign up
                 const result = await sendVerificationCode(email, 'signup');
                 if (!result.success) {
                     showNotification('❌ Error sending verification code. Please try again.', 'error');
+                    // Delete the account if code fails
+                    await userCredential.user.delete();
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Create Account';
                     return;
                 }
+                
+                // Show verification modal
                 authModal.style.display = 'none';
                 openVerificationModal(email, 'signup', async () => {
+                    // Mark email as verified
                     await userCredential.user.sendEmailVerification();
-                    showNotification('✅ Account created! Please sign in.', 'success');
+                    showNotification('✅ Account created successfully!', 'success');
+                    // Sign out and redirect to sign in
                     await auth.signOut();
                     clearAllPasswordFields();
                     setTimeout(() => openModal('login'), 2000);
                 });
+                
             } catch (error) {
                 console.error('Sign up error:', error);
                 if (error.code === 'auth/email-already-in-use') {
