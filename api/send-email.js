@@ -1,9 +1,11 @@
 // ============================================================
-// VERCEL FUNCTION: SEND EMAIL VIA RESEND API
+// VERCEL FUNCTION: SEND EMAIL VIA BREVO API
+// ============================================================
+// No domain verification required - uses Brevo API directly
 // ============================================================
 
 export default async function handler(req, res) {
-    // 1. Handle CORS preflight (OPTIONS) requests
+    // Handle CORS preflight
     if (req.method === 'OPTIONS') {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -11,7 +13,7 @@ export default async function handler(req, res) {
         return res.status(200).end();
     }
 
-    // 2. Only allow POST requests
+    // Only allow POST
     if (req.method !== 'POST') {
         res.setHeader('Allow', 'POST');
         return res.status(405).json({ 
@@ -20,13 +22,9 @@ export default async function handler(req, res) {
         });
     }
 
-    console.log('📨 Function called with:', req.body);
-
     try {
-        // 3. Get data from request
         const { email, code, action = 'verification' } = req.body;
         
-        // 4. Validate input
         if (!email || !code) {
             return res.status(400).json({ 
                 success: false, 
@@ -42,21 +40,18 @@ export default async function handler(req, res) {
             });
         }
 
-        // 5. Get Resend API key from environment variables (SECURE)
-        const RESEND_API_KEY = process.env.RESEND_API_KEY;
+        // Get Brevo API key from environment variables
+        const BREVO_API_KEY = process.env.BREVO_API_KEY;
         
-        console.log('🔑 Resend API Key present:', RESEND_API_KEY ? 'YES' : 'NO');
-        console.log('🔑 Resend API Key length:', RESEND_API_KEY ? RESEND_API_KEY.length : 0);
-        
-        if (!RESEND_API_KEY) {
-            console.error('❌ Resend API key not configured in environment variables.');
+        if (!BREVO_API_KEY) {
+            console.error('❌ Brevo API key not configured.');
             return res.status(500).json({ 
                 success: false, 
                 error: 'Email service is not configured. Please contact support.' 
             });
         }
 
-        // 6. Build email subject based on action
+        // Email subject based on action
         const subjectMap = {
             signup: 'Verify Your Email - FreeTranslate',
             signin: 'Your Sign In Code - FreeTranslate',
@@ -67,8 +62,8 @@ export default async function handler(req, res) {
         };
         
         const subject = subjectMap[action] || 'Your Verification Code - FreeTranslate';
-        
-        // 7. Build email HTML content
+
+        // Email HTML content
         const htmlContent = `
             <!DOCTYPE html>
             <html>
@@ -106,29 +101,31 @@ export default async function handler(req, res) {
             </html>
         `;
 
-        // 8. Prepare Resend API payload
-        const resendPayload = {
-            from: 'FreeTranslate <mutuyimanaornella00@gmail.com>',
-            to: email,
+        // Brevo API payload
+        const payload = {
+            sender: {
+                name: 'FreeTranslate',
+                email: 'mutuyimanaornella00@gmail.com'
+            },
+            to: [{ email: email, name: email.split('@')[0] }],
             subject: subject,
-            html: htmlContent
+            htmlContent: htmlContent
         };
 
-        console.log('📧 Sending email to:', email);
+        console.log('📧 Sending email via Brevo to:', email);
         console.log('📧 Subject:', subject);
 
-        // 9. Send email via Resend API
-        const response = await fetch('https://api.resend.com/emails', {
+        // Send via Brevo API
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${RESEND_API_KEY}`
+                'api-key': BREVO_API_KEY
             },
-            body: JSON.stringify(resendPayload)
+            body: JSON.stringify(payload)
         });
 
         const result = await response.json();
-        console.log('📥 Resend API response:', result);
 
         if (response.ok) {
             console.log('✅ Email sent successfully to:', email);
@@ -137,10 +134,10 @@ export default async function handler(req, res) {
                 message: 'Verification code sent to your email.' 
             });
         } else {
-            console.error('❌ Resend API error:', result);
+            console.error('❌ Brevo API error:', result);
             return res.status(response.status).json({ 
                 success: false, 
-                error: result.message || 'Failed to send email. Please try again.' 
+                error: result.message || 'Failed to send email.' 
             });
         }
 
@@ -148,7 +145,7 @@ export default async function handler(req, res) {
         console.error('❌ Function error:', error);
         return res.status(500).json({ 
             success: false, 
-            error: 'An internal error occurred. Please try again later.' 
+            error: 'An internal error occurred.' 
         });
     }
 }
