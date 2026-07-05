@@ -1,9 +1,6 @@
 // ============================================================
 // VERCEL FUNCTION: SEND EMAIL VIA RESEND API
 // ============================================================
-// This function securely sends verification emails using Resend.
-// The Resend API key is stored as an environment variable on Vercel.
-// ============================================================
 
 export default async function handler(req, res) {
     // 1. Handle CORS preflight (OPTIONS) requests
@@ -22,6 +19,8 @@ export default async function handler(req, res) {
             error: 'Method not allowed. Please use POST.' 
         });
     }
+
+    console.log('📨 Function called with:', req.body);
 
     try {
         // 3. Get data from request
@@ -45,6 +44,9 @@ export default async function handler(req, res) {
 
         // 5. Get Resend API key from environment variables (SECURE)
         const RESEND_API_KEY = process.env.RESEND_API_KEY;
+        
+        console.log('🔑 Resend API Key present:', RESEND_API_KEY ? 'YES' : 'NO');
+        console.log('🔑 Resend API Key length:', RESEND_API_KEY ? RESEND_API_KEY.length : 0);
         
         if (!RESEND_API_KEY) {
             console.error('❌ Resend API key not configured in environment variables.');
@@ -112,6 +114,9 @@ export default async function handler(req, res) {
             html: htmlContent
         };
 
+        console.log('📧 Sending email to:', email);
+        console.log('📧 Subject:', subject);
+
         // 9. Send email via Resend API
         const response = await fetch('https://api.resend.com/emails', {
             method: 'POST',
@@ -123,6 +128,7 @@ export default async function handler(req, res) {
         });
 
         const result = await response.json();
+        console.log('📥 Resend API response:', result);
 
         if (response.ok) {
             console.log('✅ Email sent successfully to:', email);
