@@ -5,7 +5,7 @@
 const fetch = require('node-fetch');
 
 exports.handler = async (event, context) => {
-    // 1. Only allow POST requests
+    // Only allow POST requests
     if (event.httpMethod !== 'POST') {
         return {
             statusCode: 405,
@@ -14,10 +14,8 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        // 2. Get data from request
         const { email, code, action = 'verification' } = JSON.parse(event.body);
         
-        // 3. Validate input
         if (!email || !code) {
             return {
                 statusCode: 400,
@@ -25,7 +23,6 @@ exports.handler = async (event, context) => {
             };
         }
 
-        // 4. Get Mailjet API keys from environment variables
         const MAILJET_API_KEY = process.env.MAILJET_API_KEY;
         const MAILJET_SECRET_KEY = process.env.MAILJET_SECRET_KEY;
         
@@ -37,7 +34,6 @@ exports.handler = async (event, context) => {
             };
         }
 
-        // 5. Build email content
         const subjectMap = {
             signup: 'Verify Your Email - FreeTranslate',
             signin: 'Your Sign In Code - FreeTranslate',
@@ -70,7 +66,6 @@ exports.handler = async (event, context) => {
             </div>
         `;
 
-        // 6. Mailjet API request
         const mailjetUrl = 'https://api.mailjet.com/v3.1/send';
         const auth = Buffer.from(`${MAILJET_API_KEY}:${MAILJET_SECRET_KEY}`).toString('base64');
 
