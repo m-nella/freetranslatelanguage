@@ -2,8 +2,8 @@
 // CALL VERCEL FUNCTION TO SEND EMAIL (SECURE)
 // ============================================================
 
-// Your Vercel function URL (replace with your actual Vercel URL)
-const VERCEL_FUNCTION_URL = 'https://freetranslatelanguage.vercel.app/';
+// Your Vercel function URL - MUST include /api/send-email
+const VERCEL_FUNCTION_URL = 'https://freetranslatelanguage.vercel.app/api/send-email';
 
 async function sendVerificationEmail(email, code, action = 'verification') {
     try {
@@ -96,7 +96,7 @@ let settingsModal = null;
 let historyModal = null;
 
 // ============================================================
-// NOTIFICATION SYSTEM
+// NOTIFICATION SYSTEM - CLEAN & UNDERSTANDABLE
 // ============================================================
 let notificationTimeout = null;
 
@@ -226,7 +226,7 @@ async function sendVerificationCode(email, action = 'verification') {
         showNotification('📧 Verification code sent to your email. Also check SPAM/JUNK folder.', 'success');
     } else {
         console.error('❌ Error sending code:', emailResult.error);
-        showNotification('⚠️ Failed to send code. Please try again.', 'error');
+        showNotification('⚠️ Failed to send verification code. Please try again.', 'error');
     }
     
     return { success: true, code: code };
@@ -754,7 +754,7 @@ authModal.addEventListener('click', (e) => {
 });
 
 // ============================================================
-// AUTH FORM SUBMIT
+// AUTH FORM SUBMIT - FIXED CLEAR MESSAGES
 // ============================================================
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
