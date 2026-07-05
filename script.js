@@ -1,56 +1,36 @@
 // ============================================================
-// EMAILJS CONFIGURATION (SECURE - SMTP via EmailJS)
+// CALL NETLIFY FUNCTION TO SEND EMAIL (SECURE)
 // ============================================================
 
-// Initialize EmailJS with your PUBLIC key
-(function() {
-    emailjs.init({
-        publicKey: "U_UxNswWZrqYacIbW", // ⬅️ Your Public Key  
-    });
-})();
+// Your Netlify function URL
+const NETLIFY_FUNCTION_URL = 'https://freetranslatelanguage.netlify.app/.netlify/functions/send-email';
 
-// EmailJS configuration
-const EMAILJS_SERVICE_ID = "service_r3tq78v"; // ⬅️ NEW Service ID
-const EMAILJS_TEMPLATE_ID = "verification_code"; // ⬅️ Your Template ID
-
-// ============================================================
-// SEND VERIFICATION CODE VIA EMAILJS
-// ============================================================
 async function sendVerificationEmail(email, code, action = 'verification') {
-    const subjectMap = {
-        signup: 'Verify Your Email - FreeTranslate',
-        signin: 'Your Sign In Code - FreeTranslate',
-        reset: 'Reset Your Password - FreeTranslate',
-        email: 'Change Email Verification - FreeTranslate',
-        password: 'Change Password Verification - FreeTranslate',
-        delete: 'Delete Account Verification - FreeTranslate'
-    };
-    
-    const subject = subjectMap[action] || 'Your Verification Code - FreeTranslate';
-    
     try {
-        const templateParams = {
-            email: email,
-            code: code,
-            subject: subject
-        };
-        
-        const response = await emailjs.send(
-            EMAILJS_SERVICE_ID,
-            EMAILJS_TEMPLATE_ID,
-            templateParams
-        );
-        
-        if (response.status === 200) {
+        const response = await fetch(NETLIFY_FUNCTION_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: email,
+                code: code,
+                action: action
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
             console.log('✅ Email sent successfully to:', email);
             return { success: true };
         } else {
-            console.error('❌ EmailJS error:', response);
-            return { success: false, error: 'Failed to send email' };
+            console.error('❌ Error sending email:', result);
+            return { success: false, error: result.error || 'Failed to send email' };
         }
     } catch (error) {
-        console.error('❌ EmailJS error:', error);
-        return { success: false, error: error.message || 'Network error' };
+        console.error('❌ Fetch error:', error);
+        return { success: false, error: error.message };
     }
 }
 
@@ -245,7 +225,7 @@ async function sendVerificationCode(email, action = 'verification') {
     if (emailResult.success) {
         showNotification('📧 Verification code sent to your email. Also check SPAM/JUNK folder.', 'success');
     } else {
-        console.error('❌ EmailJS error:', emailResult.error);
+        console.error('❌ Error sending code:', emailResult.error);
         showNotification('⚠️ Failed to send code. Please try again.', 'error');
     }
     
