@@ -5,10 +5,12 @@
 const VERCEL_FUNCTION_URL = 'https://freetranslatelanguage.vercel.app/api/send-email';
 
 async function sendVerificationEmail(email, code, action = 'verification') {
+    console.log('📤 Sending verification email to:', email);
+    console.log('📤 Function URL:', VERCEL_FUNCTION_URL);
+    console.log('📤 Code:', code);
+    console.log('📤 Action:', action);
+    
     try {
-        console.log('📤 Sending verification email to:', email);
-        console.log('📤 Function URL:', VERCEL_FUNCTION_URL);
-        
         const response = await fetch(VERCEL_FUNCTION_URL, {
             method: 'POST',
             headers: {
@@ -22,7 +24,8 @@ async function sendVerificationEmail(email, code, action = 'verification') {
         });
 
         const result = await response.json();
-        console.log('📥 Response:', result);
+        console.log('📥 Response status:', response.status);
+        console.log('📥 Response data:', result);
 
         if (response.ok && result.success) {
             console.log('✅ Email sent successfully to:', email);
