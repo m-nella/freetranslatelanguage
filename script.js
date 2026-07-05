@@ -2,7 +2,6 @@
 // CALL VERCEL FUNCTION TO SEND EMAIL (SECURE)
 // ============================================================
 
-// Your Vercel function URL - MUST include /api/send-email
 const VERCEL_FUNCTION_URL = 'https://freetranslatelanguage.vercel.app/api/send-email';
 
 async function sendVerificationEmail(email, code, action = 'verification') {
@@ -734,7 +733,10 @@ function openModal(mode) {
     if (switchLink) {
         switchLink.addEventListener('click', (e) => {
             e.preventDefault();
-            if (mode === 'login' || mode === 'reset') {
+            // If current mode is reset, go to login, not signup
+            if (mode === 'reset') {
+                openModal('login');
+            } else if (mode === 'login') {
                 openModal('signup');
             } else {
                 openModal('login');
@@ -895,10 +897,10 @@ authForm.addEventListener('submit', async (e) => {
                     return;
                 }
                 
-                // FIX: Create account with email and password
+                // Create account
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 
-                // FIX: ALWAYS require verification code for sign up
+                // ALWAYS require verification code for sign up
                 const result = await sendVerificationCode(email, 'signup');
                 if (!result.success) {
                     showNotification('❌ Error sending verification code. Please try again.', 'error');
