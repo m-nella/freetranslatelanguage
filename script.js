@@ -3,7 +3,7 @@
 // ============================================================
 
 // Your Vercel function URL (replace with your actual Vercel URL)
-const VERCEL_FUNCTION_URL = 'https://freetranslate.vercel.app/api/send-email';
+const VERCEL_FUNCTION_URL = 'https://freetranslatelanguage.vercel.app/';
 
 async function sendVerificationEmail(email, code, action = 'verification') {
     try {
