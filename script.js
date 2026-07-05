@@ -96,7 +96,7 @@ let settingsModal = null;
 let historyModal = null;
 
 // ============================================================
-// NOTIFICATION SYSTEM - CLEAN & UNDERSTANDABLE
+// NOTIFICATION SYSTEM
 // ============================================================
 let notificationTimeout = null;
 
@@ -329,7 +329,7 @@ function openVerificationModal(email, action, callback) {
     modal.innerHTML = `
         <div class="modal-content verification-content">
             <span class="close-modal close-verification">&times;</span>
-            <h2>${action === 'signup' ? 'Verify Your Email' : action === 'reset' ? 'Reset Password' : action === 'delete' ? 'Delete Account' : action === 'email' ? 'Change Email' : action === 'password' ? 'Change Password' : 'Verify Email'}</h2>
+            <h2>${action === 'signup' ? 'Verify Your Email' : action === 'signin' ? 'Verify Sign In' : action === 'reset' ? 'Reset Password' : action === 'delete' ? 'Delete Account' : action === 'email' ? 'Change Email' : action === 'password' ? 'Change Password' : 'Verify Email'}</h2>
             <p class="verification-desc">Enter the 6-digit code sent to your email. Also check in SPAM/JUNK folder.</p>
             <form id="verificationForm">
                 <input type="text" id="verificationCode" placeholder="Enter the 6-digit code sent to your email. Also check in SPAM/JUNK folder." maxlength="6" autocomplete="off" required>
@@ -754,7 +754,7 @@ authModal.addEventListener('click', (e) => {
 });
 
 // ============================================================
-// AUTH FORM SUBMIT - FIXED CLEAR MESSAGES
+// AUTH FORM SUBMIT - FULLY FIXED
 // ============================================================
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -767,55 +767,60 @@ authForm.addEventListener('submit', async (e) => {
             authSubmitBtn.disabled = true;
             authSubmitBtn.textContent = 'Signing in...';
             
+            // Check if email exists first
+            let emailExists = false;
             try {
-                const userCredential = await auth.signInWithEmailAndPassword(email, password);
-                if (!userCredential.user.emailVerified) {
-                    const result = await sendVerificationCode(email, 'signin');
-                    if (!result.success) {
-                        showNotification('❌ Error sending verification code. Please try again.', 'error');
-                        authSubmitBtn.disabled = false;
-                        authSubmitBtn.textContent = 'Sign In';
-                        return;
-                    }
-                    authModal.style.display = 'none';
-                    openVerificationModal(email, 'login', async () => {
-                        await userCredential.user.sendEmailVerification();
-                        showNotification('✅ Sign in successful!', 'success');
-                        authSubmitBtn.disabled = false;
-                        authSubmitBtn.textContent = 'Sign In';
-                        clearAllPasswordFields();
-                    });
-                    return;
-                }
-                authModal.style.display = 'none';
-                showNotification('Welcome back! 🎉', 'success');
-                clearAllPasswordFields();
+                const methods = await auth.fetchSignInMethodsForEmail(email);
+                emailExists = methods.length > 0;
+            } catch (error) {
+                console.error('Check email error:', error);
+            }
+            
+            if (!emailExists) {
+                showNotification('❌ Account not found. Redirecting to Create Account...', 'error');
                 authSubmitBtn.disabled = false;
                 authSubmitBtn.textContent = 'Sign In';
+                setTimeout(() => openModal('signup'), 1500);
+                return;
+            }
+            
+            try {
+                // Attempt sign in
+                const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                
+                // ALWAYS require verification code for sign in
+                const result = await sendVerificationCode(email, 'signin');
+                if (!result.success) {
+                    showNotification('❌ Error sending verification code. Please try again.', 'error');
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Sign In';
+                    return;
+                }
+                
+                // Show verification modal
+                authModal.style.display = 'none';
+                openVerificationModal(email, 'signin', async () => {
+                    showNotification('✅ Sign in successful!', 'success');
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Sign In';
+                    clearAllPasswordFields();
+                });
+                
             } catch (error) {
                 console.error('Sign in error:', error);
-                if (error.code === 'auth/user-not-found') {
-                    showNotification('❌ Account not found. Redirecting to Create Account...', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Sign In';
-                    setTimeout(() => openModal('signup'), 1500);
-                } else if (error.code === 'auth/wrong-password') {
+                if (error.code === 'auth/wrong-password') {
                     showNotification('❌ Incorrect password. Please try again.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Sign In';
                 } else if (error.code === 'auth/invalid-email') {
                     showNotification('❌ Invalid email address. Please check and try again.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Sign In';
                 } else if (error.code === 'auth/too-many-requests') {
                     showNotification('❌ Too many failed attempts. Please try again later.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Sign In';
+                } else if (error.code === 'auth/invalid-credential') {
+                    showNotification('❌ Incorrect password. Please try again.', 'error');
                 } else {
                     showNotification(`❌ ${error.message}`, 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Sign In';
                 }
+                authSubmitBtn.disabled = false;
+                authSubmitBtn.textContent = 'Sign In';
             }
             
         } else if (currentMode === 'reset') {
