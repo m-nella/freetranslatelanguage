@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FreeTranslate - Free Language Translator</title>
+    <link rel="icon" type="image/png" href="FreeTranslateeFavicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <img src="FreeTranslateeFavicon.png" alt="FreeTranslate" height="40">
+                <span class="logo-text">FreeTranslate</span>
+            </div>
+            <div class="nav-controls">
+                <button id="themeToggle" class="theme-btn" title="Toggle Theme">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button id="historyNavBtn" class="nav-btn" style="display: none;" title="History">
+                    <i class="fas fa-history"></i> History
+                </button>
+                <button id="aboutNavBtn" class="theme-btn" title="About Us">
+                    <i class="fas fa-info-circle"></i> About
+                </button>
+                <button id="authBtn" class="auth-btn">
+                    <i class="fas fa-user"></i> Sign In
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Notification Container -->
+    <div id="notificationContainer" class="notification-container"></div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <div class="translator-card">
+            <h1 class="app-title">
+                <i class="fas fa-language"></i> 
+                FreeTranslate
+                <span class="subtitle">Break language barriers instantly</span>
+            </h1>
+
+            <!-- Language Selection -->
+            <div class="language-selector">
+                <div class="lang-group">
+                    <label for="sourceLang">From</label>
+                    <select id="sourceLang" class="lang-select"></select>
+                </div>
+                <button id="swapLang" class="swap-btn"><i class="fas fa-arrow-right-arrow-left"></i></button>
+                <div class="lang-group">
+                    <label for="targetLang">To</label>
+                    <select id="targetLang" class="lang-select"></select>
+                </div>
+            </div>
+
+            <!-- Translation Area -->
+            <div class="translation-area side-by-side">
+                <div class="input-box">
+                    <div class="box-header">
+                        <span class="box-label"><i class="fas fa-pencil-alt"></i> Type or Speak</span>
+                        <div class="box-actions">
+                            <button id="clearInput" class="action-btn"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                    <textarea id="inputText" placeholder="Type your text here..." rows="4"></textarea>
+                    <div class="input-tools">
+                        <button id="micBtn" class="tool-btn mic-btn"><i class="fas fa-microphone"></i> Speak</button>
+                        <span id="recordingStatus" class="recording-status">Click mic to start</span>
+                    </div>
+                </div>
+                <button id="translateBtn" class="translate-btn">
+                    <i class="fas fa-arrow-right"></i> Translate
+                </button>
+                <div class="output-box">
+                    <div class="box-header">
+                        <span class="box-label"><i class="fas fa-copy"></i> Translation</span>
+                        <div class="box-actions">
+                            <button id="copyOutput" class="action-btn"><i class="fas fa-copy"></i></button>
+                            <button id="speakOutput" class="action-btn"><i class="fas fa-volume-up"></i></button>
+                        </div>
+                    </div>
+                    <div id="outputText" class="output-text">
+                        <span class="placeholder">Translation will appear here...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>© 2026 FreeTranslate | Built by Ornella Mutuyimana</p>
+        <div class="footer-links">
+            <a href="https://github.com/m-nella/freetranslate" target="_blank"><i class="fab fa-github"></i></a>
+            <a href="https://x.com/m_ornella_nella" target="_blank"><i class="fab fa-twitter"></i></a>
+            <a href="mailto:mutuyimanaornella00@gmail.com"><i class="fas fa-envelope"></i></a>
+        </div>
+    </footer>
+
+    <!-- Auth Modal -->
+    <div id="authModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" id="closeAuthModal">&times;</span>
+            <h2 id="authModalTitle">Sign In</h2>
+            <form id="authForm">
+                <div id="authFields"></div>
+                <div id="forgotPasswordLink" style="text-align:right; margin-top:8px; display:none;">
+                    <a href="#" id="forgotPasswordBtn" style="color:var(--accent); font-size:0.85rem; cursor:pointer;">Forgot Password?</a>
+                </div>
+                <button type="submit" id="authSubmitBtn" class="auth-submit-btn">Sign In</button>
+            </form>
+            <p id="authSwitchText" class="auth-switch">
+                Don't have an account? <a href="#" id="authSwitchLink">Sign Up</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="aboutModal" class="modal">
+        <div class="modal-content about-content">
+            <span class="close-modal" id="closeAboutModal">&times;</span>
+            <h2><i class="fas fa-info-circle"></i> About Us</h2>
+            <div class="about-body">
+                <p>FreeTranslate is a free multilingual speech and text translation web app built by <strong>Ornella Mutuyimana</strong>.</p>
+                <p>We support <strong>30+ languages</strong> including African languages.</p>
+                <div class="about-contact">
+                    <h3>Contact</h3>
+                    <div class="contact-item"><i class="fas fa-envelope"></i> <a href="mailto:mutuyimanaornella00@gmail.com">mutuyimanaornella00@gmail.com</a></div>
+                    <div class="contact-item"><i class="fab fa-twitter"></i> <a href="https://x.com/m_ornella_nella" target="_blank">@m_ornella_nella</a></div>
+                    <div class="contact-item"><i class="fab fa-github"></i> <a href="https://github.com/m-nella/freetranslate" target="_blank">github.com/m-nella/freetranslate</a></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+<!-- EmailJS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+<!-- Firebase SDK -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/11.5.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/11.5.0/firebase-auth-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/11.5.0/firebase-firestore-compat.min.js"></script>
+
+<!-- config.js FIRST (private config) -->
+<script src="config.js"></script>
+
+<!-- script.js LAST -->
+<script src="script.js"></script>
+    
+</body>
+</html>
