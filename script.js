@@ -1,5 +1,5 @@
 // ============================================================
-// FREETRANSLATE - Complete Application
+// FREETRANSLATE - Complete Application (FIXED)
 // ============================================================
 
 // ============================================================
@@ -168,9 +168,10 @@ async function sendVerificationCode(email, action = 'verification') {
 }
 
 async function verifyCode(email, code) {
+    // Reset the verifying state if it was stuck
     if (isVerifying) {
-        console.log('⏳ Verification already in progress...');
-        return { success: false, error: 'Verification in progress.' };
+        console.log('⏳ Verification already in progress, resetting...');
+        isVerifying = false;
     }
     
     isVerifying = true;
@@ -236,7 +237,7 @@ function showConfirmationModal(title, message, confirmText = 'Confirm', cancelTe
 }
 
 // ============================================================
-// VERIFICATION MODAL
+// VERIFICATION MODAL - FIXED
 // ============================================================
 function openVerificationModal(email, action, callback) {
     pendingEmail = email;
@@ -255,7 +256,7 @@ function openVerificationModal(email, action, callback) {
     modal.innerHTML = `
         <div class="modal-content verification-content">
             <span class="close-modal close-verification">&times;</span>
-            <h2>${action === 'signup' ? 'Verify Your Email' : action === 'signin' ? 'Verify Sign In' : action === 'delete' ? 'Confirm Delete Account' : action === 'email' ? 'Verify Email Change' : action === 'password' ? 'Verify Password Change' : 'Verification Required'}</h2>
+            <h2>${action === 'signup' ? 'Verify Your Email' : action === 'signin' ? 'Verify Sign In' : action === 'delete' ? 'Confirm Delete Account' : action === 'email' ? 'Verify Email Change' : action === 'password' ? 'Verify Password Change' : action === 'reset' ? 'Reset Password' : 'Verification Required'}</h2>
             <p class="verification-desc">Enter the 6-digit verification code sent to your email.</p>
             <form id="verificationForm">
                 <input type="text" id="verificationCode" placeholder="Enter 6-digit code" maxlength="6" autocomplete="off" required>
@@ -266,18 +267,19 @@ function openVerificationModal(email, action, callback) {
     `;
     document.body.appendChild(modal);
     
+    // Prevent modal from closing when clicking outside
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            // Do nothing - keep modal open
+            e.stopPropagation();
+        }
+    });
+    
     const closeBtn = modal.querySelector('.close-verification');
     closeBtn.addEventListener('click', () => {
         modal.remove();
         isVerifying = false;
         verificationDone = false;
-    });
-    modal.addEventListener('click', (e) => { 
-        if (e.target === modal) {
-            modal.remove();
-            isVerifying = false;
-            verificationDone = false;
-        }
     });
     
     const form = modal.querySelector('#verificationForm');
@@ -288,8 +290,14 @@ function openVerificationModal(email, action, callback) {
         e.preventDefault();
         e.stopPropagation();
         
-        if (isVerifying || verificationDone) {
-            console.log('⏳ Already verifying or done');
+        // Prevent multiple submissions
+        if (verificationDone) {
+            console.log('⏳ Already verified');
+            return;
+        }
+        
+        if (isVerifying) {
+            console.log('⏳ Verification in progress, please wait...');
             return;
         }
         
@@ -318,6 +326,7 @@ function openVerificationModal(email, action, callback) {
                     localStorage.setItem('authToken', result.token);
                 }
                 
+                // Close modal and execute callback
                 setTimeout(() => {
                     modal.remove();
                     if (typeof pendingCallback === 'function') {
@@ -401,6 +410,7 @@ async function checkAuthStatus() {
         authBtn.innerHTML = `<i class="fas fa-user-circle"></i> ${currentUser.username}`;
         authBtn.classList.add('logged-in');
         if (historyNavBtn) historyNavBtn.style.display = 'flex';
+        console.log('✅ User logged in:', currentUser.username);
     } else {
         localStorage.removeItem('authToken');
         isLoggedIn = false;
@@ -536,7 +546,11 @@ function openProfileModal() {
     document.body.appendChild(modal);
     
     modal.querySelector('.close-profile').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
     
     modal.querySelector('#goToSettingsBtn').addEventListener('click', () => {
         modal.remove();
@@ -594,7 +608,11 @@ function openAccountSettings() {
     bindPasswordToggles(modal);
     
     modal.querySelector('.close-settings').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
     
     modal.querySelector('#saveSettingsBtn').addEventListener('click', async () => {
         const newEmail = document.getElementById('settingsEmail').value;
@@ -743,7 +761,6 @@ function openModal(mode) {
         authFields.appendChild(password);
         bindPasswordToggles(authModal);
         
-        // Show forgot password link
         forgotPasswordLink.style.display = 'block';
         forgotPasswordBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -803,19 +820,15 @@ function openModal(mode) {
 }
 
 // ============================================================
-// CLOSE MODAL
+// CLOSE MODAL - FIXED: Don't close on outside click
 // ============================================================
 closeAuthModal.addEventListener('click', () => {
     authModal.style.display = 'none';
     clearAllPasswordFields();
 });
 
-authModal.addEventListener('click', (e) => {
-    if (e.target === authModal) {
-        authModal.style.display = 'none';
-        clearAllPasswordFields();
-    }
-});
+// REMOVED: authModal click on outside close - this was causing the issue
+// Now only the X button closes the modal
 
 // ============================================================
 // AUTH FORM SUBMIT
@@ -873,7 +886,6 @@ authForm.addEventListener('submit', async (e) => {
             authSubmitBtn.disabled = true;
             authSubmitBtn.textContent = 'Sending reset code...';
             
-            // Check if email exists
             const userExists = DATA_MANAGER.findUserByEmail(email);
             if (!userExists) {
                 showNotification('No account found with this email.', 'error');
@@ -893,7 +905,6 @@ authForm.addEventListener('submit', async (e) => {
             authModal.style.display = 'none';
             
             openVerificationModal(email, 'reset', async (token) => {
-                // After verification, allow password reset
                 const newPassword = prompt('Enter your new password (min 8 chars):');
                 if (!newPassword) {
                     showNotification('Password reset cancelled.', 'info');
