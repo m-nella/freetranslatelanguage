@@ -159,6 +159,8 @@ const DATA_MANAGER = {
                 return { success: false, error: 'Email already in use.' };
             }
             users[index].email = updates.email.toLowerCase();
+            // Auto-update username to match new email
+            users[index].username = updates.email.split('@')[0];
         }
         if (updates.profilePhoto !== undefined) users[index].profilePhoto = updates.profilePhoto;
         if (updates.preferences) {
