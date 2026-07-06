@@ -45,7 +45,7 @@ let pendingEmail = '';
 let pendingAction = '';
 let generatedCode = '';
 let codeExpiry = null;
-let isVerifying = false; // Prevent duplicate verification
+let isVerifying = false;
 
 // ============================================================
 // DOM ELEMENTS
@@ -215,13 +215,12 @@ async function sendVerificationCode(email, action = 'verification') {
 }
 
 // ============================================================
-// VERIFY CODE - FIXED with duplicate prevention
+// VERIFY CODE
 // ============================================================
 async function verifyCode(email, code) {
-    // Prevent duplicate verification
     if (isVerifying) {
-        console.log('⏳ Verification already in progress, skipping duplicate...');
-        return { success: false, error: 'Verification already in progress.' };
+        console.log('⏳ Verification already in progress...');
+        return { success: false, error: 'Verification in progress.' };
     }
     
     isVerifying = true;
@@ -307,7 +306,7 @@ function showConfirmationModal(title, message, confirmText = 'Confirm', cancelTe
 function openVerificationModal(email, action, callback) {
     pendingEmail = email;
     pendingAction = action;
-    isVerifying = false; // Reset verification flag
+    isVerifying = false;
     
     // Remove any existing verification modal
     const existing = document.getElementById('verificationModal');
@@ -342,7 +341,6 @@ function openVerificationModal(email, action, callback) {
         e.preventDefault();
         e.stopPropagation();
         
-        // Prevent multiple submissions
         if (isVerifying) {
             console.log('⏳ Already verifying, please wait...');
             return;
@@ -354,18 +352,27 @@ function openVerificationModal(email, action, callback) {
             return;
         }
         
-        // Disable button to prevent double-click
         submitBtn.disabled = true;
         submitBtn.textContent = 'Verifying...';
         
-        const result = await verifyCode(email, code);
-        
-        if (result.success) {
-            showNotification('✅ Verification successful!', 'success');
-            modal.remove();
-            if (callback) callback();
-        } else {
-            showNotification(result.error, 'error');
+        try {
+            const result = await verifyCode(email, code);
+            
+            if (result.success) {
+                showNotification('✅ Verification successful!', 'success');
+                modal.remove();
+                // Call the callback (this handles sign in, sign up, etc.)
+                if (callback) {
+                    await callback();
+                }
+            } else {
+                showNotification(result.error, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Verify';
+            }
+        } catch (error) {
+            console.error('❌ Verification error:', error);
+            showNotification('An error occurred during verification.', 'error');
             submitBtn.disabled = false;
             submitBtn.textContent = 'Verify';
         }
@@ -610,7 +617,6 @@ function openAccountSettings() {
             }
         }
         
-        // Verify current password first
         const verifyResult = await apiCall('/auth/verify-password', 'POST', {
             password: currentPassword
         });
@@ -836,7 +842,6 @@ authForm.addEventListener('submit', async (e) => {
                 }
             }
             
-            // Send verification code
             const codeResult = await sendVerificationCode(email, 'signin');
             if (!codeResult.success) {
                 showNotification('❌ Error sending verification code. Please try again.', 'error');
@@ -846,8 +851,12 @@ authForm.addEventListener('submit', async (e) => {
             }
             
             authModal.style.display = 'none';
+            
+            // Open verification modal and handle sign in on success
             openVerificationModal(email, 'signin', async () => {
-                // On successful verification, get token from verify endpoint
+                // The verification was successful, but we need to get the token
+                // The token is already returned by the verify endpoint
+                // The callback is called after verification succeeds
                 const verifyResult = await apiCall('/auth/verify', 'POST', {
                     email: email,
                     code: generatedCode,
@@ -862,7 +871,7 @@ authForm.addEventListener('submit', async (e) => {
                     authSubmitBtn.textContent = 'Sign In';
                     clearAllPasswordFields();
                 } else {
-                    showNotification('❌ Invalid verification code.', 'error');
+                    showNotification('❌ Sign in failed. Please try again.', 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Sign In';
                 }
@@ -872,15 +881,13 @@ authForm.addEventListener('submit', async (e) => {
             authSubmitBtn.disabled = true;
             authSubmitBtn.textContent = 'Sending code...';
             
-            // First check if email exists
+            // Check if email exists
             const checkResult = await apiCall('/auth/signin', 'POST', {
                 email: email,
-                password: 'dummy' // This will fail but tells us if email exists
+                password: 'dummy'
             });
             
-            // If the error is "Incorrect password", email exists
             if (checkResult.data.error === 'Incorrect password. Please try again.') {
-                // Email exists, proceed with reset
                 const result = await apiCall('/auth/send-code', 'POST', {
                     email: email,
                     action: 'reset'
@@ -902,7 +909,6 @@ authForm.addEventListener('submit', async (e) => {
                     });
                     
                     if (verifyResult.success) {
-                        // Send password reset email
                         await apiCall('/auth/reset-password', 'POST', {
                             email: email
                         });
@@ -914,7 +920,6 @@ authForm.addEventListener('submit', async (e) => {
                     }
                 });
             } else {
-                // Email not found
                 showNotification('❌ No account found with this email. Please create an account.', 'error');
                 authSubmitBtn.disabled = false;
                 authSubmitBtn.textContent = 'Send Reset Code';
@@ -962,7 +967,6 @@ authForm.addEventListener('submit', async (e) => {
                 }
             }
             
-            // Send verification code
             const codeResult = await sendVerificationCode(email, 'signup');
             if (!codeResult.success) {
                 showNotification('❌ Error sending verification code. Please try again.', 'error');
@@ -972,6 +976,7 @@ authForm.addEventListener('submit', async (e) => {
             }
             
             authModal.style.display = 'none';
+            
             openVerificationModal(email, 'signup', async () => {
                 const verifyResult = await apiCall('/auth/verify', 'POST', {
                     email: email,
@@ -987,7 +992,7 @@ authForm.addEventListener('submit', async (e) => {
                     authSubmitBtn.textContent = 'Create Account';
                     clearAllPasswordFields();
                 } else {
-                    showNotification('❌ Invalid verification code.', 'error');
+                    showNotification('❌ Account verification failed.', 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Create Account';
                 }
