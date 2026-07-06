@@ -1,39 +1,7 @@
 // ============================================================
-// BACKEND API CONFIGURATION
+// FREETRANSLATE - localStorage Version
+// Complete Frontend JavaScript
 // ============================================================
-
-const API_BASE_URL = 'https://freetranslatelanguage.onrender.com/api';
-
-// ============================================================
-// API HELPER FUNCTIONS
-// ============================================================
-
-async function apiCall(endpoint, method = 'GET', body = null) {
-    const options = {
-        method: method,
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    };
-    
-    if (body) {
-        options.body = JSON.stringify(body);
-    }
-    
-    const token = localStorage.getItem('authToken');
-    if (token) {
-        options.headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
-        const data = await response.json();
-        return { success: response.ok, data };
-    } catch (error) {
-        console.error('API Error:', error);
-        return { success: false, data: { error: error.message } };
-    }
-}
 
 // ============================================================
 // STATE
@@ -43,7 +11,6 @@ let currentUser = null;
 let isLoggedIn = false;
 let pendingEmail = '';
 let pendingAction = '';
-let pendingCode = ''; // Store the actual code sent
 let pendingCallback = null;
 let isVerifying = false;
 let verificationDone = false;
@@ -176,47 +143,36 @@ function clearAllPasswordFields() {
 }
 
 // ============================================================
-// VERIFICATION CODE SYSTEM - FIXED
+// VERIFICATION CODE SYSTEM - localStorage Version
 // ============================================================
-function generateVerificationCode() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-}
 
+// Send verification code
 async function sendVerificationCode(email, action = 'verification') {
-    const code = generateVerificationCode();
-    pendingCode = code; // Store the code globally
-    
     console.log('📧 Sending verification code for:', email);
-    console.log('📧 Code:', code);
     console.log('📧 Action:', action);
     
     try {
-        const result = await apiCall('/auth/send-code', 'POST', {
-            email: email,
-            code: code,
-            action: action
-        });
-        
-        console.log('📧 API Response:', result);
+        // Store code in localStorage
+        const result = DATA_MANAGER.storeVerificationCode(email, action);
         
         if (result.success) {
-            showNotification('📧 Verification code sent to your email. Also check SPAM/JUNK folder.', 'success');
-            return { success: true, code: code };
+            console.log('📧 Code stored:', result.code);
+            showNotification('📧 Verification code sent! Check console for code (development mode)', 'success');
+            // For development, show code in console
+            console.log(`🔑 Your verification code: ${result.code}`);
+            return { success: true, code: result.code };
         } else {
-            console.warn('⚠️ Email may have failed, but code is stored:', result);
-            showNotification('📧 If you didn\'t receive the code, please check SPAM or try again.', 'warning');
-            return { success: true, code: code };
+            showNotification('⚠️ Error storing verification code.', 'error');
+            return { success: false };
         }
     } catch (error) {
         console.error('❌ Error in sendVerificationCode:', error);
         showNotification('⚠️ There was an issue sending the code. Please try again.', 'error');
-        return { success: false, code: code };
+        return { success: false };
     }
 }
 
-// ============================================================
-// VERIFY CODE - Fixed
-// ============================================================
+// Verify code
 async function verifyCode(email, code) {
     if (isVerifying) {
         console.log('⏳ Verification already in progress...');
@@ -226,22 +182,18 @@ async function verifyCode(email, code) {
     isVerifying = true;
     
     try {
-        const result = await apiCall('/auth/verify', 'POST', {
-            email: email,
-            code: code,
-            action: pendingAction
-        });
+        const result = DATA_MANAGER.verifyCode(email, code, pendingAction);
         
         console.log('🔍 Verification result:', result);
         
         if (result.success) {
             return { 
                 success: true, 
-                token: result.data.token,
-                data: result.data 
+                token: 'local_' + email,
+                data: result 
             };
         } else {
-            return { success: false, error: result.data.error || 'Invalid code. Please try again.' };
+            return { success: false, error: result.error || 'Invalid code. Please try again.' };
         }
     } catch (error) {
         console.error('❌ Verify code error:', error);
@@ -252,17 +204,160 @@ async function verifyCode(email, code) {
 }
 
 // ============================================================
+// VERIFICATION MODAL
+// ============================================================
+function openVerificationModal(email, action, callback) {
+    pendingEmail = email;
+    pendingAction = action;
+    pendingCallback = callback;
+    isVerifying = false;
+    verificationDone = false;
+    
+    // Remove any existing verification modal
+    const existing = document.getElementById('verificationModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'verificationModal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content verification-content">
+            <span class="close-modal close-verification">&times;</span>
+            <h2>${action === 'signup' ? 'Verify Your Email' : action === 'signin' ? 'Verify Sign In' : action === 'reset' ? 'Reset Password' : action === 'delete' ? 'Delete Account' : action === 'email' ? 'Change Email' : action === 'password' ? 'Change Password' : 'Verify Email'}</h2>
+            <p class="verification-desc">Enter the 6-digit code sent to your email.</p>
+            <form id="verificationForm">
+                <input type="text" id="verificationCode" placeholder="Enter the 6-digit code" maxlength="6" autocomplete="off" required>
+                <button type="submit" class="auth-submit-btn" id="verifySubmitBtn">Verify</button>
+            </form>
+            <p class="auth-switch">Didn't receive code? <a href="#" id="resendCodeBtn">Resend Code</a></p>
+            <p class="dev-hint">💡 Check browser console for the verification code</p>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    const closeBtn = modal.querySelector('.close-verification');
+    closeBtn.addEventListener('click', () => {
+        modal.remove();
+        isVerifying = false;
+        verificationDone = false;
+    });
+    modal.addEventListener('click', (e) => { 
+        if (e.target === modal) {
+            modal.remove();
+            isVerifying = false;
+            verificationDone = false;
+        }
+    });
+    
+    const form = modal.querySelector('#verificationForm');
+    const submitBtn = modal.querySelector('#verifySubmitBtn');
+    const codeInput = document.getElementById('verificationCode');
+    
+    // Show code in console for development
+    const codes = JSON.parse(localStorage.getItem('verificationCodes') || '[]');
+    const found = codes.find(c => c.email === email && c.action === action && !c.isUsed);
+    if (found) {
+        console.log(`🔑 Your verification code: ${found.code}`);
+        console.log(`📧 Email: ${email}`);
+        console.log(`📋 Action: ${action}`);
+    }
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (isVerifying || verificationDone) {
+            console.log('⏳ Already verifying or done');
+            return;
+        }
+        
+        const code = codeInput.value.trim();
+        if (!code || code.length !== 6) {
+            showNotification('Please enter a valid 6-digit code.', 'error');
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Verifying...';
+        isVerifying = true;
+        
+        try {
+            const result = await verifyCode(email, code);
+            
+            if (result.success) {
+                verificationDone = true;
+                submitBtn.textContent = '✅ Verified';
+                submitBtn.style.backgroundColor = '#4CAF50';
+                codeInput.disabled = true;
+                
+                showNotification('✅ Verification successful!', 'success');
+                
+                if (result.token) {
+                    localStorage.setItem('authToken', result.token);
+                }
+                
+                setTimeout(() => {
+                    modal.remove();
+                    if (typeof pendingCallback === 'function') {
+                        pendingCallback(result.token);
+                    }
+                    checkAuthStatus();
+                    isVerifying = false;
+                    verificationDone = false;
+                }, 800);
+                
+            } else {
+                showNotification(result.error || 'Invalid code. Please try again.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Verify';
+                submitBtn.style.backgroundColor = '';
+                isVerifying = false;
+                codeInput.value = '';
+                codeInput.focus();
+            }
+        } catch (error) {
+            console.error('❌ Verification error:', error);
+            showNotification('An error occurred during verification.', 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Verify';
+            submitBtn.style.backgroundColor = '';
+            isVerifying = false;
+        }
+    });
+    
+    const resendBtn = modal.querySelector('#resendCodeBtn');
+    resendBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        clearAllNotifications();
+        
+        verificationDone = false;
+        isVerifying = false;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Verify';
+        submitBtn.style.backgroundColor = '';
+        codeInput.disabled = false;
+        codeInput.value = '';
+        codeInput.focus();
+        
+        const result = await sendVerificationCode(email, pendingAction);
+        if (result.success) {
+            showNotification('✅ New code sent! Check console.', 'success');
+        } else {
+            showNotification('❌ Error sending code. Please try again.', 'error');
+        }
+    });
+    
+    setTimeout(() => {
+        codeInput.focus();
+    }, 200);
+}
+
+// ============================================================
 // PASSWORD STRENGTH VALIDATION
 // ============================================================
 function validatePassword(password) {
-    const requirements = [];
-    if (password.length < 8) requirements.push('at least 8 characters');
-    if (!/[A-Z]/.test(password)) requirements.push('an uppercase letter');
-    if (!/[a-z]/.test(password)) requirements.push('a lowercase letter');
-    if (!/[0-9]/.test(password)) requirements.push('a number');
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) requirements.push('a special character');
-    if (requirements.length === 0) return { valid: true };
-    return { valid: false, message: `Password must contain: ${requirements.join(', ')}` };
+    return DATA_MANAGER.validatePasswordStrength(password);
 }
 
 // ============================================================
@@ -305,183 +400,24 @@ function showConfirmationModal(title, message, confirmText = 'Confirm', cancelTe
 }
 
 // ============================================================
-// VERIFICATION MODAL - COMPLETELY REWRITTEN
-// ============================================================
-function openVerificationModal(email, action, callback) {
-    pendingEmail = email;
-    pendingAction = action;
-    pendingCallback = callback;
-    isVerifying = false;
-    verificationDone = false;
-    
-    // Remove any existing verification modal
-    const existing = document.getElementById('verificationModal');
-    if (existing) existing.remove();
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.id = 'verificationModal';
-    modal.style.display = 'flex';
-    modal.innerHTML = `
-        <div class="modal-content verification-content">
-            <span class="close-modal close-verification">&times;</span>
-            <h2>${action === 'signup' ? 'Verify Your Email' : action === 'signin' ? 'Verify Sign In' : action === 'reset' ? 'Reset Password' : action === 'delete' ? 'Delete Account' : action === 'email' ? 'Change Email' : action === 'password' ? 'Change Password' : 'Verify Email'}</h2>
-            <p class="verification-desc">Enter the 6-digit code sent to your email. Also check in SPAM/JUNK folder.</p>
-            <form id="verificationForm">
-                <input type="text" id="verificationCode" placeholder="Enter the 6-digit code" maxlength="6" autocomplete="off" required>
-                <button type="submit" class="auth-submit-btn" id="verifySubmitBtn">Verify</button>
-            </form>
-            <p class="auth-switch">Didn't receive code? <a href="#" id="resendCodeBtn">Resend Code</a></p>
-        </div>
-    `;
-    document.body.appendChild(modal);
-    
-    const closeBtn = modal.querySelector('.close-verification');
-    closeBtn.addEventListener('click', () => {
-        modal.remove();
-        // Reset state
-        isVerifying = false;
-        verificationDone = false;
-    });
-    modal.addEventListener('click', (e) => { 
-        if (e.target === modal) {
-            modal.remove();
-            isVerifying = false;
-            verificationDone = false;
-        }
-    });
-    
-    const form = modal.querySelector('#verificationForm');
-    const submitBtn = modal.querySelector('#verifySubmitBtn');
-    const codeInput = document.getElementById('verificationCode');
-    
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Prevent multiple submissions
-        if (isVerifying || verificationDone) {
-            console.log('⏳ Already verifying or done');
-            return;
-        }
-        
-        const code = codeInput.value.trim();
-        if (!code || code.length !== 6) {
-            showNotification('Please enter a valid 6-digit code.', 'error');
-            return;
-        }
-        
-        // Disable the button
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Verifying...';
-        isVerifying = true;
-        
-        try {
-            // Verify the code
-            const result = await verifyCode(email, code);
-            
-            if (result.success) {
-                // Mark as done
-                verificationDone = true;
-                submitBtn.textContent = '✅ Verified';
-                submitBtn.style.backgroundColor = '#4CAF50';
-                codeInput.disabled = true;
-                
-                showNotification('✅ Verification successful!', 'success');
-                
-                // Store the token
-                if (result.token) {
-                    localStorage.setItem('authToken', result.token);
-                }
-                
-                // Close the modal after a short delay
-                setTimeout(() => {
-                    modal.remove();
-                    // Execute callback with token
-                    if (typeof pendingCallback === 'function') {
-                        pendingCallback(result.token);
-                    }
-                    // Check auth status
-                    checkAuthStatus();
-                    // Reset state
-                    isVerifying = false;
-                    verificationDone = false;
-                }, 800);
-                
-            } else {
-                // Verification failed
-                showNotification(result.error || 'Invalid code. Please try again.', 'error');
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Verify';
-                submitBtn.style.backgroundColor = '';
-                isVerifying = false;
-                codeInput.value = '';
-                codeInput.focus();
-            }
-        } catch (error) {
-            console.error('❌ Verification error:', error);
-            showNotification('An error occurred during verification.', 'error');
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Verify';
-            submitBtn.style.backgroundColor = '';
-            isVerifying = false;
-        }
-    });
-    
-    // Resend code handler
-    const resendBtn = modal.querySelector('#resendCodeBtn');
-    resendBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        clearAllNotifications();
-        
-        // Reset verification state for new code
-        verificationDone = false;
-        isVerifying = false;
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Verify';
-        submitBtn.style.backgroundColor = '';
-        codeInput.disabled = false;
-        codeInput.value = '';
-        codeInput.focus();
-        
-        const result = await sendVerificationCode(email, pendingAction);
-        if (result.success) {
-            showNotification('✅ New code sent! Check your email.', 'success');
-            pendingCode = result.code;
-        } else {
-            showNotification('❌ Error sending code. Please try again.', 'error');
-        }
-    });
-    
-    // Focus the input
-    setTimeout(() => {
-        codeInput.focus();
-    }, 200);
-}
-
-// ============================================================
-// AUTH STATE
+// AUTH STATE - localStorage Version
 // ============================================================
 async function checkAuthStatus() {
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-        isLoggedIn = false;
-        currentUser = null;
-        authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
-        authBtn.classList.remove('logged-in');
-        if (historyNavBtn) historyNavBtn.style.display = 'none';
-        return;
-    }
+    const user = DATA_MANAGER.getCurrentUser();
     
-    const result = await apiCall('/auth/me', 'GET');
-    if (result.success) {
-        currentUser = result.data.user;
+    if (user) {
+        currentUser = {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            createdAt: user.createdAt,
+            preferences: user.preferences
+        };
         isLoggedIn = true;
         authBtn.innerHTML = `<i class="fas fa-user-circle"></i> ${currentUser.username}`;
         authBtn.classList.add('logged-in');
         if (historyNavBtn) historyNavBtn.style.display = 'flex';
     } else {
-        localStorage.removeItem('authToken');
         isLoggedIn = false;
         currentUser = null;
         authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
@@ -510,6 +446,8 @@ function toggleProfileMenu() {
         profileMenu = null;
         return;
     }
+    
+    if (!currentUser) return;
     
     profileMenu = document.createElement('div');
     profileMenu.className = 'user-menu';
@@ -567,7 +505,7 @@ function toggleProfileMenu() {
 // LOGOUT
 // ============================================================
 function logoutUser() {
-    localStorage.removeItem('authToken');
+    DATA_MANAGER.logout();
     isLoggedIn = false;
     currentUser = null;
     authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
@@ -579,9 +517,15 @@ function logoutUser() {
 }
 
 // ============================================================
-// PROFILE MODAL
+// PROFILE MODAL - localStorage Version
 // ============================================================
 function openProfileModal() {
+    const user = DATA_MANAGER.getCurrentUser();
+    if (!user) {
+        showNotification('Please sign in to view profile.', 'warning');
+        return;
+    }
+    
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.style.display = 'flex';
@@ -590,14 +534,16 @@ function openProfileModal() {
             <span class="close-modal close-profile">&times;</span>
             <div class="profile-header">
                 <i class="fas fa-user-circle profile-icon"></i>
-                <h2>${currentUser.username}</h2>
-                <p>${currentUser.email}</p>
-                <span class="profile-badge">Account Verified</span>
+                <h2>${user.username}</h2>
+                <p>${user.email}</p>
+                <span class="profile-badge">✅ Local Account</span>
             </div>
             <div class="profile-info">
-                <div class="info-item"><strong>Username:</strong> ${currentUser.username}</div>
-                <div class="info-item"><strong>Email:</strong> ${currentUser.email}</div>
-                <div class="info-item"><strong>Account Created:</strong> ${new Date(currentUser.createdAt).toLocaleDateString()}</div>
+                <div class="info-item"><strong>Username:</strong> ${user.username}</div>
+                <div class="info-item"><strong>Email:</strong> ${user.email}</div>
+                <div class="info-item"><strong>Account Created:</strong> ${new Date(user.createdAt).toLocaleDateString()}</div>
+                <div class="info-item"><strong>Last Login:</strong> ${user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'First time'}</div>
+                <div class="info-item" style="font-size: 12px; color: #666; margin-top: 10px;">💾 Data stored locally in your browser</div>
             </div>
             <button class="auth-submit-btn" id="goToSettingsBtn">Account Settings</button>
         </div>
@@ -614,9 +560,15 @@ function openProfileModal() {
 }
 
 // ============================================================
-// ACCOUNT SETTINGS
+// ACCOUNT SETTINGS - localStorage Version
 // ============================================================
 function openAccountSettings() {
+    const user = DATA_MANAGER.getCurrentUser();
+    if (!user) {
+        showNotification('Please sign in to access settings.', 'warning');
+        return;
+    }
+    
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.id = 'settingsModal';
@@ -628,11 +580,12 @@ function openAccountSettings() {
             <div class="settings-body">
                 <div class="settings-field">
                     <label>Username</label>
-                    <input type="text" value="${currentUser.username}" disabled>
+                    <input type="text" id="settingsUsername" value="${user.username}">
                 </div>
                 <div class="settings-field">
                     <label>Email</label>
-                    <input type="email" id="settingsEmail" value="${currentUser.email}">
+                    <input type="email" id="settingsEmail" value="${user.email}" disabled>
+                    <small style="color: #666; font-size: 12px;">Email cannot be changed in local storage mode</small>
                 </div>
                 <div class="settings-field">
                     <label>Current Password</label>
@@ -648,6 +601,9 @@ function openAccountSettings() {
                 </div>
                 <button id="saveSettingsBtn" class="auth-submit-btn">Save Changes</button>
                 <button id="deleteAccountBtn" class="auth-submit-btn delete-btn">Delete Account</button>
+                <div style="margin-top: 15px; padding: 10px; background: #f0f0f0; border-radius: 5px; font-size: 12px; color: #666;">
+                    💾 All data is stored locally in your browser.
+                </div>
             </div>
         </div>
     `;
@@ -659,87 +615,62 @@ function openAccountSettings() {
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     
     modal.querySelector('#saveSettingsBtn').addEventListener('click', async () => {
-        const newEmail = document.getElementById('settingsEmail').value;
+        const newUsername = document.getElementById('settingsUsername').value;
         const currentPassword = document.getElementById('settingsCurrentPassword').value;
         const newPassword = document.getElementById('settingsNewPassword').value;
         const confirmPassword = document.getElementById('settingsConfirmPassword').value;
         
-        if (!currentPassword) {
-            showNotification('❌ Please enter your current password.', 'error');
-            return;
-        }
+        let hasChanges = false;
         
-        if (newPassword || confirmPassword) {
-            if (newPassword !== confirmPassword) {
-                showNotification('❌ New passwords do not match!', 'error');
-                return;
-            }
-            if (newPassword === currentPassword) {
-                showNotification('❌ New password must be different from your current password.', 'error');
-                return;
-            }
-            const validation = validatePassword(newPassword);
+        // Update username
+        if (newUsername && newUsername !== user.username) {
+            const validation = DATA_MANAGER.validateUsername(newUsername);
             if (!validation.valid) {
                 showNotification(validation.message, 'error');
                 return;
             }
-        }
-        
-        // Verify current password
-        const verifyResult = await apiCall('/auth/verify-password', 'POST', {
-            password: currentPassword
-        });
-        
-        if (!verifyResult.success) {
-            showNotification('❌ Incorrect current password. Please try again.', 'error');
-            return;
-        }
-        
-        if (newEmail !== currentUser.email) {
-            const result = await sendVerificationCode(newEmail, 'email');
-            if (!result.success) {
-                showNotification('❌ Error sending verification code. Please try again.', 'error');
+            
+            const result = DATA_MANAGER.updateProfile(user.id, { username: newUsername });
+            if (result.success) {
+                showNotification('✅ Username updated successfully!', 'success');
+                user.username = newUsername;
+                await checkAuthStatus();
+                hasChanges = true;
+            } else {
+                showNotification('❌ ' + result.error, 'error');
                 return;
             }
-            openVerificationModal(newEmail, 'email', async (token) => {
-                const updateResult = await apiCall('/user/update-email', 'PUT', {
-                    email: newEmail
-                });
-                if (updateResult.success) {
-                    showNotification('✅ Email updated successfully!', 'success');
-                    currentUser.email = newEmail;
-                    modal.remove();
-                    clearAllPasswordFields();
-                    setTimeout(() => openProfileModal(), 500);
-                } else {
-                    showNotification('❌ Error updating email.', 'error');
-                }
-            });
-            return;
         }
         
-        if (newPassword) {
-            const result = await sendVerificationCode(currentUser.email, 'password');
-            if (!result.success) {
-                showNotification('❌ Error sending verification code. Please try again.', 'error');
+        // Change password
+        if (newPassword || confirmPassword || currentPassword) {
+            if (!currentPassword) {
+                showNotification('❌ Please enter your current password.', 'error');
                 return;
             }
-            openVerificationModal(currentUser.email, 'password', async (token) => {
-                const updateResult = await apiCall('/user/update-password', 'PUT', {
-                    password: newPassword
-                });
-                if (updateResult.success) {
+            
+            if (newPassword !== confirmPassword) {
+                showNotification('❌ New passwords do not match!', 'error');
+                return;
+            }
+            
+            if (newPassword) {
+                const result = DATA_MANAGER.changePassword(user.id, currentPassword, newPassword);
+                if (result.success) {
                     showNotification('✅ Password updated successfully!', 'success');
-                    modal.remove();
                     clearAllPasswordFields();
+                    hasChanges = true;
                 } else {
-                    showNotification('❌ Error updating password.', 'error');
+                    showNotification('❌ ' + result.error, 'error');
+                    return;
                 }
-            });
-            return;
+            }
         }
         
-        showNotification('✅ No changes made.', 'info');
+        if (!hasChanges) {
+            showNotification('No changes made.', 'info');
+        }
+        
         modal.remove();
         clearAllPasswordFields();
     });
@@ -753,23 +684,18 @@ function openAccountSettings() {
         );
         if (!confirmed) return;
         
-        const result = await sendVerificationCode(currentUser.email, 'delete');
-        if (!result.success) {
-            showNotification('❌ Error sending verification code. Please try again.', 'error');
-            return;
+        const password = prompt('Enter your password to confirm account deletion:');
+        if (!password) return;
+        
+        const result = DATA_MANAGER.deleteAccount(user.id, password);
+        if (result.success) {
+            showNotification('✅ Account deleted successfully.', 'info');
+            modal.remove();
+            clearAllPasswordFields();
+            window.location.reload();
+        } else {
+            showNotification('❌ ' + result.error, 'error');
         }
-        openVerificationModal(currentUser.email, 'delete', async (token) => {
-            const deleteResult = await apiCall('/user/delete', 'DELETE');
-            if (deleteResult.success) {
-                localStorage.removeItem('authToken');
-                showNotification('✅ Account deleted successfully.', 'info');
-                modal.remove();
-                clearAllPasswordFields();
-                window.location.reload();
-            } else {
-                showNotification('❌ Error deleting account.', 'error');
-            }
-        });
     });
 }
 
@@ -800,21 +726,8 @@ function openModal(mode) {
         forgotPasswordLink.style.display = 'block';
         forgotPasswordBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            openModal('reset');
+            showNotification('Password reset is not available in local storage mode. Please contact support.', 'warning');
         });
-        
-    } else if (mode === 'reset') {
-        authModalTitle.textContent = 'Reset Password';
-        authSubmitBtn.textContent = 'Send Reset Code';
-        authSwitchText.innerHTML = `Remember password? <a href="#" id="authSwitchLink">Sign In</a>`;
-        
-        const email = document.createElement('input');
-        email.type = 'email';
-        email.id = 'authEmail';
-        email.placeholder = 'Email address';
-        email.required = true;
-        authFields.appendChild(email);
-        forgotPasswordLink.style.display = 'none';
         
     } else if (mode === 'signup') {
         authModalTitle.textContent = 'Create Account';
@@ -844,9 +757,7 @@ function openModal(mode) {
     if (switchLink) {
         switchLink.addEventListener('click', (e) => {
             e.preventDefault();
-            if (mode === 'reset') {
-                openModal('login');
-            } else if (mode === 'login') {
+            if (mode === 'login') {
                 openModal('signup');
             } else {
                 openModal('login');
@@ -871,7 +782,7 @@ authModal.addEventListener('click', (e) => {
 });
 
 // ============================================================
-// AUTH FORM SUBMIT - COMPLETELY REWRITTEN
+// AUTH FORM SUBMIT - localStorage Version
 // ============================================================
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -887,25 +798,17 @@ authForm.addEventListener('submit', async (e) => {
             authSubmitBtn.disabled = true;
             authSubmitBtn.textContent = 'Signing in...';
             
-            const result = await apiCall('/auth/signin', 'POST', {
-                email: email,
-                password: password
-            });
+            const result = DATA_MANAGER.login(email, password);
             
             if (!result.success) {
-                if (result.data.error === 'Account not found. Please create an account.') {
+                if (result.error === 'Account not found. Please create an account.') {
                     showNotification('❌ Account not found. Redirecting to Create Account...', 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Sign In';
                     setTimeout(() => openModal('signup'), 1500);
                     return;
-                } else if (result.data.error === 'Incorrect password. Please try again.') {
-                    showNotification('❌ Incorrect password. Please try again.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Sign In';
-                    return;
                 } else {
-                    showNotification('❌ ' + result.data.error, 'error');
+                    showNotification('❌ ' + result.error, 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Sign In';
                     return;
@@ -923,7 +826,6 @@ authForm.addEventListener('submit', async (e) => {
             
             authModal.style.display = 'none';
             
-            // Open verification modal - callback handles success
             openVerificationModal(email, 'signin', async (token) => {
                 showNotification('✅ Sign in successful!', 'success');
                 await checkAuthStatus();
@@ -932,74 +834,40 @@ authForm.addEventListener('submit', async (e) => {
                 clearAllPasswordFields();
             });
             
-        } else if (currentMode === 'reset') {
-            authSubmitBtn.disabled = true;
-            authSubmitBtn.textContent = 'Sending code...';
-            
-            // Check if email exists by trying to sign in
-            const checkResult = await apiCall('/auth/signin', 'POST', {
-                email: email,
-                password: 'dummy'
-            });
-            
-            if (checkResult.data.error === 'Incorrect password. Please try again.') {
-                const result = await sendVerificationCode(email, 'reset');
-                if (!result.success) {
-                    showNotification('❌ Error sending reset code.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Send Reset Code';
-                    return;
-                }
-                
-                authModal.style.display = 'none';
-                openVerificationModal(email, 'reset', async (token) => {
-                    await apiCall('/auth/reset-password', 'POST', {
-                        email: email
-                    });
-                    showNotification('✅ Password reset link sent to your email!', 'success');
-                    clearAllPasswordFields();
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Send Reset Code';
-                    setTimeout(() => openModal('login'), 2000);
-                });
-            } else {
-                showNotification('❌ No account found with this email. Please create an account.', 'error');
-                authSubmitBtn.disabled = false;
-                authSubmitBtn.textContent = 'Send Reset Code';
-                setTimeout(() => openModal('signup'), 2000);
-            }
-            
         } else if (currentMode === 'signup') {
             const confirmPassword = document.getElementById('authConfirmPassword')?.value || '';
+            const username = email.split('@')[0];
             
             if (password !== confirmPassword) {
                 showNotification('❌ Passwords do not match!', 'error');
                 return;
             }
             
-            const validation = validatePassword(password);
+            const validation = DATA_MANAGER.validatePasswordStrength(password);
             if (!validation.valid) {
                 showNotification(validation.message, 'error');
+                return;
+            }
+            
+            if (!DATA_MANAGER.validateEmail(email)) {
+                showNotification('❌ Invalid email format.', 'error');
                 return;
             }
             
             authSubmitBtn.disabled = true;
             authSubmitBtn.textContent = 'Creating account...';
             
-            const result = await apiCall('/auth/signup', 'POST', {
-                email: email,
-                password: password
-            });
+            const result = DATA_MANAGER.createUser(email, password, username);
             
             if (!result.success) {
-                if (result.data.error === 'Email already registered. Please sign in.') {
+                if (result.error === 'Email already registered. Please sign in.') {
                     showNotification('❌ Email already registered. Redirecting to Sign In...', 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Create Account';
                     setTimeout(() => openModal('login'), 1500);
                     return;
                 } else {
-                    showNotification('❌ ' + result.data.error, 'error');
+                    showNotification('❌ ' + result.error, 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Create Account';
                     return;
@@ -1033,7 +901,7 @@ authForm.addEventListener('submit', async (e) => {
 });
 
 // ============================================================
-// HISTORY POPUP MODAL
+// HISTORY MODAL - localStorage Version
 // ============================================================
 if (historyNavBtn) {
     historyNavBtn.addEventListener('click', () => {
@@ -1064,7 +932,7 @@ function openHistoryModal() {
             <div class="history-header">
                 <div class="history-actions">
                     <button id="deleteAllHistory" class="delete-all-btn"><i class="fas fa-trash"></i> Delete All</button>
-                    <span class="auto-delete-notice">⚠️ History auto-deletes after 30 days</span>
+                    <span class="auto-delete-notice">💾 Stored locally in your browser</span>
                 </div>
             </div>
             <div id="historyListModal" class="history-list-modal">
@@ -1098,15 +966,11 @@ function openHistoryModal() {
         );
         if (!confirmed) return;
         
-        try {
-            const result = await apiCall('/history/delete-all', 'DELETE');
-            if (result.success) {
-                await loadHistoryModal();
-                showNotification('All history deleted. 🗑️', 'info');
-            } else {
-                showNotification('Error deleting history.', 'error');
-            }
-        } catch (error) {
+        const result = DATA_MANAGER.clearHistory(currentUser.email);
+        if (result.success) {
+            await loadHistoryModal();
+            showNotification('All history deleted. 🗑️', 'info');
+        } else {
             showNotification('Error deleting history.', 'error');
         }
     });
@@ -1122,22 +986,22 @@ async function loadHistoryModal() {
     }
     
     try {
-        const result = await apiCall('/history', 'GET');
-        if (!result.success || !result.data.history) {
+        const history = DATA_MANAGER.getHistory(currentUser.email);
+        
+        if (!history || history.length === 0) {
             historyList.innerHTML = `
                 <p class="empty-history">No translations yet. Start translating!</p>
-                <p class="auto-delete-note">⚠️ History auto-deletes after 30 days</p>
+                <p class="auto-delete-note">💾 History is stored locally in your browser</p>
             `;
             return;
         }
         
         let html = '';
-        result.data.history.forEach(item => {
+        history.forEach(item => {
             const time = new Date(item.createdAt).toLocaleString();
-            const docId = item._id;
             html += `
-                <div class="history-item" data-id="${docId}">
-                    <button class="h-delete" data-id="${docId}" title="Delete this translation">
+                <div class="history-item" data-id="${item.id}">
+                    <button class="h-delete" data-id="${item.id}" title="Delete this translation">
                         <i class="fas fa-times"></i>
                     </button>
                     <div class="h-source">
@@ -1149,12 +1013,12 @@ async function loadHistoryModal() {
                 </div>
             `;
         });
-        html += `<p class="auto-delete-note">⚠️ History auto-deletes after 30 days</p>`;
+        html += `<p class="auto-delete-note">💾 History is stored locally in your browser</p>`;
         historyList.innerHTML = html;
         
         document.querySelectorAll('.h-delete').forEach(btn => {
             btn.addEventListener('click', async () => {
-                const docId = btn.dataset.id;
+                const id = btn.dataset.id;
                 const confirmed = await showConfirmationModal(
                     'Delete History Item',
                     'Are you sure you want to delete this translation history item?',
@@ -1163,15 +1027,11 @@ async function loadHistoryModal() {
                 );
                 if (!confirmed) return;
                 
-                try {
-                    const result = await apiCall(`/history/${docId}`, 'DELETE');
-                    if (result.success) {
-                        await loadHistoryModal();
-                        showNotification('History item deleted. 🗑️', 'info');
-                    } else {
-                        showNotification('Error deleting history item.', 'error');
-                    }
-                } catch (error) {
+                const result = DATA_MANAGER.deleteHistoryItem(currentUser.email, id);
+                if (result.success) {
+                    await loadHistoryModal();
+                    showNotification('History item deleted. 🗑️', 'info');
+                } else {
                     showNotification('Error deleting history item.', 'error');
                 }
             });
@@ -1197,20 +1057,19 @@ function getLanguageName(code) {
 }
 
 // ============================================================
-// SAVE TO HISTORY
+// SAVE TO HISTORY - localStorage Version
 // ============================================================
 async function saveToHistory(original, translated, sourceLang, targetLang) {
     if (!isLoggedIn || !currentUser) return;
-    try {
-        await apiCall('/history', 'POST', {
-            original: original,
-            translated: translated,
-            sourceLang: sourceLang,
-            targetLang: targetLang
-        });
-    } catch (error) {
-        console.error('Save history error:', error);
-    }
+    
+    const entry = {
+        original: original,
+        translated: translated,
+        sourceLang: sourceLang,
+        targetLang: targetLang
+    };
+    
+    DATA_MANAGER.saveHistory(currentUser.email, entry);
 }
 
 // ============================================================
@@ -1413,7 +1272,8 @@ aboutModal.addEventListener('click', (e) => {
 // INIT
 // ============================================================
 console.log('✅ FreeTranslate initialized!');
-console.log('📁 Backend API:', API_BASE_URL);
+console.log('💾 Running in localStorage mode');
+console.log('📊 Data stored in browser local storage');
 
 // Check authentication status on load
 checkAuthStatus();
