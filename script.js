@@ -15,6 +15,7 @@ let isVerifying = false;
 let verificationDone = false;
 let pendingResetEmail = '';
 let pendingResetUser = null;
+let isRecording = false;
 
 // ============================================================
 // DOM ELEMENTS
@@ -1467,10 +1468,6 @@ function resetSourceLanguage() {
     }
 }
 
-// Flag to track if we're currently recording
-let isRecording = false;
-
-// Function to stop recording if active
 function stopRecordingIfActive() {
     if (isRecording) {
         try {
@@ -1484,24 +1481,37 @@ function stopRecordingIfActive() {
             micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
             recordingStatus.textContent = 'Click mic to speak';
         }
-        showNotification('⏹ Recording stopped (language changed).', 'info', 2000);
+        showNotification('⏹ Recording stopped.', 'info', 2000);
     }
 }
 
 async function translateWithGoogle(text, sourceLangCode, targetLangCode) {
     let actualSource = sourceLangCode;
-    let detectedLang = null;
     
+    // If source is auto, detect language
     if (sourceLangCode === 'auto' && text.length > 2) {
-        detectedLang = await detectLanguage(text);
+        const detectedLang = await detectLanguage(text);
         actualSource = detectedLang;
-        updateSourceLanguage(detectedLang);
+        // Only update UI if detected language is valid
+        if (detectedLang && detectedLang !== 'en') {
+            updateSourceLanguage(detectedLang);
+        } else if (detectedLang === 'en') {
+            // For English, still show it
+            updateSourceLanguage('en');
+        }
+    }
+    
+    // If actual source is still 'auto', default to 'en'
+    if (actualSource === 'auto') {
+        actualSource = 'en';
     }
     
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${actualSource}&tl=${targetLangCode}&dt=t&q=${encodeURIComponent(text)}`;
     const response = await fetch(url);
     const data = await response.json();
-    if (data && data[0]) return data[0].map(item => item[0]).join('');
+    if (data && data[0]) {
+        return data[0].map(item => item[0]).join('');
+    }
     throw new Error('Translation failed');
 }
 
@@ -1517,6 +1527,7 @@ async function performTranslation() {
         }
         return;
     }
+    
     translateBtn.disabled = true;
     translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
     outputDisplay.innerHTML = '<span class="placeholder">Translating...</span>';
@@ -1527,6 +1538,7 @@ async function performTranslation() {
             await saveToHistory(text, translated, sourceLang.value, targetLang.value);
         }
     } catch (error) {
+        console.error('Translation error:', error);
         outputDisplay.innerHTML = `<span class="placeholder">Error: ${error.message}</span>`;
     } finally {
         translateBtn.disabled = false;
@@ -1536,13 +1548,16 @@ async function performTranslation() {
 
 translateBtn.addEventListener('click', performTranslation);
 
+// Auto-translate on input with debounce
+let translateTimeout = null;
+
 inputText.addEventListener('input', () => {
     const text = inputText.value.trim();
     if (text) {
-        clearTimeout(inputText._typingTimer);
-        inputText._typingTimer = setTimeout(() => {
+        clearTimeout(translateTimeout);
+        translateTimeout = setTimeout(() => {
             performTranslation();
-        }, 500);
+        }, 400);
     } else {
         outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
         if (sourceLang.value !== 'auto') {
@@ -1560,8 +1575,8 @@ inputText.addEventListener('keydown', (e) => {
     }
 });
 
+// Language change handlers
 sourceLang.addEventListener('change', () => {
-    // Stop recording when user manually changes language
     stopRecordingIfActive();
     
     if (sourceLang.value !== 'auto') {
@@ -1581,9 +1596,7 @@ sourceLang.addEventListener('change', () => {
 });
 
 targetLang.addEventListener('change', () => {
-    // Stop recording when user manually changes language
     stopRecordingIfActive();
-    
     const text = inputText.value.trim();
     if (text) {
         performTranslation();
@@ -1591,7 +1604,6 @@ targetLang.addEventListener('change', () => {
 });
 
 document.getElementById('swapLang').addEventListener('click', () => {
-    // Stop recording when swapping languages
     stopRecordingIfActive();
     
     const temp = sourceLang.value;
@@ -1604,7 +1616,7 @@ document.getElementById('swapLang').addEventListener('click', () => {
 
 document.getElementById('copyOutput').addEventListener('click', async () => {
     const text = outputDisplay.textContent;
-    if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating')) {
+    if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
         await navigator.clipboard.writeText(text);
         showNotification('Copied!', 'success');
     }
@@ -1612,7 +1624,7 @@ document.getElementById('copyOutput').addEventListener('click', async () => {
 
 document.getElementById('speakOutput').addEventListener('click', () => {
     const text = outputDisplay.textContent;
-    if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating')) {
+    if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = targetLang.value;
         window.speechSynthesis.speak(utterance);
@@ -1620,7 +1632,6 @@ document.getElementById('speakOutput').addEventListener('click', () => {
 });
 
 document.getElementById('clearInput').addEventListener('click', () => {
-    // Stop recording when clearing input
     stopRecordingIfActive();
     
     inputText.value = '';
@@ -1629,7 +1640,7 @@ document.getElementById('clearInput').addEventListener('click', () => {
 });
 
 // ============================================================
-// MIC - SIMPLE CLICK TO TOGGLE RECORDING WITH AUTO-TRANSLATE
+// MIC - SIMPLE CLICK TO TOGGLE RECORDING
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
@@ -1665,15 +1676,16 @@ if (SpeechRecognition) {
             }
         }
         
+        // Show interim results in real-time
         if (interimText) {
             inputText.value = finalText + interimText;
         }
         
+        // When we have final text, auto-translate
         if (finalText) {
             inputText.value = finalText;
-            // Auto-translate after speech
-            clearTimeout(inputText._typingTimer);
-            inputText._typingTimer = setTimeout(() => {
+            clearTimeout(translateTimeout);
+            translateTimeout = setTimeout(() => {
                 performTranslation();
             }, 200);
         }
@@ -1683,6 +1695,7 @@ if (SpeechRecognition) {
         console.warn('Speech recognition error:', event.error);
         
         if (event.error === 'no-speech') {
+            // Keep recording if still recording
             if (isRecording) {
                 return;
             }
