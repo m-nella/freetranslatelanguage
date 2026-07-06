@@ -1,68 +1,39 @@
 // ============================================================
-// CALL VERCEL FUNCTION TO SEND EMAIL (SECURE)
+// BACKEND API CONFIGURATION
 // ============================================================
 
-const VERCEL_FUNCTION_URL = 'https://freetranslatelanguage.vercel.app/api/send-email';
+const API_BASE_URL = 'https://freetranslatelanguage-backend.onrender.com/api';
 
-async function sendVerificationEmail(email, code, action = 'verification') {
-    console.log('📤 Sending verification email to:', email);
-    console.log('📤 Function URL:', VERCEL_FUNCTION_URL);
-    console.log('📤 Code:', code);
-    console.log('📤 Action:', action);
+// ============================================================
+// API HELPER FUNCTIONS
+// ============================================================
+
+async function apiCall(endpoint, method = 'GET', body = null) {
+    const options = {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    };
+    
+    if (body) {
+        options.body = JSON.stringify(body);
+    }
+    
+    const token = localStorage.getItem('authToken');
+    if (token) {
+        options.headers['Authorization'] = `Bearer ${token}`;
+    }
     
     try {
-        const response = await fetch(VERCEL_FUNCTION_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                email: email,
-                code: code,
-                action: action
-            })
-        });
-
-        const result = await response.json();
-        console.log('📥 Response status:', response.status);
-        console.log('📥 Response data:', result);
-
-        if (response.ok && result.success) {
-            console.log('✅ Email sent successfully to:', email);
-            return { success: true };
-        } else {
-            console.error('❌ Error sending email:', result);
-            return { success: false, error: result.error || 'Failed to send email' };
-        }
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+        const data = await response.json();
+        return { success: response.ok, data };
     } catch (error) {
-        console.error('❌ Fetch error:', error);
-        return { success: false, error: error.message };
+        console.error('API Error:', error);
+        return { success: false, data: { error: error.message } };
     }
 }
-
-// ============================================================
-// FIREBASE INITIALIZATION
-// ============================================================
-
-if (typeof window.FIREBASE_CONFIG === 'undefined') {
-    console.error('❌ config.js not loaded!');
-    alert('⚠️ Configuration error. Please contact support.');
-    window.FIREBASE_CONFIG = {
-        apiKey: "AIzaSyCtTMIuO9HeHC8GFJT0igAnUsMDD6ZSEV8",
-        authDomain: "freetranslatelanguage.firebaseapp.com",
-        projectId: "freetranslatelanguage",
-        storageBucket: "freetranslatelanguage.firebasestorage.app",
-        messagingSenderId: "240202183999",
-        appId: "1:240202183999:web:dcc227607059c7773dcf8a"
-    };
-}
-
-const config = window.FIREBASE_CONFIG;
-firebase.initializeApp(config);
-const auth = firebase.auth();
-const db = firebase.firestore();
-
-console.log('✅ Firebase initialized!');
 
 // ============================================================
 // STATE
@@ -71,7 +42,6 @@ let currentMode = 'login';
 let currentUser = null;
 let isLoggedIn = false;
 let pendingEmail = '';
-let pendingPassword = '';
 let pendingAction = '';
 let generatedCode = '';
 let codeExpiry = null;
@@ -219,57 +189,32 @@ async function sendVerificationCode(email, action = 'verification') {
     console.log('📧 Code:', code);
     console.log('📧 Action:', action);
     
-    try {
-        await db.collection('verificationCodes').doc(email).set({
-            code: code,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            expiresAt: new Date(Date.now() + 15 * 60 * 1000)
-        });
-        console.log('✅ Code stored in Firestore');
-    } catch (error) {
-        console.error('❌ Firestore save error:', error);
-    }
+    const result = await apiCall('/auth/send-code', 'POST', {
+        email: email,
+        code: code,
+        action: action
+    });
     
-    const emailResult = await sendVerificationEmail(email, code, action);
-    console.log('📧 Email result:', emailResult);
-    
-    if (emailResult.success) {
+    if (result.success) {
         showNotification('📧 Verification code sent to your email. Also check SPAM/JUNK folder.', 'success');
     } else {
-        console.error('❌ Error sending code:', emailResult.error);
-        showNotification('⚠️ Failed to send verification code. Please try again.', 'error');
+        showNotification('❌ Error sending verification code. Please try again.', 'error');
     }
     
     return { success: true, code: code };
 }
 
 async function verifyCode(email, code) {
-    try {
-        const doc = await db.collection('verificationCodes').doc(email).get();
-        if (doc.exists) {
-            const data = doc.data();
-            const now = Date.now();
-            const expiresAt = data.expiresAt?.toDate ? data.expiresAt.toDate().getTime() : new Date(data.expiresAt).getTime();
-            if (now > expiresAt) {
-                await db.collection('verificationCodes').doc(email).delete();
-                return { success: false, error: 'Code has expired. Please request a new one.' };
-            }
-            if (data.code !== code) {
-                return { success: false, error: 'Invalid code. Please try again.' };
-            }
-            await db.collection('verificationCodes').doc(email).delete();
-            return { success: true };
-        }
-        if (generatedCode === code && codeExpiry && Date.now() < codeExpiry) {
-            return { success: true };
-        }
-        return { success: false, error: 'No verification code found. Please request a new one.' };
-    } catch (error) {
-        console.error('Verify code error:', error);
-        if (generatedCode === code && codeExpiry && Date.now() < codeExpiry) {
-            return { success: true };
-        }
-        return { success: false, error: error.message };
+    const result = await apiCall('/auth/verify', 'POST', {
+        email: email,
+        code: code,
+        action: pendingAction
+    });
+    
+    if (result.success) {
+        return { success: true };
+    } else {
+        return { success: false, error: result.data.error || 'Invalid code. Please try again.' };
     }
 }
 
@@ -388,27 +333,34 @@ function openVerificationModal(email, action, callback) {
 // ============================================================
 // AUTH STATE
 // ============================================================
-auth.onAuthStateChanged((user) => {
-    if (user) {
-        currentUser = user;
+async function checkAuthStatus() {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+        isLoggedIn = false;
+        currentUser = null;
+        authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
+        authBtn.classList.remove('logged-in');
+        if (historyNavBtn) historyNavBtn.style.display = 'none';
+        return;
+    }
+    
+    const result = await apiCall('/auth/me', 'GET');
+    if (result.success) {
+        currentUser = result.data.user;
         isLoggedIn = true;
-        if (!user.emailVerified) {
-            showNotification('📧 Please verify your email using the code sent to your inbox.', 'warning');
-            return;
-        }
-        const username = user.email.split('@')[0];
-        authBtn.innerHTML = `<i class="fas fa-user-circle"></i> ${username}`;
+        authBtn.innerHTML = `<i class="fas fa-user-circle"></i> ${currentUser.username}`;
         authBtn.classList.add('logged-in');
         if (historyNavBtn) historyNavBtn.style.display = 'flex';
-        showNotification(`Welcome ${username}! 🎉`, 'success');
+        showNotification(`Welcome ${currentUser.username}! 🎉`, 'success');
     } else {
-        currentUser = null;
+        localStorage.removeItem('authToken');
         isLoggedIn = false;
+        currentUser = null;
         authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
         authBtn.classList.remove('logged-in');
         if (historyNavBtn) historyNavBtn.style.display = 'none';
     }
-});
+}
 
 // ============================================================
 // AUTH BUTTON
@@ -437,7 +389,7 @@ function toggleProfileMenu() {
         <div class="user-menu-header">
             <i class="fas fa-user-circle"></i>
             <div>
-                <strong>${currentUser.email.split('@')[0]}</strong>
+                <strong>${currentUser.username}</strong>
                 <small>${currentUser.email}</small>
             </div>
         </div>
@@ -487,12 +439,15 @@ function toggleProfileMenu() {
 // LOGOUT
 // ============================================================
 function logoutUser() {
-    auth.signOut().then(() => {
-        showNotification('Logged out successfully! 👋', 'info');
-        clearAllPasswordFields();
-    }).catch(err => {
-        showNotification('Error logging out.', 'error');
-    });
+    localStorage.removeItem('authToken');
+    isLoggedIn = false;
+    currentUser = null;
+    authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
+    authBtn.classList.remove('logged-in');
+    if (historyNavBtn) historyNavBtn.style.display = 'none';
+    showNotification('Logged out successfully! 👋', 'info');
+    clearAllPasswordFields();
+    if (profileMenu) profileMenu.remove();
 }
 
 // ============================================================
@@ -507,14 +462,14 @@ function openProfileModal() {
             <span class="close-modal close-profile">&times;</span>
             <div class="profile-header">
                 <i class="fas fa-user-circle profile-icon"></i>
-                <h2>${currentUser.email.split('@')[0]}</h2>
+                <h2>${currentUser.username}</h2>
                 <p>${currentUser.email}</p>
                 <span class="profile-badge">Account Verified</span>
             </div>
             <div class="profile-info">
-                <div class="info-item"><strong>Username:</strong> ${currentUser.email.split('@')[0]}</div>
+                <div class="info-item"><strong>Username:</strong> ${currentUser.username}</div>
                 <div class="info-item"><strong>Email:</strong> ${currentUser.email}</div>
-                <div class="info-item"><strong>Account Created:</strong> ${new Date(currentUser.metadata.creationTime).toLocaleDateString()}</div>
+                <div class="info-item"><strong>Account Created:</strong> ${new Date(currentUser.createdAt).toLocaleDateString()}</div>
             </div>
             <button class="auth-submit-btn" id="goToSettingsBtn">Account Settings</button>
         </div>
@@ -545,7 +500,7 @@ function openAccountSettings() {
             <div class="settings-body">
                 <div class="settings-field">
                     <label>Username</label>
-                    <input type="text" value="${currentUser.email.split('@')[0]}" disabled>
+                    <input type="text" value="${currentUser.username}" disabled>
                 </div>
                 <div class="settings-field">
                     <label>Email</label>
@@ -602,52 +557,63 @@ function openAccountSettings() {
             }
         }
         
-        const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, currentPassword);
-        try {
-            await currentUser.reauthenticateWithCredential(credential);
-            
-            if (newEmail !== currentUser.email) {
-                const result = await sendVerificationCode(newEmail, 'email');
-                if (!result.success) {
-                    showNotification('❌ Error sending verification code. Please try again.', 'error');
-                    return;
-                }
-                openVerificationModal(newEmail, 'email', async () => {
-                    await currentUser.updateEmail(newEmail);
+        // Verify current password first
+        const verifyResult = await apiCall('/auth/verify-password', 'POST', {
+            password: currentPassword
+        });
+        
+        if (!verifyResult.success) {
+            showNotification('❌ Incorrect current password. Please try again.', 'error');
+            return;
+        }
+        
+        if (newEmail !== currentUser.email) {
+            const result = await sendVerificationCode(newEmail, 'email');
+            if (!result.success) {
+                showNotification('❌ Error sending verification code. Please try again.', 'error');
+                return;
+            }
+            openVerificationModal(newEmail, 'email', async () => {
+                const updateResult = await apiCall('/user/update-email', 'PUT', {
+                    email: newEmail
+                });
+                if (updateResult.success) {
                     showNotification('✅ Email updated successfully!', 'success');
+                    currentUser.email = newEmail;
                     modal.remove();
                     clearAllPasswordFields();
                     setTimeout(() => openProfileModal(), 500);
-                });
+                } else {
+                    showNotification('❌ Error updating email.', 'error');
+                }
+            });
+            return;
+        }
+        
+        if (newPassword) {
+            const result = await sendVerificationCode(currentUser.email, 'password');
+            if (!result.success) {
+                showNotification('❌ Error sending verification code. Please try again.', 'error');
                 return;
             }
-            
-            if (newPassword) {
-                const result = await sendVerificationCode(currentUser.email, 'password');
-                if (!result.success) {
-                    showNotification('❌ Error sending verification code. Please try again.', 'error');
-                    return;
-                }
-                openVerificationModal(currentUser.email, 'password', async () => {
-                    await currentUser.updatePassword(newPassword);
+            openVerificationModal(currentUser.email, 'password', async () => {
+                const updateResult = await apiCall('/user/update-password', 'PUT', {
+                    password: newPassword
+                });
+                if (updateResult.success) {
                     showNotification('✅ Password updated successfully!', 'success');
                     modal.remove();
                     clearAllPasswordFields();
-                });
-                return;
-            }
-            
-            showNotification('✅ No changes made.', 'info');
-            modal.remove();
-            clearAllPasswordFields();
-        } catch (error) {
-            console.error('Settings error:', error);
-            if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-                showNotification('❌ Incorrect current password. Please try again.', 'error');
-            } else {
-                showNotification(`❌ ${error.message}`, 'error');
-            }
+                } else {
+                    showNotification('❌ Error updating password.', 'error');
+                }
+            });
+            return;
         }
+        
+        showNotification('✅ No changes made.', 'info');
+        modal.remove();
+        clearAllPasswordFields();
     });
     
     modal.querySelector('#deleteAccountBtn').addEventListener('click', async () => {
@@ -665,10 +631,16 @@ function openAccountSettings() {
             return;
         }
         openVerificationModal(currentUser.email, 'delete', async () => {
-            await currentUser.delete();
-            showNotification('✅ Account deleted successfully.', 'info');
-            modal.remove();
-            clearAllPasswordFields();
+            const deleteResult = await apiCall('/user/delete', 'DELETE');
+            if (deleteResult.success) {
+                localStorage.removeItem('authToken');
+                showNotification('✅ Account deleted successfully.', 'info');
+                modal.remove();
+                clearAllPasswordFields();
+                window.location.reload();
+            } else {
+                showNotification('❌ Error deleting account.', 'error');
+            }
         });
     });
 }
@@ -771,7 +743,7 @@ authModal.addEventListener('click', (e) => {
 });
 
 // ============================================================
-// AUTH FORM SUBMIT - SIMPLIFIED AND FIXED
+// AUTH FORM SUBMIT
 // ============================================================
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -783,173 +755,163 @@ authForm.addEventListener('submit', async (e) => {
     
     try {
         if (currentMode === 'login') {
-            // SIGN IN
             authSubmitBtn.disabled = true;
             authSubmitBtn.textContent = 'Signing in...';
             
-            try {
-                const userCredential = await auth.signInWithEmailAndPassword(email, password);
-                
-                // Check if email is verified
-                if (!userCredential.user.emailVerified) {
-                    // Send verification code
-                    const result = await sendVerificationCode(email, 'signin');
-                    if (!result.success) {
-                        showNotification('❌ Error sending verification code. Please try again.', 'error');
-                        authSubmitBtn.disabled = false;
-                        authSubmitBtn.textContent = 'Sign In';
-                        return;
-                    }
-                    authModal.style.display = 'none';
-                    openVerificationModal(email, 'signin', async () => {
-                        await userCredential.user.sendEmailVerification();
-                        showNotification('✅ Sign in successful!', 'success');
-                        authSubmitBtn.disabled = false;
-                        authSubmitBtn.textContent = 'Sign In';
-                        clearAllPasswordFields();
-                    });
-                    return;
-                }
-                
-                authModal.style.display = 'none';
-                showNotification('Welcome back! 🎉', 'success');
-                authSubmitBtn.disabled = false;
-                authSubmitBtn.textContent = 'Sign In';
-                clearAllPasswordFields();
-                
-            } catch (error) {
-                console.error('Sign in error:', error);
-                if (error.code === 'auth/user-not-found') {
+            const result = await apiCall('/auth/signin', 'POST', {
+                email: email,
+                password: password
+            });
+            
+            if (!result.success) {
+                if (result.data.error === 'Account not found. Please create an account.') {
                     showNotification('❌ Account not found. Redirecting to Create Account...', 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Sign In';
                     setTimeout(() => openModal('signup'), 1500);
-                } else if (error.code === 'auth/wrong-password') {
-                    showNotification('❌ Incorrect password. Please try again.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Sign In';
-                } else if (error.code === 'auth/invalid-email') {
-                    showNotification('❌ Invalid email address. Please check and try again.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Sign In';
-                } else if (error.code === 'auth/too-many-requests') {
-                    showNotification('❌ Too many failed attempts. Please try again later.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Sign In';
+                    return;
                 } else {
-                    showNotification(`❌ ${error.message}`, 'error');
+                    showNotification('❌ ' + result.data.error, 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Sign In';
+                    return;
                 }
             }
             
+            // Send verification code
+            const codeResult = await sendVerificationCode(email, 'signin');
+            if (!codeResult.success) {
+                showNotification('❌ Error sending verification code. Please try again.', 'error');
+                authSubmitBtn.disabled = false;
+                authSubmitBtn.textContent = 'Sign In';
+                return;
+            }
+            
+            authModal.style.display = 'none';
+            openVerificationModal(email, 'signin', async () => {
+                // Verify the code
+                const verifyResult = await apiCall('/auth/verify', 'POST', {
+                    email: email,
+                    code: generatedCode,
+                    action: 'signin'
+                });
+                
+                if (verifyResult.success) {
+                    localStorage.setItem('authToken', verifyResult.data.token);
+                    showNotification('✅ Sign in successful!', 'success');
+                    await checkAuthStatus();
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Sign In';
+                    clearAllPasswordFields();
+                } else {
+                    showNotification('❌ Invalid verification code.', 'error');
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Sign In';
+                }
+            });
+            
         } else if (currentMode === 'reset') {
-            // RESET PASSWORD
             authSubmitBtn.disabled = true;
             authSubmitBtn.textContent = 'Sending code...';
             
-            try {
-                const methods = await auth.fetchSignInMethodsForEmail(email);
-                if (methods.length === 0) {
-                    showNotification('❌ No account found with this email. Please create an account.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Send Reset Code';
-                    return;
-                }
-                
-                const result = await sendVerificationCode(email, 'reset');
-                if (!result.success) {
-                    showNotification('❌ Error sending verification code. Please try again.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Send Reset Code';
-                    return;
-                }
-                
-                authModal.style.display = 'none';
-                openVerificationModal(email, 'reset', async () => {
-                    await auth.sendPasswordResetEmail(email);
-                    showNotification('✅ Password reset link sent to your email!', 'success');
-                    clearAllPasswordFields();
+            const result = await apiCall('/auth/send-code', 'POST', {
+                email: email,
+                action: 'reset'
+            });
+            
+            if (!result.success) {
+                showNotification('❌ ' + result.data.error, 'error');
+                authSubmitBtn.disabled = false;
+                authSubmitBtn.textContent = 'Send Reset Code';
+                return;
+            }
+            
+            authModal.style.display = 'none';
+            openVerificationModal(email, 'reset', async () => {
+                const verifyResult = await apiCall('/auth/verify', 'POST', {
+                    email: email,
+                    code: generatedCode,
+                    action: 'reset'
                 });
                 
-            } catch (error) {
-                console.error('Reset error:', error);
-                if (error.code === 'auth/user-not-found') {
-                    showNotification('❌ No account found with this email.', 'error');
+                if (verifyResult.success) {
+                    showNotification('✅ Password reset verified! Please check your email.', 'success');
+                    clearAllPasswordFields();
                 } else {
-                    showNotification(`❌ ${error.message}`, 'error');
+                    showNotification('❌ Invalid verification code.', 'error');
                 }
-            }
+            });
+            
             authSubmitBtn.disabled = false;
             authSubmitBtn.textContent = 'Send Reset Code';
             
         } else if (currentMode === 'signup') {
-            // SIGN UP
             const confirmPassword = document.getElementById('authConfirmPassword')?.value || '';
             
             if (password !== confirmPassword) {
                 showNotification('❌ Passwords do not match!', 'error');
-                authSubmitBtn.disabled = false;
-                authSubmitBtn.textContent = 'Create Account';
                 return;
             }
             
             const validation = validatePassword(password);
             if (!validation.valid) {
                 showNotification(validation.message, 'error');
-                authSubmitBtn.disabled = false;
-                authSubmitBtn.textContent = 'Create Account';
                 return;
             }
             
             authSubmitBtn.disabled = true;
             authSubmitBtn.textContent = 'Creating account...';
             
-            try {
-                // Create account
-                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-                console.log('✅ Account created:', email);
-                
-                // Send verification code
-                const result = await sendVerificationCode(email, 'signup');
-                if (!result.success) {
-                    showNotification('❌ Error sending verification code. Please try again.', 'error');
-                    await userCredential.user.delete();
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Create Account';
-                    return;
-                }
-                
-                authModal.style.display = 'none';
-                openVerificationModal(email, 'signup', async () => {
-                    await userCredential.user.sendEmailVerification();
-                    showNotification('✅ Account created successfully! Please sign in.', 'success');
-                    await auth.signOut();
-                    clearAllPasswordFields();
-                    setTimeout(() => openModal('login'), 2000);
-                });
-                
-            } catch (error) {
-                console.error('Sign up error:', error);
-                if (error.code === 'auth/email-already-in-use') {
+            const result = await apiCall('/auth/signup', 'POST', {
+                email: email,
+                password: password
+            });
+            
+            if (!result.success) {
+                if (result.data.error === 'Email already registered. Please sign in.') {
                     showNotification('❌ Email already registered. Redirecting to Sign In...', 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Create Account';
                     setTimeout(() => openModal('login'), 1500);
-                } else if (error.code === 'auth/invalid-email') {
-                    showNotification('❌ Invalid email address. Please check and try again.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Create Account';
-                } else if (error.code === 'auth/weak-password') {
-                    showNotification('❌ Password is too weak. Please use a stronger password.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Create Account';
+                    return;
                 } else {
-                    showNotification(`❌ ${error.message}`, 'error');
+                    showNotification('❌ ' + result.data.error, 'error');
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Create Account';
+                    return;
+                }
+            }
+            
+            // Send verification code
+            const codeResult = await sendVerificationCode(email, 'signup');
+            if (!codeResult.success) {
+                showNotification('❌ Error sending verification code. Please try again.', 'error');
+                authSubmitBtn.disabled = false;
+                authSubmitBtn.textContent = 'Create Account';
+                return;
+            }
+            
+            authModal.style.display = 'none';
+            openVerificationModal(email, 'signup', async () => {
+                const verifyResult = await apiCall('/auth/verify', 'POST', {
+                    email: email,
+                    code: generatedCode,
+                    action: 'signup'
+                });
+                
+                if (verifyResult.success) {
+                    localStorage.setItem('authToken', verifyResult.data.token);
+                    showNotification('✅ Account created successfully!', 'success');
+                    await checkAuthStatus();
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Create Account';
+                    clearAllPasswordFields();
+                } else {
+                    showNotification('❌ Invalid verification code.', 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Create Account';
                 }
-            }
+            });
         }
     } catch (error) {
         console.error('Form error:', error);
@@ -1026,12 +988,13 @@ function openHistoryModal() {
         if (!confirmed) return;
         
         try {
-            const snapshot = await db.collection('users').doc(currentUser.uid).collection('history').get();
-            const batch = db.batch();
-            snapshot.docs.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-            await loadHistoryModal();
-            showNotification('All history deleted. 🗑️', 'info');
+            const result = await apiCall('/history/delete-all', 'DELETE');
+            if (result.success) {
+                await loadHistoryModal();
+                showNotification('All history deleted. 🗑️', 'info');
+            } else {
+                showNotification('Error deleting history.', 'error');
+            }
         } catch (error) {
             showNotification('Error deleting history.', 'error');
         }
@@ -1048,11 +1011,8 @@ async function loadHistoryModal() {
     }
     
     try {
-        const snapshot = await db
-            .collection('users').doc(currentUser.uid).collection('history')
-            .orderBy('timestamp', 'desc').limit(50).get();
-        
-        if (snapshot.empty) {
+        const result = await apiCall('/history', 'GET');
+        if (!result.success || !result.data.history) {
             historyList.innerHTML = `
                 <p class="empty-history">No translations yet. Start translating!</p>
                 <p class="auto-delete-note">⚠️ History auto-deletes after 30 days</p>
@@ -1061,21 +1021,20 @@ async function loadHistoryModal() {
         }
         
         let html = '';
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const time = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'Just now';
-            const docId = doc.id;
+        result.data.history.forEach(item => {
+            const time = new Date(item.createdAt).toLocaleString();
+            const docId = item._id;
             html += `
                 <div class="history-item" data-id="${docId}">
                     <button class="h-delete" data-id="${docId}" title="Delete this translation">
                         <i class="fas fa-times"></i>
                     </button>
                     <div class="h-source">
-                        ${getLanguageName(data.sourceLang)} → ${getLanguageName(data.targetLang)}
+                        ${getLanguageName(item.sourceLang)} → ${getLanguageName(item.targetLang)}
                         <span class="h-time">${time}</span>
                     </div>
-                    <div class="h-original">"${data.original.substring(0, 60)}${data.original.length > 60 ? '...' : ''}"</div>
-                    <div class="h-translation">"${data.translated.substring(0, 60)}${data.translated.length > 60 ? '...' : ''}"</div>
+                    <div class="h-original">"${item.original.substring(0, 60)}${item.original.length > 60 ? '...' : ''}"</div>
+                    <div class="h-translation">"${item.translated.substring(0, 60)}${item.translated.length > 60 ? '...' : ''}"</div>
                 </div>
             `;
         });
@@ -1094,9 +1053,13 @@ async function loadHistoryModal() {
                 if (!confirmed) return;
                 
                 try {
-                    await db.collection('users').doc(currentUser.uid).collection('history').doc(docId).delete();
-                    await loadHistoryModal();
-                    showNotification('History item deleted. 🗑️', 'info');
+                    const result = await apiCall(`/history/${docId}`, 'DELETE');
+                    if (result.success) {
+                        await loadHistoryModal();
+                        showNotification('History item deleted. 🗑️', 'info');
+                    } else {
+                        showNotification('Error deleting history item.', 'error');
+                    }
                 } catch (error) {
                     showNotification('Error deleting history item.', 'error');
                 }
@@ -1128,9 +1091,11 @@ function getLanguageName(code) {
 async function saveToHistory(original, translated, sourceLang, targetLang) {
     if (!isLoggedIn || !currentUser) return;
     try {
-        await db.collection('users').doc(currentUser.uid).collection('history').add({
-            original, translated, sourceLang, targetLang,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        await apiCall('/history', 'POST', {
+            original: original,
+            translated: translated,
+            sourceLang: sourceLang,
+            targetLang: targetLang
         });
     } catch (error) {
         console.error('Save history error:', error);
@@ -1337,4 +1302,7 @@ aboutModal.addEventListener('click', (e) => {
 // INIT
 // ============================================================
 console.log('✅ FreeTranslate initialized!');
-console.log('📁 Project:', config.projectId);
+console.log('📁 Backend API:', API_BASE_URL);
+
+// Check authentication status on load
+checkAuthStatus();
