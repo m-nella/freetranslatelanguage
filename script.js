@@ -366,7 +366,7 @@ function showConfirmationModal(title, message, confirmText = 'Confirm', cancelTe
 }
 
 // ============================================================
-// VERIFICATION MODAL
+// VERIFICATION MODAL - UPDATED with SPAM/JUNK message
 // ============================================================
 function openVerificationModal(email, action, callback) {
     pendingEmail = email;
@@ -386,7 +386,7 @@ function openVerificationModal(email, action, callback) {
         <div class="modal-content verification-content">
             <span class="close-modal close-verification">&times;</span>
             <h2>${action === 'signup' ? 'Verify Your Email' : action === 'signin' ? 'Verify Sign In' : action === 'delete' ? 'Confirm Delete Account' : action === 'email' ? 'Verify Email Change' : action === 'password' ? 'Verify Password Change' : action === 'reset' ? 'Reset Password' : 'Verification Required'}</h2>
-            <p class="verification-desc">Enter the 6-digit verification code sent to your email.</p>
+            <p class="verification-desc">Enter the 6-digit verification code sent to your email. Also check SPAM/JUNK folder.</p>
             <form id="verificationForm">
                 <input type="text" id="verificationCode" placeholder="Enter 6-digit code" maxlength="6" autocomplete="off" required>
                 <button type="submit" class="auth-submit-btn" id="verifySubmitBtn">Verify</button>
@@ -753,7 +753,6 @@ function openAccountSettings() {
                 return;
             }
             
-            // Change button to sending state
             const saveBtn = document.getElementById('saveSettingsBtn');
             const originalText = saveBtn.textContent;
             saveBtn.textContent = 'Sending code...';
@@ -807,7 +806,6 @@ function openAccountSettings() {
                 return;
             }
             
-            // Change button to sending state
             const saveBtn = document.getElementById('saveSettingsBtn');
             const originalText = saveBtn.textContent;
             saveBtn.textContent = 'Sending code...';
@@ -874,7 +872,6 @@ function openAccountSettings() {
             return;
         }
         
-        // Change button to sending state
         const deleteBtn = document.getElementById('deleteAccountBtn');
         const originalDeleteText = deleteBtn.textContent;
         deleteBtn.textContent = 'Sending code...';
@@ -1085,7 +1082,6 @@ authForm.addEventListener('submit', async (e) => {
                     return;
                 }
                 
-                // Check if new password is same as old
                 if (DATA_MANAGER.verifyPassword(newPassword, pendingResetUser.password)) {
                     showNotification('New password must be different from your current password.', 'error');
                     authSubmitBtn.disabled = false;
@@ -1095,8 +1091,6 @@ authForm.addEventListener('submit', async (e) => {
                     return;
                 }
                 
-                // Directly update the password without requiring current password verification
-                // Since this is a reset flow, we bypass the current password check
                 const users = DATA_MANAGER.loadUsers();
                 const index = users.findIndex(u => u.id === pendingResetUser.id);
                 
@@ -1109,7 +1103,6 @@ authForm.addEventListener('submit', async (e) => {
                     return;
                 }
                 
-                // Update password directly
                 users[index].password = DATA_MANAGER.hashPassword(newPassword);
                 DATA_MANAGER.saveUsers(users);
                 
@@ -1478,13 +1471,13 @@ document.getElementById('clearInput').addEventListener('click', () => {
 });
 
 // ============================================================
-// MIC - UPDATED with Auto-Translation
+// MIC - WHATSAPP STYLE RECORDING
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
 let recognition = null;
 let isRecording = false;
-let isHoldMode = false;
+let isReady = false;
 
 // Check if Speech Recognition is supported
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1498,8 +1491,9 @@ if (SpeechRecognition) {
     recognition.onstart = () => {
         isRecording = true;
         micBtn.classList.add('recording');
-        recordingStatus.textContent = '🎤 Listening... Speak now!';
+        recordingStatus.textContent = '🎤 Recording... Speak now!';
         micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+        isReady = false;
     };
     
     recognition.onresult = (event) => {
@@ -1527,10 +1521,11 @@ if (SpeechRecognition) {
     };
     
     recognition.onerror = (event) => {
-        recordingStatus.textContent = '❌ Error. Click mic again.';
+        recordingStatus.textContent = '❌ Error. Click mic to try again.';
         micBtn.classList.remove('recording');
         micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
         isRecording = false;
+        isReady = false;
         
         if (event.error === 'not-allowed') {
             showNotification('Microphone access denied. Please allow microphone access.', 'error');
@@ -1542,58 +1537,85 @@ if (SpeechRecognition) {
         micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
         recordingStatus.textContent = 'Click mic to speak';
         isRecording = false;
+        isReady = false;
     };
     
-    // Click to toggle recording
+    // ============================================================
+    // WHATSAPP STYLE: Click to toggle recording
+    // ============================================================
     micBtn.addEventListener('click', () => {
         if (isRecording) {
+            // Stop recording
             recognition.stop();
         } else {
+            // Start recording
             recognition.lang = sourceLang.value;
             recognition.start();
         }
     });
     
-    // Press and hold functionality
+    // ============================================================
+    // WHATSAPP STYLE: Press and hold to record, release to stop
+    // ============================================================
     micBtn.addEventListener('mousedown', (e) => {
         e.preventDefault();
-        if (!isRecording) {
-            isHoldMode = true;
-            recognition.lang = sourceLang.value;
-            recognition.start();
+        if (!isRecording && !isReady) {
+            isReady = true;
+            micBtn.style.transform = 'scale(0.9)';
+            recordingStatus.textContent = 'Hold to record...';
         }
     });
     
     micBtn.addEventListener('mouseup', (e) => {
         e.preventDefault();
-        if (isHoldMode && isRecording) {
-            recognition.stop();
-            isHoldMode = false;
-        }
-    });
-    
-    micBtn.addEventListener('mouseleave', (e) => {
-        if (isHoldMode && isRecording) {
-            recognition.stop();
-            isHoldMode = false;
-        }
-    });
-    
-    // Touch events for mobile
-    micBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if (!isRecording) {
-            isHoldMode = true;
+        if (isReady && !isRecording) {
+            micBtn.style.transform = 'scale(1)';
+            // Start recording
             recognition.lang = sourceLang.value;
             recognition.start();
+        } else if (isRecording) {
+            micBtn.style.transform = 'scale(1)';
+            recognition.stop();
+        }
+        isReady = false;
+    });
+    
+    micBtn.addEventListener('mouseleave', () => {
+        if (isReady) {
+            micBtn.style.transform = 'scale(1)';
+            isReady = false;
+        }
+    });
+    
+    // ============================================================
+    // WHATSAPP STYLE: Touch events for mobile
+    // ============================================================
+    micBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (!isRecording && !isReady) {
+            isReady = true;
+            micBtn.style.transform = 'scale(0.9)';
+            recordingStatus.textContent = 'Hold to record...';
         }
     }, { passive: false });
     
     micBtn.addEventListener('touchend', (e) => {
         e.preventDefault();
-        if (isHoldMode && isRecording) {
+        if (isReady && !isRecording) {
+            micBtn.style.transform = 'scale(1)';
+            recognition.lang = sourceLang.value;
+            recognition.start();
+        } else if (isRecording) {
+            micBtn.style.transform = 'scale(1)';
             recognition.stop();
-            isHoldMode = false;
+        }
+        isReady = false;
+    }, { passive: false });
+    
+    micBtn.addEventListener('touchcancel', () => {
+        if (isReady) {
+            micBtn.style.transform = 'scale(1)';
+            isReady = false;
         }
     }, { passive: false });
     
