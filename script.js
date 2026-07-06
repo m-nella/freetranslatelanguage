@@ -43,8 +43,7 @@ let currentUser = null;
 let isLoggedIn = false;
 let pendingEmail = '';
 let pendingAction = '';
-let generatedCode = '';
-let codeExpiry = null;
+let pendingCallback = null; // Store callback for after verification
 let isVerifying = false;
 
 // ============================================================
@@ -183,9 +182,6 @@ function generateVerificationCode() {
 
 async function sendVerificationCode(email, action = 'verification') {
     const code = generateVerificationCode();
-    generatedCode = code;
-    codeExpiry = Date.now() + 15 * 60 * 1000;
-    
     console.log('📧 Sending verification code for:', email);
     console.log('📧 Code:', code);
     console.log('📧 Action:', action);
@@ -215,7 +211,7 @@ async function sendVerificationCode(email, action = 'verification') {
 }
 
 // ============================================================
-// VERIFY CODE
+// VERIFY CODE - Fixed to return token
 // ============================================================
 async function verifyCode(email, code) {
     if (isVerifying) {
@@ -235,7 +231,12 @@ async function verifyCode(email, code) {
         console.log('🔍 Verification result:', result);
         
         if (result.success) {
-            return { success: true, data: result.data };
+            // Return the token from the verification response
+            return { 
+                success: true, 
+                token: result.data.token,
+                data: result.data 
+            };
         } else {
             return { success: false, error: result.data.error || 'Invalid code. Please try again.' };
         }
@@ -301,11 +302,12 @@ function showConfirmationModal(title, message, confirmText = 'Confirm', cancelTe
 }
 
 // ============================================================
-// VERIFICATION MODAL - FIXED
+// VERIFICATION MODAL - FIXED COMPLETELY
 // ============================================================
 function openVerificationModal(email, action, callback) {
     pendingEmail = email;
     pendingAction = action;
+    pendingCallback = callback; // Store the callback
     isVerifying = false;
     
     // Remove any existing verification modal
@@ -336,13 +338,15 @@ function openVerificationModal(email, action, callback) {
     
     const form = modal.querySelector('#verificationForm');
     const submitBtn = modal.querySelector('#verifySubmitBtn');
+    let verificationDone = false; // Prevent double verification
     
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         e.stopPropagation();
         
-        if (isVerifying) {
-            console.log('⏳ Already verifying, please wait...');
+        // Prevent multiple submissions
+        if (isVerifying || verificationDone) {
+            console.log('⏳ Verification already in progress or done...');
             return;
         }
         
@@ -354,27 +358,52 @@ function openVerificationModal(email, action, callback) {
         
         submitBtn.disabled = true;
         submitBtn.textContent = 'Verifying...';
+        isVerifying = true;
         
         try {
+            // This calls the backend and gets the token
             const result = await verifyCode(email, code);
             
             if (result.success) {
+                // Mark as done to prevent further submissions
+                verificationDone = true;
+                submitBtn.disabled = true;
+                submitBtn.textContent = '✅ Verified';
+                
                 showNotification('✅ Verification successful!', 'success');
-                modal.remove();
-                // Call the callback (this handles sign in, sign up, etc.)
-                if (callback) {
-                    await callback();
+                
+                // Store the token
+                if (result.token) {
+                    localStorage.setItem('authToken', result.token);
                 }
+                
+                // Close the modal
+                modal.remove();
+                
+                // Execute the callback with the token
+                if (typeof pendingCallback === 'function') {
+                    await pendingCallback(result.token);
+                }
+                
+                // Refresh auth status
+                await checkAuthStatus();
+                
             } else {
-                showNotification(result.error, 'error');
+                showNotification(result.error || 'Invalid code. Please try again.', 'error');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Verify';
+                isVerifying = false;
+                
+                // Clear the input for retry
+                document.getElementById('verificationCode').value = '';
+                document.getElementById('verificationCode').focus();
             }
         } catch (error) {
             console.error('❌ Verification error:', error);
             showNotification('An error occurred during verification.', 'error');
             submitBtn.disabled = false;
             submitBtn.textContent = 'Verify';
+            isVerifying = false;
         }
     });
     
@@ -384,10 +413,17 @@ function openVerificationModal(email, action, callback) {
         const result = await sendVerificationCode(email, pendingAction);
         if (result.success) {
             showNotification('New code sent! 📧', 'success');
+            document.getElementById('verificationCode').value = '';
+            document.getElementById('verificationCode').focus();
         } else {
             showNotification('Error sending code. Please try again.', 'error');
         }
     });
+    
+    // Focus the input
+    setTimeout(() => {
+        document.getElementById('verificationCode').focus();
+    }, 100);
 }
 
 // ============================================================
@@ -632,7 +668,7 @@ function openAccountSettings() {
                 showNotification('❌ Error sending verification code. Please try again.', 'error');
                 return;
             }
-            openVerificationModal(newEmail, 'email', async () => {
+            openVerificationModal(newEmail, 'email', async (token) => {
                 const updateResult = await apiCall('/user/update-email', 'PUT', {
                     email: newEmail
                 });
@@ -655,7 +691,7 @@ function openAccountSettings() {
                 showNotification('❌ Error sending verification code. Please try again.', 'error');
                 return;
             }
-            openVerificationModal(currentUser.email, 'password', async () => {
+            openVerificationModal(currentUser.email, 'password', async (token) => {
                 const updateResult = await apiCall('/user/update-password', 'PUT', {
                     password: newPassword
                 });
@@ -689,7 +725,7 @@ function openAccountSettings() {
             showNotification('❌ Error sending verification code. Please try again.', 'error');
             return;
         }
-        openVerificationModal(currentUser.email, 'delete', async () => {
+        openVerificationModal(currentUser.email, 'delete', async (token) => {
             const deleteResult = await apiCall('/user/delete', 'DELETE');
             if (deleteResult.success) {
                 localStorage.removeItem('authToken');
@@ -802,7 +838,7 @@ authModal.addEventListener('click', (e) => {
 });
 
 // ============================================================
-// AUTH FORM SUBMIT
+// AUTH FORM SUBMIT - FIXED
 // ============================================================
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -852,29 +888,15 @@ authForm.addEventListener('submit', async (e) => {
             
             authModal.style.display = 'none';
             
-            // Open verification modal and handle sign in on success
-            openVerificationModal(email, 'signin', async () => {
-                // The verification was successful, but we need to get the token
-                // The token is already returned by the verify endpoint
-                // The callback is called after verification succeeds
-                const verifyResult = await apiCall('/auth/verify', 'POST', {
-                    email: email,
-                    code: generatedCode,
-                    action: 'signin'
-                });
-                
-                if (verifyResult.success) {
-                    localStorage.setItem('authToken', verifyResult.data.token);
-                    showNotification('✅ Sign in successful!', 'success');
-                    await checkAuthStatus();
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Sign In';
-                    clearAllPasswordFields();
-                } else {
-                    showNotification('❌ Sign in failed. Please try again.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Sign In';
-                }
+            // Open verification modal - callback receives the token directly
+            openVerificationModal(email, 'signin', async (token) => {
+                // Token is already stored in localStorage by the modal
+                // Just update the UI and reset the button
+                showNotification('✅ Sign in successful!', 'success');
+                await checkAuthStatus();
+                authSubmitBtn.disabled = false;
+                authSubmitBtn.textContent = 'Sign In';
+                clearAllPasswordFields();
             });
             
         } else if (currentMode === 'reset') {
@@ -901,23 +923,15 @@ authForm.addEventListener('submit', async (e) => {
                 }
                 
                 authModal.style.display = 'none';
-                openVerificationModal(email, 'reset', async () => {
-                    const verifyResult = await apiCall('/auth/verify', 'POST', {
-                        email: email,
-                        code: generatedCode,
-                        action: 'reset'
+                openVerificationModal(email, 'reset', async (token) => {
+                    await apiCall('/auth/reset-password', 'POST', {
+                        email: email
                     });
-                    
-                    if (verifyResult.success) {
-                        await apiCall('/auth/reset-password', 'POST', {
-                            email: email
-                        });
-                        showNotification('✅ Password reset link sent to your email!', 'success');
-                        clearAllPasswordFields();
-                        setTimeout(() => openModal('login'), 2000);
-                    } else {
-                        showNotification('❌ Invalid verification code.', 'error');
-                    }
+                    showNotification('✅ Password reset link sent to your email!', 'success');
+                    clearAllPasswordFields();
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Send Reset Code';
+                    setTimeout(() => openModal('login'), 2000);
                 });
             } else {
                 showNotification('❌ No account found with this email. Please create an account.', 'error');
@@ -926,9 +940,6 @@ authForm.addEventListener('submit', async (e) => {
                 setTimeout(() => openModal('signup'), 2000);
                 return;
             }
-            
-            authSubmitBtn.disabled = false;
-            authSubmitBtn.textContent = 'Send Reset Code';
             
         } else if (currentMode === 'signup') {
             const confirmPassword = document.getElementById('authConfirmPassword')?.value || '';
@@ -977,25 +988,12 @@ authForm.addEventListener('submit', async (e) => {
             
             authModal.style.display = 'none';
             
-            openVerificationModal(email, 'signup', async () => {
-                const verifyResult = await apiCall('/auth/verify', 'POST', {
-                    email: email,
-                    code: generatedCode,
-                    action: 'signup'
-                });
-                
-                if (verifyResult.success) {
-                    localStorage.setItem('authToken', verifyResult.data.token);
-                    showNotification('✅ Account created successfully!', 'success');
-                    await checkAuthStatus();
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Create Account';
-                    clearAllPasswordFields();
-                } else {
-                    showNotification('❌ Account verification failed.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Create Account';
-                }
+            openVerificationModal(email, 'signup', async (token) => {
+                showNotification('✅ Account created successfully!', 'success');
+                await checkAuthStatus();
+                authSubmitBtn.disabled = false;
+                authSubmitBtn.textContent = 'Create Account';
+                clearAllPasswordFields();
             });
         }
     } catch (error) {
