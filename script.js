@@ -16,7 +16,7 @@ let verificationDone = false;
 let pendingResetEmail = '';
 let pendingResetUser = null;
 let isRecording = false;
-let translateTimeout = null;
+let lastFinalText = '';
 
 // ============================================================
 // DOM ELEMENTS
@@ -1635,7 +1635,7 @@ document.getElementById('clearInput').addEventListener('click', () => {
 });
 
 // ============================================================
-// MIC - RECORDING WITH AUTO-DETECT AND AUTO-TRANSLATE
+// MIC - SIMPLIFIED RECORDING WITH AUTO-TRANSLATE
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
@@ -1671,33 +1671,32 @@ if (SpeechRecognition) {
             }
         }
         
-        // Show interim results in real-time
+        // Always show what's being recognized (interim results)
         if (interimText) {
             inputText.value = finalText + interimText;
         }
         
         // When we have final text, process it
-        if (finalText) {
+        if (finalText && finalText !== lastFinalText) {
+            lastFinalText = finalText;
             inputText.value = finalText;
             
-            // If auto-detect is selected, detect language and update dropdown
+            // Check if we need to detect language
             if (sourceLang.value === 'auto' && finalText.length > 2) {
+                // Detect language first, then translate
                 detectLanguage(finalText).then(detectedLang => {
                     if (detectedLang && detectedLang !== 'auto') {
                         updateSourceLanguage(detectedLang);
                     }
-                    // After detection, perform translation
-                    clearTimeout(translateTimeout);
-                    translateTimeout = setTimeout(() => {
-                        performTranslation();
-                    }, 200);
+                    // Now translate with the detected language
+                    performTranslation();
+                }).catch(() => {
+                    // If detection fails, still try to translate
+                    performTranslation();
                 });
             } else {
-                // Manual language selected, just translate
-                clearTimeout(translateTimeout);
-                translateTimeout = setTimeout(() => {
-                    performTranslation();
-                }, 200);
+                // Manual language or auto without detection needed
+                performTranslation();
             }
         }
     };
@@ -1745,6 +1744,7 @@ if (SpeechRecognition) {
     micBtn.addEventListener('click', () => {
         if (isRecording) {
             isRecording = false;
+            lastFinalText = '';
             try {
                 recognition.stop();
             } catch (e) {}
@@ -1753,7 +1753,7 @@ if (SpeechRecognition) {
             recordingStatus.textContent = 'Click mic to speak';
             showNotification('⏹ Recording stopped.', 'info', 2000);
         } else {
-            // Use the current source language or default to 'en' for auto-detect
+            lastFinalText = '';
             const lang = sourceLang.value === 'auto' ? 'en' : sourceLang.value;
             recognition.lang = lang;
             try {
