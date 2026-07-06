@@ -1438,30 +1438,27 @@ async function detectLanguage(text) {
 function updateSourceLanguage(detectedCode) {
     const detectedName = LANGUAGES.find(l => l.code === detectedCode)?.name || detectedCode;
     
-    // Check if there's already a detected option
+    // Remove existing detected option if any
     const existingDetected = sourceLang.querySelector('option[data-detected="true"]');
     if (existingDetected) {
-        existingDetected.textContent = detectedName;
-        existingDetected.value = detectedCode;
-    } else {
-        // Create a new option for detected language
-        const option = document.createElement('option');
-        option.value = detectedCode;
-        option.textContent = detectedName;
-        option.setAttribute('data-detected', 'true');
-        option.selected = true;
-        
-        // Keep auto option but mark it
-        const autoOption = sourceLang.querySelector('option[value="auto"]');
-        if (autoOption) {
-            autoOption.textContent = '🔍 Auto-detect';
-        }
-        
-        // Insert after auto option
-        sourceLang.insertBefore(option, sourceLang.children[1]);
+        existingDetected.remove();
     }
     
-    // Select the detected language
+    // Reset auto option text
+    const autoOption = sourceLang.querySelector('option[value="auto"]');
+    if (autoOption) {
+        autoOption.textContent = '🔍 Auto-detect';
+    }
+    
+    // Create detected option with - detected suffix
+    const option = document.createElement('option');
+    option.value = detectedCode;
+    option.textContent = `${detectedName} - detected`;
+    option.setAttribute('data-detected', 'true');
+    option.selected = true;
+    
+    // Insert after auto option
+    sourceLang.insertBefore(option, sourceLang.children[1]);
     sourceLang.value = detectedCode;
 }
 
@@ -1500,7 +1497,14 @@ async function translateWithGoogle(text, sourceLangCode, targetLangCode) {
 async function performTranslation() {
     const text = inputText.value.trim();
     if (!text) {
-        outputDisplay.innerHTML = '<span class="placeholder">Please enter text to translate.</span>';
+        outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+        // Reset auto-detect if no text
+        if (sourceLang.value !== 'auto') {
+            const detected = sourceLang.querySelector('option[data-detected="true"]');
+            if (detected) {
+                resetSourceLanguage();
+            }
+        }
         return;
     }
     translateBtn.disabled = true;
@@ -1528,9 +1532,10 @@ inputText.addEventListener('input', () => {
         clearTimeout(inputText._typingTimer);
         inputText._typingTimer = setTimeout(() => {
             performTranslation();
-        }, 800);
+        }, 500);
     } else {
-        // If input is cleared, reset auto-detect
+        // Clear output when input is empty
+        outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
         if (sourceLang.value !== 'auto') {
             const detected = sourceLang.querySelector('option[data-detected="true"]');
             if (detected) {
@@ -1549,7 +1554,6 @@ inputText.addEventListener('keydown', (e) => {
 // Reset auto-detect when source language is manually changed
 sourceLang.addEventListener('change', () => {
     if (sourceLang.value !== 'auto') {
-        // User manually selected a language, remove detected option
         const detected = sourceLang.querySelector('option[data-detected="true"]');
         if (detected) {
             detected.remove();
@@ -1558,6 +1562,19 @@ sourceLang.addEventListener('change', () => {
         if (autoOption) {
             autoOption.textContent = '🔍 Auto-detect';
         }
+        // Auto-translate when language changes
+        const text = inputText.value.trim();
+        if (text) {
+            performTranslation();
+        }
+    }
+});
+
+targetLang.addEventListener('change', () => {
+    // Auto-translate when target language changes
+    const text = inputText.value.trim();
+    if (text) {
+        performTranslation();
     }
 });
 
@@ -1567,13 +1584,12 @@ document.getElementById('swapLang').addEventListener('click', () => {
     targetLang.value = temp;
     outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
     inputText.value = '';
-    // Reset auto-detect if source was auto
     resetSourceLanguage();
 });
 
 document.getElementById('copyOutput').addEventListener('click', async () => {
     const text = outputDisplay.textContent;
-    if (text && !text.includes('placeholder') && !text.includes('Please enter')) {
+    if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating')) {
         await navigator.clipboard.writeText(text);
         showNotification('Copied!', 'success');
     }
@@ -1581,7 +1597,7 @@ document.getElementById('copyOutput').addEventListener('click', async () => {
 
 document.getElementById('speakOutput').addEventListener('click', () => {
     const text = outputDisplay.textContent;
-    if (text && !text.includes('placeholder') && !text.includes('Please enter')) {
+    if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating')) {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = targetLang.value;
         window.speechSynthesis.speak(utterance);
@@ -1595,21 +1611,19 @@ document.getElementById('clearInput').addEventListener('click', () => {
 });
 
 // ============================================================
-// MIC - WHATSAPP STYLE RECORDING WITH AUTO-TRANSLATE
+// MIC - SIMPLE CLICK TO TOGGLE RECORDING
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
 let recognition = null;
 let isRecording = false;
-let isReady = false;
-let restartTimeout = null;
 
 // Check if Speech Recognition is supported
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
-    recognition.continuous = true; // Keep listening until stopped
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en';
     recognition.maxAlternatives = 1;
@@ -1617,14 +1631,9 @@ if (SpeechRecognition) {
     recognition.onstart = () => {
         isRecording = true;
         micBtn.classList.add('recording');
-        recordingStatus.textContent = '🎤 Recording... Speak now!';
+        recordingStatus.textContent = '🎤 Recording... Click to stop';
         micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
-        isReady = false;
-        // Clear any restart timeout
-        if (restartTimeout) {
-            clearTimeout(restartTimeout);
-            restartTimeout = null;
-        }
+        showNotification('🎤 Recording started. Speak now!', 'info', 2000);
     };
     
     recognition.onresult = (event) => {
@@ -1639,61 +1648,50 @@ if (SpeechRecognition) {
             }
         }
         
-        // Show interim results in real-time
         if (interimText) {
             inputText.value = finalText + interimText;
         }
         
-        // When we have final text, update and auto-translate
         if (finalText) {
             inputText.value = finalText;
-            // Auto-translate immediately after speech is recognized
+            // Auto-translate after speech
             clearTimeout(inputText._typingTimer);
             inputText._typingTimer = setTimeout(() => {
                 performTranslation();
-            }, 200);
+            }, 300);
         }
     };
     
     recognition.onerror = (event) => {
         console.warn('Speech recognition error:', event.error);
         
-        // If error is 'no-speech' or 'audio-capture', keep trying to restart
-        if (event.error === 'no-speech' || event.error === 'audio-capture') {
+        if (event.error === 'no-speech') {
+            // Keep recording if still recording
             if (isRecording) {
-                // Restart recognition if still recording
-                try {
-                    recognition.stop();
-                } catch (e) {}
-                setTimeout(() => {
-                    if (isRecording) {
-                        try {
-                            recognition.start();
-                        } catch (e) {}
-                    }
-                }, 100);
+                return;
             }
-            return;
         }
         
-        recordingStatus.textContent = '❌ Error. Click mic to try again.';
-        micBtn.classList.remove('recording');
-        micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-        isRecording = false;
-        isReady = false;
-        
         if (event.error === 'not-allowed') {
-            showNotification('Microphone access denied. Please allow microphone access.', 'error');
+            showNotification('Microphone access denied. Please allow microphone access in browser settings.', 'error');
+        } else if (event.error !== 'no-speech') {
+            showNotification('Microphone error. Please try again.', 'error');
+        }
+        
+        // Only reset UI if not recording
+        if (!isRecording) {
+            micBtn.classList.remove('recording');
+            micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+            recordingStatus.textContent = 'Click mic to speak';
         }
     };
     
     recognition.onend = () => {
-        // If still recording, restart
+        // If still recording flag is true, restart
         if (isRecording) {
             try {
                 recognition.start();
             } catch (e) {
-                // If can't restart, stop recording state
                 isRecording = false;
                 micBtn.classList.remove('recording');
                 micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
@@ -1704,11 +1702,10 @@ if (SpeechRecognition) {
             micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
             recordingStatus.textContent = 'Click mic to speak';
         }
-        isReady = false;
     };
     
     // ============================================================
-    // WHATSAPP STYLE: Click to toggle recording
+    // SIMPLE: Click to start, Click again to stop
     // ============================================================
     micBtn.addEventListener('click', () => {
         if (isRecording) {
@@ -1717,9 +1714,14 @@ if (SpeechRecognition) {
             try {
                 recognition.stop();
             } catch (e) {}
+            micBtn.classList.remove('recording');
+            micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+            recordingStatus.textContent = 'Click mic to speak';
+            showNotification('⏹ Recording stopped.', 'info', 2000);
         } else {
             // Start recording
-            recognition.lang = sourceLang.value === 'auto' ? 'en' : sourceLang.value;
+            const lang = sourceLang.value === 'auto' ? 'en' : sourceLang.value;
+            recognition.lang = lang;
             try {
                 recognition.start();
             } catch (e) {
@@ -1727,89 +1729,6 @@ if (SpeechRecognition) {
             }
         }
     });
-    
-    // ============================================================
-    // WHATSAPP STYLE: Press and hold to record, release to stop
-    // ============================================================
-    micBtn.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        if (!isRecording) {
-            isReady = true;
-            micBtn.style.transform = 'scale(0.85)';
-            recordingStatus.textContent = 'Hold to record...';
-            // Start recording immediately on press
-            recognition.lang = sourceLang.value === 'auto' ? 'en' : sourceLang.value;
-            try {
-                recognition.start();
-            } catch (e) {
-                showNotification('Error starting microphone. Please try again.', 'error');
-            }
-        }
-    });
-    
-    micBtn.addEventListener('mouseup', (e) => {
-        e.preventDefault();
-        if (isRecording) {
-            isRecording = false;
-            micBtn.style.transform = 'scale(1)';
-            try {
-                recognition.stop();
-            } catch (e) {}
-        }
-        isReady = false;
-    });
-    
-    micBtn.addEventListener('mouseleave', () => {
-        if (isRecording) {
-            isRecording = false;
-            micBtn.style.transform = 'scale(1)';
-            try {
-                recognition.stop();
-            } catch (e) {}
-        }
-        isReady = false;
-    });
-    
-    // ============================================================
-    // WHATSAPP STYLE: Touch events for mobile
-    // ============================================================
-    micBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if (!isRecording) {
-            isReady = true;
-            micBtn.style.transform = 'scale(0.85)';
-            recordingStatus.textContent = 'Hold to record...';
-            recognition.lang = sourceLang.value === 'auto' ? 'en' : sourceLang.value;
-            try {
-                recognition.start();
-            } catch (e) {
-                showNotification('Error starting microphone. Please try again.', 'error');
-            }
-        }
-    }, { passive: false });
-    
-    micBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        if (isRecording) {
-            isRecording = false;
-            micBtn.style.transform = 'scale(1)';
-            try {
-                recognition.stop();
-            } catch (e) {}
-        }
-        isReady = false;
-    }, { passive: false });
-    
-    micBtn.addEventListener('touchcancel', () => {
-        if (isRecording) {
-            isRecording = false;
-            micBtn.style.transform = 'scale(1)';
-            try {
-                recognition.stop();
-            } catch (e) {}
-        }
-        isReady = false;
-    }, { passive: false });
     
 } else {
     micBtn.disabled = true;
