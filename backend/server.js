@@ -22,6 +22,9 @@ const app = express();
 // MIDDLEWARE
 // ============================================================
 
+// Enable trust proxy (for rate limiting behind proxy)
+app.set('trust proxy', 1);
+
 // CORS
 app.use(cors({
     origin: ['https://m-nella.github.io', 'http://localhost:5500', 'http://127.0.0.1:5500'],
@@ -35,7 +38,9 @@ app.use(express.json());
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // Limit each IP to 100 requests per windowMs
-    message: { error: 'Too many requests, please try again later.' }
+    message: { error: 'Too many requests, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
 });
 app.use('/api/', limiter);
 
@@ -49,6 +54,17 @@ app.use('/api/user', userRoutes);
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', message: 'FreeTranslate API is running' });
+});
+
+// ============================================================
+// 404 Handler for API routes - Return JSON instead of HTML
+// ============================================================
+
+app.use('/api/*', (req, res) => {
+    res.status(404).json({
+        success: false,
+        error: 'API endpoint not found'
+    });
 });
 
 // ============================================================
