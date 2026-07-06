@@ -1349,7 +1349,7 @@ async function saveToHistory(original, translated, sourceLang, targetLang) {
 }
 
 // ============================================================
-// TRANSLATION
+// TRANSLATION - WITH AUTO-DETECT LANGUAGE
 // ============================================================
 const translateBtn = document.getElementById('translateBtn');
 const inputText = document.getElementById('inputText');
@@ -1357,42 +1357,105 @@ const outputDisplay = document.getElementById('outputText');
 const sourceLang = document.getElementById('sourceLang');
 const targetLang = document.getElementById('targetLang');
 
+// Language list with Auto-detect option
 const LANGUAGES = [
-    { code: 'en', name: 'English' }, { code: 'es', name: 'Spanish' },
-    { code: 'fr', name: 'French' }, { code: 'de', name: 'German' },
-    { code: 'it', name: 'Italian' }, { code: 'pt', name: 'Portuguese' },
-    { code: 'ru', name: 'Russian' }, { code: 'ja', name: 'Japanese' },
-    { code: 'ko', name: 'Korean' }, { code: 'zh', name: 'Chinese' },
-    { code: 'ar', name: 'Arabic' }, { code: 'hi', name: 'Hindi' },
-    { code: 'rw', name: 'Kinyarwanda' }, { code: 'rn', name: 'Kirundi' },
-    { code: 'sw', name: 'Swahili' }, { code: 'zu', name: 'Zulu' },
-    { code: 'yo', name: 'Yoruba' }, { code: 'ig', name: 'Igbo' },
-    { code: 'ha', name: 'Hausa' }, { code: 'ak', name: 'Akan' },
-    { code: 'am', name: 'Amharic' }, { code: 'so', name: 'Somali' },
-    { code: 'mg', name: 'Malagasy' }, { code: 'xh', name: 'Xhosa' },
-    { code: 'af', name: 'Afrikaans' }, { code: 'wo', name: 'Wolof' },
-    { code: 'ki', name: 'Kikuyu' }, { code: 'lg', name: 'Luganda' },
+    { code: 'auto', name: '🔍 Auto-detect' },
+    { code: 'en', name: 'English' },
+    { code: 'es', name: 'Spanish' },
+    { code: 'fr', name: 'French' },
+    { code: 'de', name: 'German' },
+    { code: 'it', name: 'Italian' },
+    { code: 'pt', name: 'Portuguese' },
+    { code: 'ru', name: 'Russian' },
+    { code: 'ja', name: 'Japanese' },
+    { code: 'ko', name: 'Korean' },
+    { code: 'zh', name: 'Chinese' },
+    { code: 'ar', name: 'Arabic' },
+    { code: 'hi', name: 'Hindi' },
+    { code: 'rw', name: 'Kinyarwanda' },
+    { code: 'rn', name: 'Kirundi' },
+    { code: 'sw', name: 'Swahili' },
+    { code: 'zu', name: 'Zulu' },
+    { code: 'yo', name: 'Yoruba' },
+    { code: 'ig', name: 'Igbo' },
+    { code: 'ha', name: 'Hausa' },
+    { code: 'ak', name: 'Akan' },
+    { code: 'am', name: 'Amharic' },
+    { code: 'so', name: 'Somali' },
+    { code: 'mg', name: 'Malagasy' },
+    { code: 'xh', name: 'Xhosa' },
+    { code: 'af', name: 'Afrikaans' },
+    { code: 'wo', name: 'Wolof' },
+    { code: 'ki', name: 'Kikuyu' },
+    { code: 'lg', name: 'Luganda' },
     { code: 'ny', name: 'Chichewa' }
 ];
 
 function populateLanguages() {
-    [sourceLang, targetLang].forEach(select => {
-        if (!select) return;
-        select.innerHTML = '';
+    // Source language dropdown (includes Auto-detect)
+    if (sourceLang) {
+        sourceLang.innerHTML = '';
         LANGUAGES.forEach(lang => {
             const option = document.createElement('option');
             option.value = lang.code;
             option.textContent = lang.name;
-            select.appendChild(option);
+            sourceLang.appendChild(option);
         });
-    });
-    if (sourceLang) sourceLang.value = 'en';
-    if (targetLang) targetLang.value = 'rw';
+        sourceLang.value = 'auto';
+    }
+    
+    // Target language dropdown (NO Auto-detect)
+    if (targetLang) {
+        targetLang.innerHTML = '';
+        // Skip 'auto' for target language
+        LANGUAGES.filter(lang => lang.code !== 'auto').forEach(lang => {
+            const option = document.createElement('option');
+            option.value = lang.code;
+            option.textContent = lang.name;
+            targetLang.appendChild(option);
+        });
+        targetLang.value = 'rw';
+    }
 }
 populateLanguages();
 
+// Detect language using Google Translate API
+async function detectLanguage(text) {
+    try {
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(text)}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data && data[2]) {
+            return data[2];
+        }
+        return 'en';
+    } catch (error) {
+        console.warn('Language detection failed, defaulting to English:', error);
+        return 'en';
+    }
+}
+
 async function translateWithGoogle(text, sourceLang, targetLang) {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+    // If source is 'auto', detect language first
+    let actualSource = sourceLang;
+    if (sourceLang === 'auto' && text.length > 3) {
+        actualSource = await detectLanguage(text);
+        // Update the source dropdown to show detected language
+        const detectedName = LANGUAGES.find(l => l.code === actualSource)?.name || actualSource;
+        if (sourceLang) {
+            const option = document.createElement('option');
+            option.value = actualSource;
+            option.textContent = `🔍 Detected: ${detectedName}`;
+            // Add temporary option
+            const existingAuto = sourceLang.querySelector('option[value="auto"]');
+            if (existingAuto) {
+                existingAuto.textContent = `🔍 Detected: ${detectedName}`;
+                existingAuto.value = actualSource;
+            }
+        }
+    }
+    
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${actualSource}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
     const response = await fetch(url);
     const data = await response.json();
     if (data && data[0]) return data[0].map(item => item[0]).join('');
@@ -1430,7 +1493,7 @@ inputText.addEventListener('input', () => {
         clearTimeout(inputText._typingTimer);
         inputText._typingTimer = setTimeout(() => {
             performTranslation();
-        }, 800);
+        }, 1000);
     }
 });
 
@@ -1446,6 +1509,13 @@ document.getElementById('swapLang').addEventListener('click', () => {
     targetLang.value = temp;
     outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
     inputText.value = '';
+    // Reset auto-detect text if source was auto
+    if (sourceLang.value === 'auto') {
+        const autoOption = sourceLang.querySelector('option[value="auto"]');
+        if (autoOption) {
+            autoOption.textContent = '🔍 Auto-detect';
+        }
+    }
 });
 
 document.getElementById('copyOutput').addEventListener('click', async () => {
@@ -1468,10 +1538,17 @@ document.getElementById('speakOutput').addEventListener('click', () => {
 document.getElementById('clearInput').addEventListener('click', () => {
     inputText.value = '';
     outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+    // Reset auto-detect text
+    if (sourceLang.value === 'auto') {
+        const autoOption = sourceLang.querySelector('option[value="auto"]');
+        if (autoOption) {
+            autoOption.textContent = '🔍 Auto-detect';
+        }
+    }
 });
 
 // ============================================================
-// MIC - WHATSAPP STYLE RECORDING
+// MIC - WHATSAPP STYLE RECORDING WITH AUTO-TRANSLATE
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
@@ -1484,9 +1561,10 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
-    recognition.continuous = false;
+    recognition.continuous = true; // Keep listening until stopped
     recognition.interimResults = true;
     recognition.lang = 'en';
+    recognition.maxAlternatives = 1;
     
     recognition.onstart = () => {
         isRecording = true;
@@ -1508,19 +1586,23 @@ if (SpeechRecognition) {
             }
         }
         
+        // Show interim results in real-time
         if (interimText) {
             inputText.value = finalText + interimText;
         }
         
+        // When we have final text, update and auto-translate
         if (finalText) {
             inputText.value = finalText;
+            // Auto-translate immediately after speech is recognized
             setTimeout(() => {
                 performTranslation();
-            }, 300);
+            }, 200);
         }
     };
     
     recognition.onerror = (event) => {
+        console.warn('Speech recognition error:', event.error);
         recordingStatus.textContent = '❌ Error. Click mic to try again.';
         micBtn.classList.remove('recording');
         micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
@@ -1549,7 +1631,7 @@ if (SpeechRecognition) {
             recognition.stop();
         } else {
             // Start recording
-            recognition.lang = sourceLang.value;
+            recognition.lang = sourceLang.value === 'auto' ? 'en' : sourceLang.value;
             recognition.start();
         }
     });
@@ -1559,21 +1641,19 @@ if (SpeechRecognition) {
     // ============================================================
     micBtn.addEventListener('mousedown', (e) => {
         e.preventDefault();
-        if (!isRecording && !isReady) {
+        if (!isRecording) {
             isReady = true;
-            micBtn.style.transform = 'scale(0.9)';
+            micBtn.style.transform = 'scale(0.85)';
             recordingStatus.textContent = 'Hold to record...';
+            // Start recording immediately on press
+            recognition.lang = sourceLang.value === 'auto' ? 'en' : sourceLang.value;
+            recognition.start();
         }
     });
     
     micBtn.addEventListener('mouseup', (e) => {
         e.preventDefault();
-        if (isReady && !isRecording) {
-            micBtn.style.transform = 'scale(1)';
-            // Start recording
-            recognition.lang = sourceLang.value;
-            recognition.start();
-        } else if (isRecording) {
+        if (isRecording) {
             micBtn.style.transform = 'scale(1)';
             recognition.stop();
         }
@@ -1581,10 +1661,11 @@ if (SpeechRecognition) {
     });
     
     micBtn.addEventListener('mouseleave', () => {
-        if (isReady) {
+        if (isRecording) {
             micBtn.style.transform = 'scale(1)';
-            isReady = false;
+            recognition.stop();
         }
+        isReady = false;
     });
     
     // ============================================================
@@ -1592,20 +1673,18 @@ if (SpeechRecognition) {
     // ============================================================
     micBtn.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        if (!isRecording && !isReady) {
+        if (!isRecording) {
             isReady = true;
-            micBtn.style.transform = 'scale(0.9)';
+            micBtn.style.transform = 'scale(0.85)';
             recordingStatus.textContent = 'Hold to record...';
+            recognition.lang = sourceLang.value === 'auto' ? 'en' : sourceLang.value;
+            recognition.start();
         }
     }, { passive: false });
     
     micBtn.addEventListener('touchend', (e) => {
         e.preventDefault();
-        if (isReady && !isRecording) {
-            micBtn.style.transform = 'scale(1)';
-            recognition.lang = sourceLang.value;
-            recognition.start();
-        } else if (isRecording) {
+        if (isRecording) {
             micBtn.style.transform = 'scale(1)';
             recognition.stop();
         }
@@ -1613,10 +1692,11 @@ if (SpeechRecognition) {
     }, { passive: false });
     
     micBtn.addEventListener('touchcancel', () => {
-        if (isReady) {
+        if (isRecording) {
             micBtn.style.transform = 'scale(1)';
-            isReady = false;
+            recognition.stop();
         }
+        isReady = false;
     }, { passive: false });
     
 } else {
