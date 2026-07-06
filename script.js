@@ -13,8 +13,8 @@ let pendingAction = '';
 let pendingCallback = null;
 let isVerifying = false;
 let verificationDone = false;
-let pendingResetEmail = ''; // Store email for password reset
-let pendingResetUser = null; // Store user for password reset
+let pendingResetEmail = '';
+let pendingResetUser = null;
 
 // ============================================================
 // DOM ELEMENTS
@@ -148,14 +148,10 @@ function clearAllPasswordFields() {
 // ============================================================
 
 async function sendVerificationCode(email, action = 'verification') {
-    console.log('📧 Sending verification code for:', email);
-    console.log('📧 Action:', action);
-    
     try {
         const result = await DATA_MANAGER.storeVerificationCode(email, action);
         
         if (result.success) {
-            console.log('📧 Code stored:', result.code);
             showNotification('📧 Verification code sent to your email. Please check your inbox and spam folder.', 'success');
             return { success: true, code: result.code };
         } else {
@@ -163,7 +159,6 @@ async function sendVerificationCode(email, action = 'verification') {
             return { success: false };
         }
     } catch (error) {
-        console.error('❌ Error in sendVerificationCode:', error);
         showNotification('⚠️ There was an issue sending the code. Please try again.', 'error');
         return { success: false };
     }
@@ -171,7 +166,6 @@ async function sendVerificationCode(email, action = 'verification') {
 
 async function verifyCode(email, code) {
     if (isVerifying) {
-        console.log('⏳ Verification already in progress, resetting...');
         isVerifying = false;
     }
     
@@ -179,8 +173,6 @@ async function verifyCode(email, code) {
     
     try {
         const result = DATA_MANAGER.verifyCode(email, code, pendingAction);
-        
-        console.log('🔍 Verification result:', result);
         
         if (result.success) {
             return { 
@@ -191,8 +183,7 @@ async function verifyCode(email, code) {
             return { success: false, error: result.error || 'Invalid code. Please try again.' };
         }
     } catch (error) {
-        console.error('❌ Verify code error:', error);
-        return { success: false, error: error.message };
+        return { success: false, error: 'An error occurred during verification.' };
     } finally {
         isVerifying = false;
     }
@@ -202,26 +193,31 @@ async function verifyCode(email, code) {
 // CUSTOM MODALS
 // ============================================================
 
-// Custom prompt modal (replaces browser prompt)
-function showPromptModal(title, message, inputPlaceholder = '', inputType = 'password') {
+// Custom prompt modal for password confirmation
+function showPasswordConfirmModal(title, message, inputPlaceholder = 'Enter your password', inputType = 'password') {
     return new Promise((resolve) => {
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
         modal.innerHTML = `
-            <div class="modal-content prompt-content">
-                <h2>${title}</h2>
-                <p>${message}</p>
-                <input type="${inputType}" id="promptInput" placeholder="${inputPlaceholder}" required>
+            <div class="modal-content prompt-content" style="max-width: 420px;">
+                <h2 style="text-align: center; color: #ef4444; margin-bottom: 12px;">${title}</h2>
+                <p style="text-align: center; color: var(--text-secondary); margin-bottom: 16px;">${message}</p>
+                <div class="settings-field">
+                    <label>Password</label>
+                    ${createPasswordField('promptPasswordInput', inputPlaceholder).outerHTML}
+                </div>
                 <div class="confirmation-buttons" style="margin-top: 16px;">
-                    <button class="auth-submit-btn cancel-btn" id="promptCancel">Cancel</button>
-                    <button class="auth-submit-btn" id="promptConfirm">Confirm</button>
+                    <button class="auth-submit-btn cancel-btn" id="promptCancel" style="flex:1;">Cancel</button>
+                    <button class="auth-submit-btn delete-btn" id="promptConfirm" style="flex:1;">Confirm</button>
                 </div>
             </div>
         `;
         document.body.appendChild(modal);
         
-        const input = modal.querySelector('#promptInput');
+        bindPasswordToggles(modal);
+        
+        const input = document.getElementById('promptPasswordInput');
         const confirmBtn = modal.querySelector('#promptConfirm');
         const cancelBtn = modal.querySelector('#promptCancel');
         
@@ -259,16 +255,16 @@ function showPromptModal(title, message, inputPlaceholder = '', inputType = 'pas
     });
 }
 
-// Custom password reset modal (replaces browser prompt for new password)
+// Custom password reset modal
 function showPasswordResetModal() {
     return new Promise((resolve) => {
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
         modal.innerHTML = `
-            <div class="modal-content prompt-content">
-                <h2>Reset Password</h2>
-                <p>Enter your new password below.</p>
+            <div class="modal-content prompt-content" style="max-width: 440px;">
+                <h2 style="text-align: center; margin-bottom: 12px;">Reset Password</h2>
+                <p style="text-align: center; color: var(--text-secondary); margin-bottom: 16px;">Enter your new password below.</p>
                 <div class="settings-field">
                     <label>New Password (min 8 chars)</label>
                     ${createPasswordField('resetNewPassword', 'Enter new password').outerHTML}
@@ -278,8 +274,8 @@ function showPasswordResetModal() {
                     ${createPasswordField('resetConfirmPassword', 'Confirm new password').outerHTML}
                 </div>
                 <div class="confirmation-buttons" style="margin-top: 16px;">
-                    <button class="auth-submit-btn cancel-btn" id="resetCancel">Cancel</button>
-                    <button class="auth-submit-btn" id="resetConfirm">Reset Password</button>
+                    <button class="auth-submit-btn cancel-btn" id="resetCancel" style="flex:1;">Cancel</button>
+                    <button class="auth-submit-btn" id="resetConfirm" style="flex:1; background: var(--accent);">Reset Password</button>
                 </div>
             </div>
         `;
@@ -423,15 +419,8 @@ function openVerificationModal(email, action, callback) {
         e.preventDefault();
         e.stopPropagation();
         
-        if (verificationDone) {
-            console.log('⏳ Already verified');
-            return;
-        }
-        
-        if (isVerifying) {
-            console.log('⏳ Verification in progress, please wait...');
-            return;
-        }
+        if (verificationDone) return;
+        if (isVerifying) return;
         
         const code = codeInput.value.trim();
         if (!code || code.length !== 6) {
@@ -478,7 +467,6 @@ function openVerificationModal(email, action, callback) {
                 codeInput.focus();
             }
         } catch (error) {
-            console.error('❌ Verification error:', error);
             showNotification('An error occurred during verification.', 'error');
             submitBtn.disabled = false;
             submitBtn.textContent = 'Verify';
@@ -541,7 +529,6 @@ async function checkAuthStatus() {
         authBtn.innerHTML = `<i class="fas fa-user-circle"></i> ${currentUser.username}`;
         authBtn.classList.add('logged-in');
         if (historyNavBtn) historyNavBtn.style.display = 'flex';
-        console.log('✅ User logged in:', currentUser.username);
     } else {
         localStorage.removeItem('authToken');
         isLoggedIn = false;
@@ -775,7 +762,6 @@ function openAccountSettings() {
             }
             
             openVerificationModal(newEmail, 'email', async (token) => {
-                // Update email AND username (auto-generated from new email)
                 const updateResult = DATA_MANAGER.updateProfile(user.id, { 
                     email: newEmail,
                     username: newEmail.split('@')[0]
@@ -801,7 +787,7 @@ function openAccountSettings() {
                 return;
             }
             if (newPassword === currentPassword) {
-                showNotification('New password must be different from current password.', 'error');
+                showNotification('New password must be different from your current password.', 'error');
                 return;
             }
             
@@ -844,8 +830,7 @@ function openAccountSettings() {
         );
         if (!confirmed) return;
         
-        // Use custom prompt instead of browser prompt
-        const password = await showPromptModal(
+        const password = await showPasswordConfirmModal(
             'Confirm Deletion',
             'Enter your password to confirm account deletion:',
             'Enter your password',
@@ -863,7 +848,7 @@ function openAccountSettings() {
         }
         
         if (!DATA_MANAGER.verifyPassword(password, user.password)) {
-            showNotification('Incorrect password.', 'error');
+            showNotification('Incorrect password. Please try again.', 'error');
             return;
         }
         
@@ -989,8 +974,6 @@ authForm.addEventListener('submit', async (e) => {
     const email = document.getElementById('authEmail').value;
     const password = document.getElementById('authPassword')?.value || '';
     
-    console.log('📝 Form submitted:', { mode: currentMode, email });
-    
     try {
         if (currentMode === 'login') {
             authSubmitBtn.disabled = true;
@@ -1051,20 +1034,28 @@ authForm.addEventListener('submit', async (e) => {
                 return;
             }
             
-            // Store for use in verification callback
             pendingResetEmail = email;
             pendingResetUser = userExists;
             
             authModal.style.display = 'none';
             
             openVerificationModal(email, 'reset', async (token) => {
-                // Use custom modal instead of browser prompt
                 const newPassword = await showPasswordResetModal();
                 
                 if (newPassword === null) {
                     showNotification('Password reset cancelled.', 'info');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Send Reset Code';
+                    return;
+                }
+                
+                // Check if new password is same as old password
+                if (DATA_MANAGER.verifyPassword(newPassword, pendingResetUser.password)) {
+                    showNotification('New password must be different from your current password.', 'error');
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Send Reset Code';
+                    pendingResetEmail = '';
+                    pendingResetUser = null;
                     return;
                 }
                 
@@ -1078,7 +1069,7 @@ authForm.addEventListener('submit', async (e) => {
                     pendingResetUser = null;
                     setTimeout(() => openModal('login'), 2000);
                 } else {
-                    showNotification('Error resetting password.', 'error');
+                    showNotification('Error resetting password. Please try again.', 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Send Reset Code';
                 }
@@ -1143,7 +1134,6 @@ authForm.addEventListener('submit', async (e) => {
             });
         }
     } catch (error) {
-        console.error('Form error:', error);
         showNotification('An error occurred. Please try again.', 'error');
         authSubmitBtn.disabled = false;
         authSubmitBtn.textContent = currentMode === 'login' ? 'Sign In' : 'Create Account';
@@ -1284,7 +1274,6 @@ async function loadHistoryModal() {
             });
         });
     } catch (error) {
-        console.error('Load history error:', error);
         historyList.innerHTML = '<p class="empty-history">Could not load history.</p>';
     }
 }
@@ -1518,7 +1507,4 @@ aboutModal.addEventListener('click', (e) => {
 // ============================================================
 // INIT
 // ============================================================
-console.log('✅ Free Translate Language initialized!');
-
-// Check authentication status on load
 checkAuthStatus();
