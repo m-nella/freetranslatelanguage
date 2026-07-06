@@ -1,5 +1,5 @@
 // ============================================================
-// FREETRANSLATE - EMAIL SERVICE
+// FREE TRANSLATE LANGUAGE - EMAIL SERVICE
 // Using Brevo REST API (not SMTP)
 // ============================================================
 
@@ -26,7 +26,7 @@ app.get('/health', (req, res) => {
 // Root endpoint
 app.get('/', (req, res) => {
     res.json({
-        service: 'FreeTranslate Email Service',
+        service: 'Free Translate Language Email Service',
         version: '1.0.0',
         endpoints: {
             health: 'GET /health',
@@ -61,7 +61,7 @@ app.post('/api/send-email', async (req, res) => {
         // Prepare Brevo API request
         const postData = JSON.stringify({
             sender: {
-                name: process.env.BREVO_SENDER_NAME || 'FreeTranslate',
+                name: process.env.BREVO_SENDER_NAME || 'Free Translate Language',
                 email: process.env.BREVO_SENDER_EMAIL || 'mutuyimanaornella00@gmail.com'
             },
             to: [{
@@ -138,14 +138,14 @@ app.post('/api/send-email', async (req, res) => {
 
 function getEmailSubject(action) {
     const subjects = {
-        signup: 'Verify Your Email - FreeTranslate',
-        signin: 'Your Sign In Code - FreeTranslate',
-        reset: 'Reset Your Password - FreeTranslate',
-        delete: 'Delete Account Verification - FreeTranslate',
-        email: 'Change Email Verification - FreeTranslate',
-        password: 'Change Password Verification - FreeTranslate'
+        signup: 'Verify Your Email - Free Translate Language',
+        signin: 'Your Sign In Code - Free Translate Language',
+        reset: 'Reset Your Password - Free Translate Language',
+        delete: 'Delete Account Verification - Free Translate Language',
+        email: 'Change Email Verification - Free Translate Language',
+        password: 'Change Password Verification - Free Translate Language'
     };
-    return subjects[action] || 'Verification Code - FreeTranslate';
+    return subjects[action] || 'Verification Code - Free Translate Language';
 }
 
 function getEmailTemplate(code, action) {
@@ -182,7 +182,7 @@ function getEmailTemplate(code, action) {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Verification Code - FreeTranslate</title>
+            <title>Verification Code - Free Translate Language</title>
             <style>
                 body {
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
@@ -286,7 +286,7 @@ function getEmailTemplate(code, action) {
             <div class="container">
                 <div class="header">
                     <span class="emoji">${actionEmoji[action] || '📧'}</span>
-                    <h1>FreeTranslate</h1>
+                    <h1>Free Translate Language</h1>
                     <p style="color: #666; margin: 5px 0 0;">Break language barriers instantly</p>
                 </div>
                 
@@ -313,9 +313,9 @@ function getEmailTemplate(code, action) {
                 </div>
                 
                 <div class="footer">
-                    <p>© 2026 FreeTranslate | Built by Ornella Mutuyimana</p>
+                    <p>© 2026 Free Translate Language | Built by Ornella Mutuyimana</p>
                     <p>
-                        <a href="https://m-nella.github.io/freetranslatelanguage/">Visit FreeTranslate</a> 
+                        <a href="https://m-nella.github.io/freetranslatelanguage/">Visit Free Translate Language</a> 
                         • 
                         <a href="mailto:mutuyimanaornella00@gmail.com">Contact Support</a>
                     </p>
@@ -337,7 +337,7 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
     console.log('='.repeat(50));
-    console.log('🚀 FreeTranslate Email Service Started');
+    console.log('🚀 Free Translate Language Email Service Started');
     console.log('='.repeat(50));
     console.log(`📡 Server running on port: ${PORT}`);
     console.log(`🌐 URL: http://localhost:${PORT}`);
