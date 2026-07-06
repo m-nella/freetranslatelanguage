@@ -1,11 +1,11 @@
 // ============================================================
-// FREETRANSLATE - EMAIL SERVICE ONLY
-// Lightweight server for sending verification emails
+// FREETRANSLATE - EMAIL SERVICE
+// Using Brevo REST API (not SMTP)
 // ============================================================
 
 const express = require('express');
 const cors = require('cors');
-const nodemailer = require('nodemailer');
+const https = require('https');
 require('dotenv').config();
 
 const app = express();
@@ -36,7 +36,7 @@ app.get('/', (req, res) => {
 });
 
 // ============================================================
-// EMAIL SENDING ENDPOINT
+// SEND EMAIL VIA BREVO REST API
 // ============================================================
 
 app.post('/api/send-email', async (req, res) => {
@@ -54,37 +54,74 @@ app.post('/api/send-email', async (req, res) => {
         console.log(`📧 Sending ${action} code to: ${email}`);
         console.log(`🔑 Code: ${code}`);
 
-        // Configure Brevo SMTP
-        const transporter = nodemailer.createTransport({
-            host: 'smtp-relay.brevo.com',
-            port: 587,
-            secure: false, // true for 465, false for other ports
-            auth: {
-                user: process.env.BREVO_EMAIL,
-                pass: process.env.BREVO_API_KEY
-            }
-        });
-
         // Get email content
         const subject = getEmailSubject(action);
-        const html = getEmailTemplate(code, action, email);
+        const htmlContent = getEmailTemplate(code, action);
 
-        // Send email
-        const info = await transporter.sendMail({
-            from: `FreeTranslate <${process.env.BREVO_SENDER_EMAIL}>`,
-            to: email,
+        // Prepare Brevo API request
+        const postData = JSON.stringify({
+            sender: {
+                name: process.env.BREVO_SENDER_NAME || 'FreeTranslate',
+                email: process.env.BREVO_SENDER_EMAIL || 'mutuyimanaornella00@gmail.com'
+            },
+            to: [{
+                email: email,
+                name: email.split('@')[0]
+            }],
             subject: subject,
-            html: html
+            htmlContent: htmlContent
         });
 
-        console.log(`✅ Email sent successfully to: ${email}`);
-        console.log(`📨 Message ID: ${info.messageId}`);
+        const options = {
+            hostname: 'api.brevo.com',
+            port: 443,
+            path: '/v3/smtp/email',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'api-key': process.env.BREVO_API_KEY,
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
 
-        res.json({
-            success: true,
-            message: 'Verification code sent successfully',
-            messageId: info.messageId
+        // Send request to Brevo
+        const response = await new Promise((resolve, reject) => {
+            const request = https.request(options, (response) => {
+                let data = '';
+                response.on('data', (chunk) => { data += chunk; });
+                response.on('end', () => {
+                    try {
+                        const parsed = JSON.parse(data);
+                        resolve({ statusCode: response.statusCode, data: parsed });
+                    } catch (e) {
+                        resolve({ statusCode: response.statusCode, data: data });
+                    }
+                });
+            });
+
+            request.on('error', (error) => {
+                reject(error);
+            });
+
+            request.write(postData);
+            request.end();
         });
+
+        if (response.statusCode === 201 || response.statusCode === 200) {
+            console.log(`✅ Email sent successfully to: ${email}`);
+            console.log(`📨 Message ID: ${response.data.messageId || 'N/A'}`);
+            res.json({
+                success: true,
+                message: 'Verification code sent successfully',
+                messageId: response.data.messageId
+            });
+        } else {
+            console.error('❌ Brevo API error:', response.data);
+            res.status(response.statusCode || 500).json({
+                success: false,
+                error: response.data.message || 'Failed to send email'
+            });
+        }
 
     } catch (error) {
         console.error('❌ Email error:', error);
@@ -111,7 +148,7 @@ function getEmailSubject(action) {
     return subjects[action] || 'Verification Code - FreeTranslate';
 }
 
-function getEmailTemplate(code, action, email) {
+function getEmailTemplate(code, action) {
     const actionText = {
         signup: 'create your account',
         signin: 'sign in to your account',
@@ -305,6 +342,6 @@ app.listen(PORT, () => {
     console.log(`📡 Server running on port: ${PORT}`);
     console.log(`🌐 URL: http://localhost:${PORT}`);
     console.log(`📧 Email service: ${process.env.BREVO_EMAIL || 'Not configured'}`);
-    console.log(`📊 Status: Ready to send emails`);
+    console.log(`📊 Status: Ready to send emails via Brevo REST API`);
     console.log('='.repeat(50));
 });
