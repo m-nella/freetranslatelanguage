@@ -61,11 +61,13 @@ exports.signup = async (req, res) => {
 };
 
 // ============================================================
-// VERIFY CODE
+// VERIFY CODE - FIXED
 // ============================================================
 exports.verifyCode = async (req, res) => {
     try {
         const { email, code, action } = req.body;
+
+        console.log('🔍 Verifying code:', { email, code, action });
 
         // Find verification code
         const verification = await VerificationCode.findOne({
@@ -76,6 +78,7 @@ exports.verifyCode = async (req, res) => {
         });
 
         if (!verification) {
+            console.log('❌ No verification found for:', { email, code, action });
             return res.status(400).json({
                 success: false,
                 error: 'Invalid or expired verification code.'
@@ -84,6 +87,7 @@ exports.verifyCode = async (req, res) => {
 
         // Check if expired
         if (codeGenerator.isExpired(verification.expiresAt)) {
+            console.log('❌ Code expired:', verification.expiresAt);
             return res.status(400).json({
                 success: false,
                 error: 'Code has expired. Please request a new one.'
@@ -102,6 +106,8 @@ exports.verifyCode = async (req, res) => {
         // Mark as used
         verification.isUsed = true;
         await verification.save();
+
+        console.log('✅ Code verified for:', email);
 
         // Handle different actions
         switch (action) {
@@ -125,6 +131,12 @@ exports.verifyCode = async (req, res) => {
                     success: true,
                     message: 'Sign in successful!',
                     token: signinToken
+                });
+
+            case 'reset':
+                return res.json({
+                    success: true,
+                    message: 'Password reset verified!'
                 });
 
             default:
