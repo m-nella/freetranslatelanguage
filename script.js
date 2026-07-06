@@ -43,8 +43,10 @@ let currentUser = null;
 let isLoggedIn = false;
 let pendingEmail = '';
 let pendingAction = '';
-let pendingCallback = null; // Store callback for after verification
+let pendingCode = ''; // Store the actual code sent
+let pendingCallback = null;
 let isVerifying = false;
+let verificationDone = false;
 
 // ============================================================
 // DOM ELEMENTS
@@ -174,7 +176,7 @@ function clearAllPasswordFields() {
 }
 
 // ============================================================
-// VERIFICATION CODE SYSTEM
+// VERIFICATION CODE SYSTEM - FIXED
 // ============================================================
 function generateVerificationCode() {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -182,6 +184,8 @@ function generateVerificationCode() {
 
 async function sendVerificationCode(email, action = 'verification') {
     const code = generateVerificationCode();
+    pendingCode = code; // Store the code globally
+    
     console.log('📧 Sending verification code for:', email);
     console.log('📧 Code:', code);
     console.log('📧 Action:', action);
@@ -211,7 +215,7 @@ async function sendVerificationCode(email, action = 'verification') {
 }
 
 // ============================================================
-// VERIFY CODE - Fixed to return token
+// VERIFY CODE - Fixed
 // ============================================================
 async function verifyCode(email, code) {
     if (isVerifying) {
@@ -231,7 +235,6 @@ async function verifyCode(email, code) {
         console.log('🔍 Verification result:', result);
         
         if (result.success) {
-            // Return the token from the verification response
             return { 
                 success: true, 
                 token: result.data.token,
@@ -302,13 +305,14 @@ function showConfirmationModal(title, message, confirmText = 'Confirm', cancelTe
 }
 
 // ============================================================
-// VERIFICATION MODAL - FIXED COMPLETELY
+// VERIFICATION MODAL - COMPLETELY REWRITTEN
 // ============================================================
 function openVerificationModal(email, action, callback) {
     pendingEmail = email;
     pendingAction = action;
-    pendingCallback = callback; // Store the callback
+    pendingCallback = callback;
     isVerifying = false;
+    verificationDone = false;
     
     // Remove any existing verification modal
     const existing = document.getElementById('verificationModal');
@@ -324,7 +328,7 @@ function openVerificationModal(email, action, callback) {
             <h2>${action === 'signup' ? 'Verify Your Email' : action === 'signin' ? 'Verify Sign In' : action === 'reset' ? 'Reset Password' : action === 'delete' ? 'Delete Account' : action === 'email' ? 'Change Email' : action === 'password' ? 'Change Password' : 'Verify Email'}</h2>
             <p class="verification-desc">Enter the 6-digit code sent to your email. Also check in SPAM/JUNK folder.</p>
             <form id="verificationForm">
-                <input type="text" id="verificationCode" placeholder="Enter the 6-digit code sent to your email. Also check in SPAM/JUNK folder." maxlength="6" autocomplete="off" required>
+                <input type="text" id="verificationCode" placeholder="Enter the 6-digit code" maxlength="6" autocomplete="off" required>
                 <button type="submit" class="auth-submit-btn" id="verifySubmitBtn">Verify</button>
             </form>
             <p class="auth-switch">Didn't receive code? <a href="#" id="resendCodeBtn">Resend Code</a></p>
@@ -333,12 +337,23 @@ function openVerificationModal(email, action, callback) {
     document.body.appendChild(modal);
     
     const closeBtn = modal.querySelector('.close-verification');
-    closeBtn.addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    closeBtn.addEventListener('click', () => {
+        modal.remove();
+        // Reset state
+        isVerifying = false;
+        verificationDone = false;
+    });
+    modal.addEventListener('click', (e) => { 
+        if (e.target === modal) {
+            modal.remove();
+            isVerifying = false;
+            verificationDone = false;
+        }
+    });
     
     const form = modal.querySelector('#verificationForm');
     const submitBtn = modal.querySelector('#verifySubmitBtn');
-    let verificationDone = false; // Prevent double verification
+    const codeInput = document.getElementById('verificationCode');
     
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -346,29 +361,31 @@ function openVerificationModal(email, action, callback) {
         
         // Prevent multiple submissions
         if (isVerifying || verificationDone) {
-            console.log('⏳ Verification already in progress or done...');
+            console.log('⏳ Already verifying or done');
             return;
         }
         
-        const code = document.getElementById('verificationCode').value.trim();
+        const code = codeInput.value.trim();
         if (!code || code.length !== 6) {
             showNotification('Please enter a valid 6-digit code.', 'error');
             return;
         }
         
+        // Disable the button
         submitBtn.disabled = true;
         submitBtn.textContent = 'Verifying...';
         isVerifying = true;
         
         try {
-            // This calls the backend and gets the token
+            // Verify the code
             const result = await verifyCode(email, code);
             
             if (result.success) {
-                // Mark as done to prevent further submissions
+                // Mark as done
                 verificationDone = true;
-                submitBtn.disabled = true;
                 submitBtn.textContent = '✅ Verified';
+                submitBtn.style.backgroundColor = '#4CAF50';
+                codeInput.disabled = true;
                 
                 showNotification('✅ Verification successful!', 'success');
                 
@@ -377,53 +394,69 @@ function openVerificationModal(email, action, callback) {
                     localStorage.setItem('authToken', result.token);
                 }
                 
-                // Close the modal
-                modal.remove();
-                
-                // Execute the callback with the token
-                if (typeof pendingCallback === 'function') {
-                    await pendingCallback(result.token);
-                }
-                
-                // Refresh auth status
-                await checkAuthStatus();
+                // Close the modal after a short delay
+                setTimeout(() => {
+                    modal.remove();
+                    // Execute callback with token
+                    if (typeof pendingCallback === 'function') {
+                        pendingCallback(result.token);
+                    }
+                    // Check auth status
+                    checkAuthStatus();
+                    // Reset state
+                    isVerifying = false;
+                    verificationDone = false;
+                }, 800);
                 
             } else {
+                // Verification failed
                 showNotification(result.error || 'Invalid code. Please try again.', 'error');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Verify';
+                submitBtn.style.backgroundColor = '';
                 isVerifying = false;
-                
-                // Clear the input for retry
-                document.getElementById('verificationCode').value = '';
-                document.getElementById('verificationCode').focus();
+                codeInput.value = '';
+                codeInput.focus();
             }
         } catch (error) {
             console.error('❌ Verification error:', error);
             showNotification('An error occurred during verification.', 'error');
             submitBtn.disabled = false;
             submitBtn.textContent = 'Verify';
+            submitBtn.style.backgroundColor = '';
             isVerifying = false;
         }
     });
     
+    // Resend code handler
     const resendBtn = modal.querySelector('#resendCodeBtn');
-    resendBtn.addEventListener('click', async () => {
+    resendBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
         clearAllNotifications();
+        
+        // Reset verification state for new code
+        verificationDone = false;
+        isVerifying = false;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Verify';
+        submitBtn.style.backgroundColor = '';
+        codeInput.disabled = false;
+        codeInput.value = '';
+        codeInput.focus();
+        
         const result = await sendVerificationCode(email, pendingAction);
         if (result.success) {
-            showNotification('New code sent! 📧', 'success');
-            document.getElementById('verificationCode').value = '';
-            document.getElementById('verificationCode').focus();
+            showNotification('✅ New code sent! Check your email.', 'success');
+            pendingCode = result.code;
         } else {
-            showNotification('Error sending code. Please try again.', 'error');
+            showNotification('❌ Error sending code. Please try again.', 'error');
         }
     });
     
     // Focus the input
     setTimeout(() => {
-        document.getElementById('verificationCode').focus();
-    }, 100);
+        codeInput.focus();
+    }, 200);
 }
 
 // ============================================================
@@ -447,7 +480,6 @@ async function checkAuthStatus() {
         authBtn.innerHTML = `<i class="fas fa-user-circle"></i> ${currentUser.username}`;
         authBtn.classList.add('logged-in');
         if (historyNavBtn) historyNavBtn.style.display = 'flex';
-        showNotification(`Welcome ${currentUser.username}! 🎉`, 'success');
     } else {
         localStorage.removeItem('authToken');
         isLoggedIn = false;
@@ -653,6 +685,7 @@ function openAccountSettings() {
             }
         }
         
+        // Verify current password
         const verifyResult = await apiCall('/auth/verify-password', 'POST', {
             password: currentPassword
         });
@@ -838,10 +871,11 @@ authModal.addEventListener('click', (e) => {
 });
 
 // ============================================================
-// AUTH FORM SUBMIT - FIXED
+// AUTH FORM SUBMIT - COMPLETELY REWRITTEN
 // ============================================================
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    e.stopPropagation();
     
     const email = document.getElementById('authEmail').value;
     const password = document.getElementById('authPassword')?.value || '';
@@ -878,6 +912,7 @@ authForm.addEventListener('submit', async (e) => {
                 }
             }
             
+            // Send verification code
             const codeResult = await sendVerificationCode(email, 'signin');
             if (!codeResult.success) {
                 showNotification('❌ Error sending verification code. Please try again.', 'error');
@@ -888,10 +923,8 @@ authForm.addEventListener('submit', async (e) => {
             
             authModal.style.display = 'none';
             
-            // Open verification modal - callback receives the token directly
+            // Open verification modal - callback handles success
             openVerificationModal(email, 'signin', async (token) => {
-                // Token is already stored in localStorage by the modal
-                // Just update the UI and reset the button
                 showNotification('✅ Sign in successful!', 'success');
                 await checkAuthStatus();
                 authSubmitBtn.disabled = false;
@@ -903,18 +936,14 @@ authForm.addEventListener('submit', async (e) => {
             authSubmitBtn.disabled = true;
             authSubmitBtn.textContent = 'Sending code...';
             
-            // Check if email exists
+            // Check if email exists by trying to sign in
             const checkResult = await apiCall('/auth/signin', 'POST', {
                 email: email,
                 password: 'dummy'
             });
             
             if (checkResult.data.error === 'Incorrect password. Please try again.') {
-                const result = await apiCall('/auth/send-code', 'POST', {
-                    email: email,
-                    action: 'reset'
-                });
-                
+                const result = await sendVerificationCode(email, 'reset');
                 if (!result.success) {
                     showNotification('❌ Error sending reset code.', 'error');
                     authSubmitBtn.disabled = false;
@@ -938,7 +967,6 @@ authForm.addEventListener('submit', async (e) => {
                 authSubmitBtn.disabled = false;
                 authSubmitBtn.textContent = 'Send Reset Code';
                 setTimeout(() => openModal('signup'), 2000);
-                return;
             }
             
         } else if (currentMode === 'signup') {
