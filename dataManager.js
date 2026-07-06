@@ -11,6 +11,9 @@ const DATA_MANAGER = {
         HISTORY: 'history'
     },
 
+    // Email API URL
+    EMAIL_API_URL: 'https://freetranslatelanguage.onrender.com/api/send-email',
+
     // ============================================================
     // INITIALIZATION
     // ============================================================
@@ -246,13 +249,13 @@ const DATA_MANAGER = {
         localStorage.removeItem(this.KEYS.LOGGED_IN_USER);
         
         // Clear user's history
-        this.clearUserHistory(userId);
+        this.clearUserHistory(user.email);
 
         return { success: true };
     },
 
     // ============================================================
-    // VERIFICATION CODE SYSTEM
+    // VERIFICATION CODE SYSTEM WITH EMAIL
     // ============================================================
 
     // Generate a verification code
@@ -260,18 +263,52 @@ const DATA_MANAGER = {
         return Math.floor(100000 + Math.random() * 900000).toString();
     },
 
-    // Send/stored verification code
-    storeVerificationCode(email, action) {
-        const code = this.generateCode();
-        const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutes
+    // Send verification code via Render API
+    async sendEmailViaAPI(email, code, action) {
+        try {
+            console.log(`📧 Sending email via Render API to: ${email}`);
+            console.log(`🔑 Code: ${code}`);
+            console.log(`📋 Action: ${action}`);
 
-        // Load existing codes
+            const response = await fetch(this.EMAIL_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email,
+                    code: code,
+                    action: action
+                })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                console.log('✅ Email sent successfully via Render');
+                return { success: true };
+            } else {
+                console.error('❌ Email API returned error:', data);
+                return { success: false, error: data.error || 'Email sending failed' };
+            }
+        } catch (error) {
+            console.error('❌ Email API error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Store verification code and send email
+    async storeVerificationCode(email, action) {
+        const code = this.generateCode();
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+        console.log('📦 Storing verification code for:', email);
+        console.log('🔑 Code:', code);
+        console.log('📋 Action:', action);
+
+        // Store in localStorage
         const codes = JSON.parse(localStorage.getItem(this.KEYS.VERIFICATION_CODES) || '[]');
-        
-        // Remove old codes for this email and action
         const filtered = codes.filter(c => !(c.email === email && c.action === action));
-        
-        // Add new code
         filtered.push({
             email: email,
             code: code,
@@ -281,10 +318,24 @@ const DATA_MANAGER = {
             attempts: 0,
             createdAt: new Date().toISOString()
         });
-
         localStorage.setItem(this.KEYS.VERIFICATION_CODES, JSON.stringify(filtered));
 
-        return { success: true, code: code };
+        // Send email via Render API
+        try {
+            const emailResult = await this.sendEmailViaAPI(email, code, action);
+            
+            if (emailResult.success) {
+                console.log('📧 Verification code sent to:', email);
+                return { success: true, code: code };
+            } else {
+                // Email failed but code is stored locally
+                console.warn('⚠️ Email failed but code is stored locally:', emailResult.error);
+                return { success: true, code: code, warning: 'Email sending failed, check console for code' };
+            }
+        } catch (error) {
+            console.error('❌ Email send error:', error);
+            return { success: true, code: code, warning: 'Email failed' };
+        }
     },
 
     // Verify code
@@ -329,14 +380,14 @@ const DATA_MANAGER = {
     },
 
     // Resend code (delete old, create new)
-    resendCode(email, action) {
+    async resendCode(email, action) {
         // Remove old codes
         const codes = JSON.parse(localStorage.getItem(this.KEYS.VERIFICATION_CODES) || '[]');
         const filtered = codes.filter(c => !(c.email === email && c.action === action && !c.isUsed));
         localStorage.setItem(this.KEYS.VERIFICATION_CODES, JSON.stringify(filtered));
 
-        // Generate new code
-        return this.storeVerificationCode(email, action);
+        // Generate new code with email
+        return await this.storeVerificationCode(email, action);
     },
 
     // Clean expired codes
@@ -416,8 +467,6 @@ const DATA_MANAGER = {
 
     // Simple password hashing (for localStorage only - NOT SECURE for production)
     hashPassword(password) {
-        // This is a simple hash for development only
-        // In production, use bcrypt or similar on the backend
         let hash = '';
         for (let i = 0; i < password.length; i++) {
             const char = password.charCodeAt(i);
@@ -428,8 +477,6 @@ const DATA_MANAGER = {
 
     // Verify password
     verifyPassword(input, stored) {
-        const [hash, length] = stored.split(':');
-        // Simple verification for development
         const inputHash = this.hashPassword(input);
         return inputHash === stored;
     },
