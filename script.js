@@ -1,6 +1,7 @@
 // ============================================================
-// FREETRANSLATE - localStorage Version
-// Complete Frontend JavaScript
+// FREETRANSLATE - Complete Working Version
+// All account actions require verification code
+// No localStorage mentions in UI
 // ============================================================
 
 // ============================================================
@@ -143,7 +144,7 @@ function clearAllPasswordFields() {
 }
 
 // ============================================================
-// VERIFICATION CODE SYSTEM - localStorage Version
+// VERIFICATION CODE SYSTEM
 // ============================================================
 
 // Send verification code
@@ -152,15 +153,14 @@ async function sendVerificationCode(email, action = 'verification') {
     console.log('📧 Action:', action);
     
     try {
-        // Store code in localStorage and send email
         const result = await DATA_MANAGER.storeVerificationCode(email, action);
         
         if (result.success) {
             console.log('📧 Code stored:', result.code);
-            showNotification('📧 Verification code sent to your email! Please check your inbox (and spam folder).', 'success');
+            showNotification('📧 Verification code sent to your email. Please check your inbox and spam folder.', 'success');
             return { success: true, code: result.code };
         } else {
-            showNotification('⚠️ Error storing verification code.', 'error');
+            showNotification('⚠️ Error sending verification code. Please try again.', 'error');
             return { success: false };
         }
     } catch (error) {
@@ -187,8 +187,7 @@ async function verifyCode(email, code) {
         if (result.success) {
             return { 
                 success: true, 
-                token: 'local_' + email,
-                data: result 
+                token: 'local_' + email
             };
         } else {
             return { success: false, error: result.error || 'Invalid code. Please try again.' };
@@ -202,6 +201,45 @@ async function verifyCode(email, code) {
 }
 
 // ============================================================
+// CONFIRMATION MODAL
+// ============================================================
+function showConfirmationModal(title, message, confirmText = 'Confirm', cancelText = 'Cancel') {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'flex';
+        modal.innerHTML = `
+            <div class="modal-content confirmation-content">
+                <h2>${title}</h2>
+                <p>${message}</p>
+                <div class="confirmation-buttons">
+                    <button class="auth-submit-btn cancel-btn" id="cancelConfirm">${cancelText}</button>
+                    <button class="auth-submit-btn delete-btn" id="confirmAction">${confirmText}</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        modal.querySelector('#cancelConfirm').addEventListener('click', () => {
+            modal.remove();
+            resolve(false);
+        });
+        
+        modal.querySelector('#confirmAction').addEventListener('click', () => {
+            modal.remove();
+            resolve(true);
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+                resolve(false);
+            }
+        });
+    });
+}
+
+// ============================================================
 // VERIFICATION MODAL
 // ============================================================
 function openVerificationModal(email, action, callback) {
@@ -211,7 +249,6 @@ function openVerificationModal(email, action, callback) {
     isVerifying = false;
     verificationDone = false;
     
-    // Remove any existing verification modal
     const existing = document.getElementById('verificationModal');
     if (existing) existing.remove();
     
@@ -222,10 +259,10 @@ function openVerificationModal(email, action, callback) {
     modal.innerHTML = `
         <div class="modal-content verification-content">
             <span class="close-modal close-verification">&times;</span>
-            <h2>${action === 'signup' ? 'Verify Your Email' : action === 'signin' ? 'Verify Sign In' : action === 'reset' ? 'Reset Password' : action === 'delete' ? 'Delete Account' : action === 'email' ? 'Change Email' : action === 'password' ? 'Change Password' : 'Verify Email'}</h2>
-            <p class="verification-desc">Enter the 6-digit code sent to your email. Also check in SPAM/JUNK folder.</p>
+            <h2>${action === 'signup' ? 'Verify Your Email' : action === 'signin' ? 'Verify Sign In' : action === 'delete' ? 'Confirm Delete Account' : action === 'email' ? 'Verify Email Change' : action === 'password' ? 'Verify Password Change' : 'Verification Required'}</h2>
+            <p class="verification-desc">Enter the 6-digit verification code sent to your email.</p>
             <form id="verificationForm">
-                <input type="text" id="verificationCode" placeholder="Enter the 6-digit code" maxlength="6" autocomplete="off" required>
+                <input type="text" id="verificationCode" placeholder="Enter 6-digit code" maxlength="6" autocomplete="off" required>
                 <button type="submit" class="auth-submit-btn" id="verifySubmitBtn">Verify</button>
             </form>
             <p class="auth-switch">Didn't receive code? <a href="#" id="resendCodeBtn">Resend Code</a></p>
@@ -275,11 +312,11 @@ function openVerificationModal(email, action, callback) {
             
             if (result.success) {
                 verificationDone = true;
-                submitBtn.textContent = '✅ Verified';
+                submitBtn.textContent = '✓ Verified';
                 submitBtn.style.backgroundColor = '#4CAF50';
                 codeInput.disabled = true;
                 
-                showNotification('✅ Verification successful!', 'success');
+                showNotification('Verification successful!', 'success');
                 
                 if (result.token) {
                     localStorage.setItem('authToken', result.token);
@@ -330,9 +367,9 @@ function openVerificationModal(email, action, callback) {
         
         const result = await sendVerificationCode(email, pendingAction);
         if (result.success) {
-            showNotification('✅ New code sent! Check your email.', 'success');
+            showNotification('New code sent! Check your email.', 'success');
         } else {
-            showNotification('❌ Error sending code. Please try again.', 'error');
+            showNotification('Error sending code. Please try again.', 'error');
         }
     });
     
@@ -342,31 +379,39 @@ function openVerificationModal(email, action, callback) {
 }
 
 // ============================================================
-// AUTH STATE - localStorage Version
+// AUTH STATE
 // ============================================================
 async function checkAuthStatus() {
-    const user = DATA_MANAGER.getCurrentUser();
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+        isLoggedIn = false;
+        currentUser = null;
+        authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
+        authBtn.classList.remove('logged-in');
+        if (historyNavBtn) historyNavBtn.style.display = 'none';
+        return;
+    }
     
+    const user = DATA_MANAGER.getCurrentUser();
     if (user) {
         currentUser = {
             id: user.id,
             email: user.email,
             username: user.username,
             createdAt: user.createdAt,
-            preferences: user.preferences
+            lastLogin: user.lastLogin
         };
         isLoggedIn = true;
         authBtn.innerHTML = `<i class="fas fa-user-circle"></i> ${currentUser.username}`;
         authBtn.classList.add('logged-in');
         if (historyNavBtn) historyNavBtn.style.display = 'flex';
-        console.log('✅ User logged in:', currentUser.username);
     } else {
+        localStorage.removeItem('authToken');
         isLoggedIn = false;
         currentUser = null;
         authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
         authBtn.classList.remove('logged-in');
         if (historyNavBtn) historyNavBtn.style.display = 'none';
-        localStorage.removeItem('authToken');
     }
 }
 
@@ -456,13 +501,13 @@ function logoutUser() {
     authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
     authBtn.classList.remove('logged-in');
     if (historyNavBtn) historyNavBtn.style.display = 'none';
-    showNotification('Logged out successfully! 👋', 'info');
+    showNotification('Logged out successfully.', 'info');
     clearAllPasswordFields();
     if (profileMenu) profileMenu.remove();
 }
 
 // ============================================================
-// PROFILE MODAL - localStorage Version
+// PROFILE MODAL
 // ============================================================
 function openProfileModal() {
     const user = DATA_MANAGER.getCurrentUser();
@@ -481,14 +526,13 @@ function openProfileModal() {
                 <i class="fas fa-user-circle profile-icon"></i>
                 <h2>${user.username}</h2>
                 <p>${user.email}</p>
-                <span class="profile-badge">✅ Local Account</span>
+                <span class="profile-badge">Verified</span>
             </div>
             <div class="profile-info">
                 <div class="info-item"><strong>Username:</strong> ${user.username}</div>
                 <div class="info-item"><strong>Email:</strong> ${user.email}</div>
-                <div class="info-item"><strong>Account Created:</strong> ${new Date(user.createdAt).toLocaleDateString()}</div>
+                <div class="info-item"><strong>Member Since:</strong> ${new Date(user.createdAt).toLocaleDateString()}</div>
                 <div class="info-item"><strong>Last Login:</strong> ${user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'First time'}</div>
-                <div class="info-item" style="font-size: 12px; color: #666; margin-top: 10px;">💾 Data stored locally in your browser</div>
             </div>
             <button class="auth-submit-btn" id="goToSettingsBtn">Account Settings</button>
         </div>
@@ -505,7 +549,7 @@ function openProfileModal() {
 }
 
 // ============================================================
-// ACCOUNT SETTINGS - localStorage Version
+// ACCOUNT SETTINGS
 // ============================================================
 function openAccountSettings() {
     const user = DATA_MANAGER.getCurrentUser();
@@ -525,12 +569,12 @@ function openAccountSettings() {
             <div class="settings-body">
                 <div class="settings-field">
                     <label>Username</label>
-                    <input type="text" id="settingsUsername" value="${user.username}">
+                    <input type="text" value="${user.username}" disabled>
+                    <small style="color: #888; font-size: 12px;">Username is auto-generated and cannot be changed</small>
                 </div>
                 <div class="settings-field">
                     <label>Email</label>
-                    <input type="email" id="settingsEmail" value="${user.email}" disabled>
-                    <small style="color: #666; font-size: 12px;">Email cannot be changed in local storage mode</small>
+                    <input type="email" id="settingsEmail" value="${user.email}">
                 </div>
                 <div class="settings-field">
                     <label>Current Password</label>
@@ -538,7 +582,7 @@ function openAccountSettings() {
                 </div>
                 <div class="settings-field">
                     <label>New Password</label>
-                    ${createPasswordField('settingsNewPassword', 'Enter new password (8+ chars, different from current)').outerHTML}
+                    ${createPasswordField('settingsNewPassword', 'Enter new password (8+ chars)').outerHTML}
                 </div>
                 <div class="settings-field">
                     <label>Confirm New Password</label>
@@ -546,9 +590,6 @@ function openAccountSettings() {
                 </div>
                 <button id="saveSettingsBtn" class="auth-submit-btn">Save Changes</button>
                 <button id="deleteAccountBtn" class="auth-submit-btn delete-btn">Delete Account</button>
-                <div style="margin-top: 15px; padding: 10px; background: #f0f0f0; border-radius: 5px; font-size: 12px; color: #666;">
-                    💾 All data is stored locally in your browser.
-                </div>
             </div>
         </div>
     `;
@@ -560,62 +601,89 @@ function openAccountSettings() {
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     
     modal.querySelector('#saveSettingsBtn').addEventListener('click', async () => {
-        const newUsername = document.getElementById('settingsUsername').value;
+        const newEmail = document.getElementById('settingsEmail').value;
         const currentPassword = document.getElementById('settingsCurrentPassword').value;
         const newPassword = document.getElementById('settingsNewPassword').value;
         const confirmPassword = document.getElementById('settingsConfirmPassword').value;
         
-        let hasChanges = false;
+        if (!currentPassword) {
+            showNotification('Please enter your current password.', 'error');
+            return;
+        }
         
-        // Update username
-        if (newUsername && newUsername !== user.username) {
-            const validation = DATA_MANAGER.validateUsername(newUsername);
+        // Verify current password
+        if (!DATA_MANAGER.verifyPassword(currentPassword, user.password)) {
+            showNotification('Current password is incorrect.', 'error');
+            return;
+        }
+        
+        // Handle email change
+        if (newEmail && newEmail !== user.email) {
+            // Check if email already exists
+            const existing = DATA_MANAGER.findUserByEmail(newEmail);
+            if (existing && existing.id !== user.id) {
+                showNotification('Email already in use by another account.', 'error');
+                return;
+            }
+            
+            const result = await sendVerificationCode(newEmail, 'email');
+            if (!result.success) {
+                showNotification('Error sending verification code.', 'error');
+                return;
+            }
+            
+            openVerificationModal(newEmail, 'email', async (token) => {
+                const updateResult = DATA_MANAGER.updateProfile(user.id, { email: newEmail });
+                if (updateResult.success) {
+                    showNotification('Email updated successfully!', 'success');
+                    user.email = newEmail;
+                    modal.remove();
+                    clearAllPasswordFields();
+                    setTimeout(() => openProfileModal(), 500);
+                } else {
+                    showNotification('Error updating email.', 'error');
+                }
+            });
+            return;
+        }
+        
+        // Handle password change
+        if (newPassword || confirmPassword) {
+            if (newPassword !== confirmPassword) {
+                showNotification('New passwords do not match!', 'error');
+                return;
+            }
+            if (newPassword === currentPassword) {
+                showNotification('New password must be different from current password.', 'error');
+                return;
+            }
+            
+            const validation = DATA_MANAGER.validatePasswordStrength(newPassword);
             if (!validation.valid) {
                 showNotification(validation.message, 'error');
                 return;
             }
             
-            const result = DATA_MANAGER.updateProfile(user.id, { username: newUsername });
-            if (result.success) {
-                showNotification('✅ Username updated successfully!', 'success');
-                user.username = newUsername;
-                await checkAuthStatus();
-                hasChanges = true;
-            } else {
-                showNotification('❌ ' + result.error, 'error');
-                return;
-            }
-        }
-        
-        // Change password
-        if (newPassword || confirmPassword || currentPassword) {
-            if (!currentPassword) {
-                showNotification('❌ Please enter your current password.', 'error');
+            const result = await sendVerificationCode(user.email, 'password');
+            if (!result.success) {
+                showNotification('Error sending verification code.', 'error');
                 return;
             }
             
-            if (newPassword !== confirmPassword) {
-                showNotification('❌ New passwords do not match!', 'error');
-                return;
-            }
-            
-            if (newPassword) {
-                const result = DATA_MANAGER.changePassword(user.id, currentPassword, newPassword);
-                if (result.success) {
-                    showNotification('✅ Password updated successfully!', 'success');
+            openVerificationModal(user.email, 'password', async (token) => {
+                const updateResult = DATA_MANAGER.changePassword(user.id, currentPassword, newPassword);
+                if (updateResult.success) {
+                    showNotification('Password updated successfully!', 'success');
+                    modal.remove();
                     clearAllPasswordFields();
-                    hasChanges = true;
                 } else {
-                    showNotification('❌ ' + result.error, 'error');
-                    return;
+                    showNotification('Error updating password.', 'error');
                 }
-            }
+            });
+            return;
         }
         
-        if (!hasChanges) {
-            showNotification('No changes made.', 'info');
-        }
-        
+        showNotification('No changes made.', 'info');
         modal.remove();
         clearAllPasswordFields();
     });
@@ -623,24 +691,38 @@ function openAccountSettings() {
     modal.querySelector('#deleteAccountBtn').addEventListener('click', async () => {
         const confirmed = await showConfirmationModal(
             'Delete Account',
-            'Are you sure you want to delete your account? This action cannot be undone. All your data will be permanently lost.',
+            'Are you sure you want to delete your account? This action cannot be undone.',
             'Delete Account',
             'Cancel'
         );
         if (!confirmed) return;
         
-        const password = prompt('Enter your password to confirm account deletion:');
+        const password = prompt('Enter your password to confirm deletion:');
         if (!password) return;
         
-        const result = DATA_MANAGER.deleteAccount(user.id, password);
-        if (result.success) {
-            showNotification('✅ Account deleted successfully.', 'info');
-            modal.remove();
-            clearAllPasswordFields();
-            window.location.reload();
-        } else {
-            showNotification('❌ ' + result.error, 'error');
+        if (!DATA_MANAGER.verifyPassword(password, user.password)) {
+            showNotification('Incorrect password.', 'error');
+            return;
         }
+        
+        const result = await sendVerificationCode(user.email, 'delete');
+        if (!result.success) {
+            showNotification('Error sending verification code.', 'error');
+            return;
+        }
+        
+        openVerificationModal(user.email, 'delete', async (token) => {
+            const deleteResult = DATA_MANAGER.deleteAccount(user.id, password);
+            if (deleteResult.success) {
+                localStorage.removeItem('authToken');
+                showNotification('Account deleted successfully.', 'info');
+                modal.remove();
+                clearAllPasswordFields();
+                window.location.reload();
+            } else {
+                showNotification('Error deleting account.', 'error');
+            }
+        });
     });
 }
 
@@ -668,11 +750,7 @@ function openModal(mode) {
         const password = createPasswordField('authPassword', 'Password');
         authFields.appendChild(password);
         bindPasswordToggles(authModal);
-        forgotPasswordLink.style.display = 'block';
-        forgotPasswordBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            showNotification('Password reset is not available in local storage mode. Please contact support.', 'warning');
-        });
+        forgotPasswordLink.style.display = 'none';
         
     } else if (mode === 'signup') {
         authModalTitle.textContent = 'Create Account';
@@ -727,7 +805,7 @@ authModal.addEventListener('click', (e) => {
 });
 
 // ============================================================
-// AUTH FORM SUBMIT - localStorage Version
+// AUTH FORM SUBMIT
 // ============================================================
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -747,23 +825,22 @@ authForm.addEventListener('submit', async (e) => {
             
             if (!result.success) {
                 if (result.error === 'Account not found. Please create an account.') {
-                    showNotification('❌ Account not found. Redirecting to Create Account...', 'error');
+                    showNotification('Account not found. Redirecting to Create Account...', 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Sign In';
                     setTimeout(() => openModal('signup'), 1500);
                     return;
                 } else {
-                    showNotification('❌ ' + result.error, 'error');
+                    showNotification(result.error, 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Sign In';
                     return;
                 }
             }
             
-            // Send verification code
             const codeResult = await sendVerificationCode(email, 'signin');
             if (!codeResult.success) {
-                showNotification('❌ Error sending verification code. Please try again.', 'error');
+                showNotification('Error sending verification code.', 'error');
                 authSubmitBtn.disabled = false;
                 authSubmitBtn.textContent = 'Sign In';
                 return;
@@ -772,7 +849,7 @@ authForm.addEventListener('submit', async (e) => {
             authModal.style.display = 'none';
             
             openVerificationModal(email, 'signin', async (token) => {
-                showNotification('✅ Sign in successful!', 'success');
+                showNotification('Sign in successful!', 'success');
                 await checkAuthStatus();
                 authSubmitBtn.disabled = false;
                 authSubmitBtn.textContent = 'Sign In';
@@ -784,7 +861,7 @@ authForm.addEventListener('submit', async (e) => {
             const username = email.split('@')[0];
             
             if (password !== confirmPassword) {
-                showNotification('❌ Passwords do not match!', 'error');
+                showNotification('Passwords do not match!', 'error');
                 return;
             }
             
@@ -795,7 +872,7 @@ authForm.addEventListener('submit', async (e) => {
             }
             
             if (!DATA_MANAGER.validateEmail(email)) {
-                showNotification('❌ Invalid email format.', 'error');
+                showNotification('Invalid email format.', 'error');
                 return;
             }
             
@@ -806,13 +883,13 @@ authForm.addEventListener('submit', async (e) => {
             
             if (!result.success) {
                 if (result.error === 'Email already registered. Please sign in.') {
-                    showNotification('❌ Email already registered. Redirecting to Sign In...', 'error');
+                    showNotification('Email already registered. Redirecting to Sign In...', 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Create Account';
                     setTimeout(() => openModal('login'), 1500);
                     return;
                 } else {
-                    showNotification('❌ ' + result.error, 'error');
+                    showNotification(result.error, 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Create Account';
                     return;
@@ -821,7 +898,7 @@ authForm.addEventListener('submit', async (e) => {
             
             const codeResult = await sendVerificationCode(email, 'signup');
             if (!codeResult.success) {
-                showNotification('❌ Error sending verification code. Please try again.', 'error');
+                showNotification('Error sending verification code.', 'error');
                 authSubmitBtn.disabled = false;
                 authSubmitBtn.textContent = 'Create Account';
                 return;
@@ -830,7 +907,7 @@ authForm.addEventListener('submit', async (e) => {
             authModal.style.display = 'none';
             
             openVerificationModal(email, 'signup', async (token) => {
-                showNotification('✅ Account created successfully!', 'success');
+                showNotification('Account created successfully!', 'success');
                 await checkAuthStatus();
                 authSubmitBtn.disabled = false;
                 authSubmitBtn.textContent = 'Create Account';
@@ -839,14 +916,14 @@ authForm.addEventListener('submit', async (e) => {
         }
     } catch (error) {
         console.error('Form error:', error);
-        showNotification(`❌ ${error.message}`, 'error');
+        showNotification('An error occurred. Please try again.', 'error');
         authSubmitBtn.disabled = false;
         authSubmitBtn.textContent = currentMode === 'login' ? 'Sign In' : 'Create Account';
     }
 });
 
 // ============================================================
-// HISTORY MODAL - localStorage Version
+// HISTORY MODAL
 // ============================================================
 if (historyNavBtn) {
     historyNavBtn.addEventListener('click', () => {
@@ -877,7 +954,6 @@ function openHistoryModal() {
             <div class="history-header">
                 <div class="history-actions">
                     <button id="deleteAllHistory" class="delete-all-btn"><i class="fas fa-trash"></i> Delete All</button>
-                    <span class="auto-delete-notice">💾 Stored locally in your browser</span>
                 </div>
             </div>
             <div id="historyListModal" class="history-list-modal">
@@ -914,7 +990,7 @@ function openHistoryModal() {
         const result = DATA_MANAGER.clearHistory(currentUser.email);
         if (result.success) {
             await loadHistoryModal();
-            showNotification('All history deleted. 🗑️', 'info');
+            showNotification('All history deleted.', 'info');
         } else {
             showNotification('Error deleting history.', 'error');
         }
@@ -936,7 +1012,6 @@ async function loadHistoryModal() {
         if (!history || history.length === 0) {
             historyList.innerHTML = `
                 <p class="empty-history">No translations yet. Start translating!</p>
-                <p class="auto-delete-note">💾 History is stored locally in your browser</p>
             `;
             return;
         }
@@ -958,7 +1033,6 @@ async function loadHistoryModal() {
                 </div>
             `;
         });
-        html += `<p class="auto-delete-note">💾 History is stored locally in your browser</p>`;
         historyList.innerHTML = html;
         
         document.querySelectorAll('.h-delete').forEach(btn => {
@@ -975,7 +1049,7 @@ async function loadHistoryModal() {
                 const result = DATA_MANAGER.deleteHistoryItem(currentUser.email, id);
                 if (result.success) {
                     await loadHistoryModal();
-                    showNotification('History item deleted. 🗑️', 'info');
+                    showNotification('History item deleted.', 'info');
                 } else {
                     showNotification('Error deleting history item.', 'error');
                 }
@@ -983,7 +1057,7 @@ async function loadHistoryModal() {
         });
     } catch (error) {
         console.error('Load history error:', error);
-        historyList.innerHTML = '<p class="empty-history">⚠️ Could not load history.</p>';
+        historyList.innerHTML = '<p class="empty-history">Could not load history.</p>';
     }
 }
 
@@ -1002,7 +1076,7 @@ function getLanguageName(code) {
 }
 
 // ============================================================
-// SAVE TO HISTORY - localStorage Version
+// SAVE TO HISTORY
 // ============================================================
 async function saveToHistory(original, translated, sourceLang, targetLang) {
     if (!isLoggedIn || !currentUser) return;
@@ -1071,12 +1145,12 @@ async function translateWithGoogle(text, sourceLang, targetLang) {
 async function performTranslation() {
     const text = inputText.value.trim();
     if (!text) {
-        outputDisplay.innerHTML = '<span class="placeholder">⚠️ Please enter text to translate.</span>';
+        outputDisplay.innerHTML = '<span class="placeholder">Please enter text to translate.</span>';
         return;
     }
     translateBtn.disabled = true;
     translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
-    outputDisplay.innerHTML = '<span class="placeholder">⏳ Translating...</span>';
+    outputDisplay.innerHTML = '<span class="placeholder">Translating...</span>';
     try {
         const translated = await translateWithGoogle(text, sourceLang.value, targetLang.value);
         outputDisplay.textContent = translated;
@@ -1084,7 +1158,7 @@ async function performTranslation() {
             await saveToHistory(text, translated, sourceLang.value, targetLang.value);
         }
     } catch (error) {
-        outputDisplay.innerHTML = `<span class="placeholder">❌ ${error.message}</span>`;
+        outputDisplay.innerHTML = `<span class="placeholder">Error: ${error.message}</span>`;
     } finally {
         translateBtn.disabled = false;
         translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
@@ -1108,7 +1182,7 @@ document.getElementById('copyOutput').addEventListener('click', async () => {
     const text = outputDisplay.textContent;
     if (text && !text.includes('placeholder')) {
         await navigator.clipboard.writeText(text);
-        showNotification('Copied! ✅', 'success');
+        showNotification('Copied!', 'success');
     }
 });
 
@@ -1144,7 +1218,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     recognition.onstart = () => {
         isRecording = true;
         micBtn.classList.add('recording');
-        recordingStatus.textContent = '🎤 Listening... Speak now!';
+        recordingStatus.textContent = 'Listening... Speak now!';
         micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
     };
     
@@ -1162,7 +1236,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     };
     
     recognition.onerror = () => {
-        recordingStatus.textContent = '❌ Error. Click mic again.';
+        recordingStatus.textContent = 'Error. Click mic again.';
         micBtn.classList.remove('recording');
         micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
         isRecording = false;
@@ -1185,7 +1259,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     });
 } else {
     micBtn.disabled = true;
-    recordingStatus.textContent = '⚠️ Not supported';
+    recordingStatus.textContent = 'Not supported';
 }
 
 // ============================================================
@@ -1217,8 +1291,6 @@ aboutModal.addEventListener('click', (e) => {
 // INIT
 // ============================================================
 console.log('✅ FreeTranslate initialized!');
-console.log('💾 Running in localStorage mode');
-console.log('📊 Data stored in browser local storage');
 
 // Check authentication status on load
 checkAuthStatus();
