@@ -1,5 +1,5 @@
 // ============================================================
-// FREETRANSLATE - Complete Application (FIXED)
+// FREE TRANSLATE LANGUAGE - Complete Application
 // ============================================================
 
 // ============================================================
@@ -13,6 +13,8 @@ let pendingAction = '';
 let pendingCallback = null;
 let isVerifying = false;
 let verificationDone = false;
+let pendingResetEmail = ''; // Store email for password reset
+let pendingResetUser = null; // Store user for password reset
 
 // ============================================================
 // DOM ELEMENTS
@@ -168,7 +170,6 @@ async function sendVerificationCode(email, action = 'verification') {
 }
 
 async function verifyCode(email, code) {
-    // Reset the verifying state if it was stuck
     if (isVerifying) {
         console.log('⏳ Verification already in progress, resetting...');
         isVerifying = false;
@@ -195,6 +196,140 @@ async function verifyCode(email, code) {
     } finally {
         isVerifying = false;
     }
+}
+
+// ============================================================
+// CUSTOM MODALS
+// ============================================================
+
+// Custom prompt modal (replaces browser prompt)
+function showPromptModal(title, message, inputPlaceholder = '', inputType = 'password') {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'flex';
+        modal.innerHTML = `
+            <div class="modal-content prompt-content">
+                <h2>${title}</h2>
+                <p>${message}</p>
+                <input type="${inputType}" id="promptInput" placeholder="${inputPlaceholder}" required>
+                <div class="confirmation-buttons" style="margin-top: 16px;">
+                    <button class="auth-submit-btn cancel-btn" id="promptCancel">Cancel</button>
+                    <button class="auth-submit-btn" id="promptConfirm">Confirm</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        const input = modal.querySelector('#promptInput');
+        const confirmBtn = modal.querySelector('#promptConfirm');
+        const cancelBtn = modal.querySelector('#promptCancel');
+        
+        input.focus();
+        
+        confirmBtn.addEventListener('click', () => {
+            const value = input.value;
+            modal.remove();
+            resolve(value);
+        });
+        
+        cancelBtn.addEventListener('click', () => {
+            modal.remove();
+            resolve(null);
+        });
+        
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const value = input.value;
+                modal.remove();
+                resolve(value);
+            }
+            if (e.key === 'Escape') {
+                modal.remove();
+                resolve(null);
+            }
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+                resolve(null);
+            }
+        });
+    });
+}
+
+// Custom password reset modal (replaces browser prompt for new password)
+function showPasswordResetModal() {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'flex';
+        modal.innerHTML = `
+            <div class="modal-content prompt-content">
+                <h2>Reset Password</h2>
+                <p>Enter your new password below.</p>
+                <div class="settings-field">
+                    <label>New Password (min 8 chars)</label>
+                    ${createPasswordField('resetNewPassword', 'Enter new password').outerHTML}
+                </div>
+                <div class="settings-field">
+                    <label>Confirm New Password</label>
+                    ${createPasswordField('resetConfirmPassword', 'Confirm new password').outerHTML}
+                </div>
+                <div class="confirmation-buttons" style="margin-top: 16px;">
+                    <button class="auth-submit-btn cancel-btn" id="resetCancel">Cancel</button>
+                    <button class="auth-submit-btn" id="resetConfirm">Reset Password</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        bindPasswordToggles(modal);
+        
+        const newPassword = document.getElementById('resetNewPassword');
+        const confirmPassword = document.getElementById('resetConfirmPassword');
+        const confirmBtn = modal.querySelector('#resetConfirm');
+        const cancelBtn = modal.querySelector('#resetCancel');
+        
+        newPassword.focus();
+        
+        confirmBtn.addEventListener('click', () => {
+            const pass1 = newPassword.value;
+            const pass2 = confirmPassword.value;
+            
+            if (!pass1 || pass1.length < 8) {
+                showNotification('Password must be at least 8 characters.', 'error');
+                return;
+            }
+            
+            if (pass1 !== pass2) {
+                showNotification('Passwords do not match!', 'error');
+                return;
+            }
+            
+            const validation = DATA_MANAGER.validatePasswordStrength(pass1);
+            if (!validation.valid) {
+                showNotification(validation.message, 'error');
+                return;
+            }
+            
+            modal.remove();
+            resolve(pass1);
+        });
+        
+        cancelBtn.addEventListener('click', () => {
+            modal.remove();
+            resolve(null);
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+                resolve(null);
+            }
+        });
+    });
 }
 
 // ============================================================
@@ -237,7 +372,7 @@ function showConfirmationModal(title, message, confirmText = 'Confirm', cancelTe
 }
 
 // ============================================================
-// VERIFICATION MODAL - FIXED
+// VERIFICATION MODAL
 // ============================================================
 function openVerificationModal(email, action, callback) {
     pendingEmail = email;
@@ -267,10 +402,8 @@ function openVerificationModal(email, action, callback) {
     `;
     document.body.appendChild(modal);
     
-    // Prevent modal from closing when clicking outside
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
-            // Do nothing - keep modal open
             e.stopPropagation();
         }
     });
@@ -290,7 +423,6 @@ function openVerificationModal(email, action, callback) {
         e.preventDefault();
         e.stopPropagation();
         
-        // Prevent multiple submissions
         if (verificationDone) {
             console.log('⏳ Already verified');
             return;
@@ -326,7 +458,6 @@ function openVerificationModal(email, action, callback) {
                     localStorage.setItem('authToken', result.token);
                 }
                 
-                // Close modal and execute callback
                 setTimeout(() => {
                     modal.remove();
                     if (typeof pendingCallback === 'function') {
@@ -644,12 +775,18 @@ function openAccountSettings() {
             }
             
             openVerificationModal(newEmail, 'email', async (token) => {
-                const updateResult = DATA_MANAGER.updateProfile(user.id, { email: newEmail });
+                // Update email AND username (auto-generated from new email)
+                const updateResult = DATA_MANAGER.updateProfile(user.id, { 
+                    email: newEmail,
+                    username: newEmail.split('@')[0]
+                });
                 if (updateResult.success) {
                     showNotification('Email updated successfully!', 'success');
                     user.email = newEmail;
+                    user.username = newEmail.split('@')[0];
                     modal.remove();
                     clearAllPasswordFields();
+                    await checkAuthStatus();
                     setTimeout(() => openProfileModal(), 500);
                 } else {
                     showNotification('Error updating email.', 'error');
@@ -707,8 +844,23 @@ function openAccountSettings() {
         );
         if (!confirmed) return;
         
-        const password = prompt('Enter your password to confirm deletion:');
-        if (!password) return;
+        // Use custom prompt instead of browser prompt
+        const password = await showPromptModal(
+            'Confirm Deletion',
+            'Enter your password to confirm account deletion:',
+            'Enter your password',
+            'password'
+        );
+        
+        if (password === null) {
+            showNotification('Account deletion cancelled.', 'info');
+            return;
+        }
+        
+        if (!password || password.trim() === '') {
+            showNotification('Password is required.', 'error');
+            return;
+        }
         
         if (!DATA_MANAGER.verifyPassword(password, user.password)) {
             showNotification('Incorrect password.', 'error');
@@ -820,15 +972,12 @@ function openModal(mode) {
 }
 
 // ============================================================
-// CLOSE MODAL - FIXED: Don't close on outside click
+// CLOSE MODAL
 // ============================================================
 closeAuthModal.addEventListener('click', () => {
     authModal.style.display = 'none';
     clearAllPasswordFields();
 });
-
-// REMOVED: authModal click on outside close - this was causing the issue
-// Now only the X button closes the modal
 
 // ============================================================
 // AUTH FORM SUBMIT
@@ -902,31 +1051,31 @@ authForm.addEventListener('submit', async (e) => {
                 return;
             }
             
+            // Store for use in verification callback
+            pendingResetEmail = email;
+            pendingResetUser = userExists;
+            
             authModal.style.display = 'none';
             
             openVerificationModal(email, 'reset', async (token) => {
-                const newPassword = prompt('Enter your new password (min 8 chars):');
-                if (!newPassword) {
+                // Use custom modal instead of browser prompt
+                const newPassword = await showPasswordResetModal();
+                
+                if (newPassword === null) {
                     showNotification('Password reset cancelled.', 'info');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Send Reset Code';
                     return;
                 }
                 
-                const validation = DATA_MANAGER.validatePasswordStrength(newPassword);
-                if (!validation.valid) {
-                    showNotification(validation.message, 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Send Reset Code';
-                    return;
-                }
-                
-                const result = DATA_MANAGER.changePassword(userExists.id, userExists.password, newPassword);
+                const result = DATA_MANAGER.changePassword(pendingResetUser.id, pendingResetUser.password, newPassword);
                 if (result.success) {
                     showNotification('Password reset successfully! Please sign in.', 'success');
                     clearAllPasswordFields();
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Send Reset Code';
+                    pendingResetEmail = '';
+                    pendingResetUser = null;
                     setTimeout(() => openModal('login'), 2000);
                 } else {
                     showNotification('Error resetting password.', 'error');
@@ -1369,7 +1518,7 @@ aboutModal.addEventListener('click', (e) => {
 // ============================================================
 // INIT
 // ============================================================
-console.log('✅ FreeTranslate initialized!');
+console.log('✅ Free Translate Language initialized!');
 
 // Check authentication status on load
 checkAuthStatus();
