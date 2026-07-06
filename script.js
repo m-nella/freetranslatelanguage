@@ -152,14 +152,12 @@ async function sendVerificationCode(email, action = 'verification') {
     console.log('📧 Action:', action);
     
     try {
-        // Store code in localStorage
-        const result = DATA_MANAGER.storeVerificationCode(email, action);
+        // Store code in localStorage and send email
+        const result = await DATA_MANAGER.storeVerificationCode(email, action);
         
         if (result.success) {
             console.log('📧 Code stored:', result.code);
-            showNotification('📧 Verification code sent! Check console for code (development mode)', 'success');
-            // For development, show code in console
-            console.log(`🔑 Your verification code: ${result.code}`);
+            showNotification('📧 Verification code sent to your email! Please check your inbox (and spam folder).', 'success');
             return { success: true, code: result.code };
         } else {
             showNotification('⚠️ Error storing verification code.', 'error');
@@ -225,13 +223,12 @@ function openVerificationModal(email, action, callback) {
         <div class="modal-content verification-content">
             <span class="close-modal close-verification">&times;</span>
             <h2>${action === 'signup' ? 'Verify Your Email' : action === 'signin' ? 'Verify Sign In' : action === 'reset' ? 'Reset Password' : action === 'delete' ? 'Delete Account' : action === 'email' ? 'Change Email' : action === 'password' ? 'Change Password' : 'Verify Email'}</h2>
-            <p class="verification-desc">Enter the 6-digit code sent to your email.</p>
+            <p class="verification-desc">Enter the 6-digit code sent to your email. Also check in SPAM/JUNK folder.</p>
             <form id="verificationForm">
                 <input type="text" id="verificationCode" placeholder="Enter the 6-digit code" maxlength="6" autocomplete="off" required>
                 <button type="submit" class="auth-submit-btn" id="verifySubmitBtn">Verify</button>
             </form>
             <p class="auth-switch">Didn't receive code? <a href="#" id="resendCodeBtn">Resend Code</a></p>
-            <p class="dev-hint">💡 Check browser console for the verification code</p>
         </div>
     `;
     document.body.appendChild(modal);
@@ -253,15 +250,6 @@ function openVerificationModal(email, action, callback) {
     const form = modal.querySelector('#verificationForm');
     const submitBtn = modal.querySelector('#verifySubmitBtn');
     const codeInput = document.getElementById('verificationCode');
-    
-    // Show code in console for development
-    const codes = JSON.parse(localStorage.getItem('verificationCodes') || '[]');
-    const found = codes.find(c => c.email === email && c.action === action && !c.isUsed);
-    if (found) {
-        console.log(`🔑 Your verification code: ${found.code}`);
-        console.log(`📧 Email: ${email}`);
-        console.log(`📋 Action: ${action}`);
-    }
     
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -342,7 +330,7 @@ function openVerificationModal(email, action, callback) {
         
         const result = await sendVerificationCode(email, pendingAction);
         if (result.success) {
-            showNotification('✅ New code sent! Check console.', 'success');
+            showNotification('✅ New code sent! Check your email.', 'success');
         } else {
             showNotification('❌ Error sending code. Please try again.', 'error');
         }
@@ -351,52 +339,6 @@ function openVerificationModal(email, action, callback) {
     setTimeout(() => {
         codeInput.focus();
     }, 200);
-}
-
-// ============================================================
-// PASSWORD STRENGTH VALIDATION
-// ============================================================
-function validatePassword(password) {
-    return DATA_MANAGER.validatePasswordStrength(password);
-}
-
-// ============================================================
-// CUSTOM CONFIRMATION MODAL
-// ============================================================
-function showConfirmationModal(title, message, confirmText = 'Confirm', cancelText = 'Cancel') {
-    return new Promise((resolve) => {
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.style.display = 'flex';
-        modal.innerHTML = `
-            <div class="modal-content confirmation-content">
-                <h2>${title}</h2>
-                <p>${message}</p>
-                <div class="confirmation-buttons">
-                    <button class="auth-submit-btn cancel-btn" id="cancelConfirm">${cancelText}</button>
-                    <button class="auth-submit-btn delete-btn" id="confirmAction">${confirmText}</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        
-        modal.querySelector('#cancelConfirm').addEventListener('click', () => {
-            modal.remove();
-            resolve(false);
-        });
-        
-        modal.querySelector('#confirmAction').addEventListener('click', () => {
-            modal.remove();
-            resolve(true);
-        });
-        
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.remove();
-                resolve(false);
-            }
-        });
-    });
 }
 
 // ============================================================
@@ -417,12 +359,14 @@ async function checkAuthStatus() {
         authBtn.innerHTML = `<i class="fas fa-user-circle"></i> ${currentUser.username}`;
         authBtn.classList.add('logged-in');
         if (historyNavBtn) historyNavBtn.style.display = 'flex';
+        console.log('✅ User logged in:', currentUser.username);
     } else {
         isLoggedIn = false;
         currentUser = null;
         authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
         authBtn.classList.remove('logged-in');
         if (historyNavBtn) historyNavBtn.style.display = 'none';
+        localStorage.removeItem('authToken');
     }
 }
 
@@ -506,6 +450,7 @@ function toggleProfileMenu() {
 // ============================================================
 function logoutUser() {
     DATA_MANAGER.logout();
+    localStorage.removeItem('authToken');
     isLoggedIn = false;
     currentUser = null;
     authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
