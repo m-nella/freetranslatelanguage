@@ -1,7 +1,5 @@
 // ============================================================
-// FREETRANSLATE - Complete Working Version
-// All account actions require verification code
-// No localStorage mentions in UI
+// FREETRANSLATE - Complete Application
 // ============================================================
 
 // ============================================================
@@ -147,7 +145,6 @@ function clearAllPasswordFields() {
 // VERIFICATION CODE SYSTEM
 // ============================================================
 
-// Send verification code
 async function sendVerificationCode(email, action = 'verification') {
     console.log('📧 Sending verification code for:', email);
     console.log('📧 Action:', action);
@@ -170,7 +167,6 @@ async function sendVerificationCode(email, action = 'verification') {
     }
 }
 
-// Verify code
 async function verifyCode(email, code) {
     if (isVerifying) {
         console.log('⏳ Verification already in progress...');
@@ -526,7 +522,7 @@ function openProfileModal() {
                 <i class="fas fa-user-circle profile-icon"></i>
                 <h2>${user.username}</h2>
                 <p>${user.email}</p>
-                <span class="profile-badge">Verified</span>
+                <span class="profile-badge">Verified Account</span>
             </div>
             <div class="profile-info">
                 <div class="info-item"><strong>Username:</strong> ${user.username}</div>
@@ -611,15 +607,12 @@ function openAccountSettings() {
             return;
         }
         
-        // Verify current password
         if (!DATA_MANAGER.verifyPassword(currentPassword, user.password)) {
             showNotification('Current password is incorrect.', 'error');
             return;
         }
         
-        // Handle email change
         if (newEmail && newEmail !== user.email) {
-            // Check if email already exists
             const existing = DATA_MANAGER.findUserByEmail(newEmail);
             if (existing && existing.id !== user.id) {
                 showNotification('Email already in use by another account.', 'error');
@@ -647,7 +640,6 @@ function openAccountSettings() {
             return;
         }
         
-        // Handle password change
         if (newPassword || confirmPassword) {
             if (newPassword !== confirmPassword) {
                 showNotification('New passwords do not match!', 'error');
@@ -750,6 +742,25 @@ function openModal(mode) {
         const password = createPasswordField('authPassword', 'Password');
         authFields.appendChild(password);
         bindPasswordToggles(authModal);
+        
+        // Show forgot password link
+        forgotPasswordLink.style.display = 'block';
+        forgotPasswordBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            openModal('reset');
+        });
+        
+    } else if (mode === 'reset') {
+        authModalTitle.textContent = 'Reset Password';
+        authSubmitBtn.textContent = 'Send Reset Code';
+        authSwitchText.innerHTML = `Remember password? <a href="#" id="authSwitchLink">Sign In</a>`;
+        
+        const email = document.createElement('input');
+        email.type = 'email';
+        email.id = 'authEmail';
+        email.placeholder = 'Email address';
+        email.required = true;
+        authFields.appendChild(email);
         forgotPasswordLink.style.display = 'none';
         
     } else if (mode === 'signup') {
@@ -780,7 +791,9 @@ function openModal(mode) {
     if (switchLink) {
         switchLink.addEventListener('click', (e) => {
             e.preventDefault();
-            if (mode === 'login') {
+            if (mode === 'reset') {
+                openModal('login');
+            } else if (mode === 'login') {
                 openModal('signup');
             } else {
                 openModal('login');
@@ -854,6 +867,61 @@ authForm.addEventListener('submit', async (e) => {
                 authSubmitBtn.disabled = false;
                 authSubmitBtn.textContent = 'Sign In';
                 clearAllPasswordFields();
+            });
+            
+        } else if (currentMode === 'reset') {
+            authSubmitBtn.disabled = true;
+            authSubmitBtn.textContent = 'Sending reset code...';
+            
+            // Check if email exists
+            const userExists = DATA_MANAGER.findUserByEmail(email);
+            if (!userExists) {
+                showNotification('No account found with this email.', 'error');
+                authSubmitBtn.disabled = false;
+                authSubmitBtn.textContent = 'Send Reset Code';
+                return;
+            }
+            
+            const codeResult = await sendVerificationCode(email, 'reset');
+            if (!codeResult.success) {
+                showNotification('Error sending reset code.', 'error');
+                authSubmitBtn.disabled = false;
+                authSubmitBtn.textContent = 'Send Reset Code';
+                return;
+            }
+            
+            authModal.style.display = 'none';
+            
+            openVerificationModal(email, 'reset', async (token) => {
+                // After verification, allow password reset
+                const newPassword = prompt('Enter your new password (min 8 chars):');
+                if (!newPassword) {
+                    showNotification('Password reset cancelled.', 'info');
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Send Reset Code';
+                    return;
+                }
+                
+                const validation = DATA_MANAGER.validatePasswordStrength(newPassword);
+                if (!validation.valid) {
+                    showNotification(validation.message, 'error');
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Send Reset Code';
+                    return;
+                }
+                
+                const result = DATA_MANAGER.changePassword(userExists.id, userExists.password, newPassword);
+                if (result.success) {
+                    showNotification('Password reset successfully! Please sign in.', 'success');
+                    clearAllPasswordFields();
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Send Reset Code';
+                    setTimeout(() => openModal('login'), 2000);
+                } else {
+                    showNotification('Error resetting password.', 'error');
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Send Reset Code';
+                }
             });
             
         } else if (currentMode === 'signup') {
