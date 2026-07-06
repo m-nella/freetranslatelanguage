@@ -175,8 +175,9 @@ function clearAllPasswordFields() {
 }
 
 // ============================================================
-// VERIFICATION CODE SYSTEM
+// VERIFICATION CODE SYSTEM - FIXED
 // ============================================================
+
 function generateVerificationCode() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -190,32 +191,49 @@ async function sendVerificationCode(email, action = 'verification') {
     console.log('📧 Code:', code);
     console.log('📧 Action:', action);
     
-    const result = await apiCall('/auth/send-code', 'POST', {
-        email: email,
-        code: code,
-        action: action
-    });
-    
-    if (result.success) {
-        showNotification('📧 Verification code sent to your email. Also check SPAM/JUNK folder.', 'success');
-    } else {
-        showNotification('❌ Error sending verification code. Please try again.', 'error');
+    try {
+        const result = await apiCall('/auth/send-code', 'POST', {
+            email: email,
+            code: code,
+            action: action
+        });
+        
+        console.log('📧 API Response:', result);
+        
+        if (result.success) {
+            showNotification('📧 Verification code sent to your email. Also check SPAM/JUNK folder.', 'success');
+            return { success: true, code: code };
+        } else {
+            // Even if email fails, code is stored - user can still enter it
+            console.warn('⚠️ Email may have failed, but code is stored:', result);
+            showNotification('📧 If you didn\'t receive the code, please check SPAM or try again.', 'warning');
+            return { success: true, code: code };
+        }
+    } catch (error) {
+        console.error('❌ Error in sendVerificationCode:', error);
+        showNotification('⚠️ There was an issue sending the code. Please try again.', 'error');
+        return { success: false, code: code };
     }
-    
-    return { success: true, code: code };
 }
 
 async function verifyCode(email, code) {
-    const result = await apiCall('/auth/verify', 'POST', {
-        email: email,
-        code: code,
-        action: pendingAction
-    });
-    
-    if (result.success) {
-        return { success: true };
-    } else {
-        return { success: false, error: result.data.error || 'Invalid code. Please try again.' };
+    try {
+        const result = await apiCall('/auth/verify', 'POST', {
+            email: email,
+            code: code,
+            action: pendingAction
+        });
+        
+        console.log('🔍 Verification result:', result);
+        
+        if (result.success) {
+            return { success: true, data: result.data };
+        } else {
+            return { success: false, error: result.data.error || 'Invalid code. Please try again.' };
+        }
+    } catch (error) {
+        console.error('❌ Verify code error:', error);
+        return { success: false, error: error.message };
     }
 }
 
