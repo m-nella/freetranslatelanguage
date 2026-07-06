@@ -2,7 +2,8 @@
 // BACKEND API CONFIGURATION
 // ============================================================
 
-const API_BASE_URL = 'https://freetranslatelanguage-backend.onrender.com/api';
+// ✅ FIXED: Correct Render URL (without "-backend")
+const API_BASE_URL = 'https://freetranslatelanguage.onrender.com/api';
 
 // ============================================================
 // API HELPER FUNCTIONS
