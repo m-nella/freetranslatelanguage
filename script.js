@@ -16,7 +16,7 @@ let verificationDone = false;
 let pendingResetEmail = '';
 let pendingResetUser = null;
 let isRecording = false;
-let isProcessingSpeech = false;
+let translateTimeout = null;
 
 // ============================================================
 // DOM ELEMENTS
@@ -1488,17 +1488,14 @@ function stopRecordingIfActive() {
 async function translateWithGoogle(text, sourceLangCode, targetLangCode) {
     let actualSource = sourceLangCode;
     
-    // If source is auto, detect language
     if (sourceLangCode === 'auto' && text.length > 2) {
         const detectedLang = await detectLanguage(text);
         actualSource = detectedLang;
-        // Update UI to show detected language
         if (detectedLang && detectedLang !== 'auto') {
             updateSourceLanguage(detectedLang);
         }
     }
     
-    // If actual source is still 'auto', default to 'en'
     if (actualSource === 'auto') {
         actualSource = 'en';
     }
@@ -1546,7 +1543,6 @@ async function performTranslation() {
 // ============================================================
 // TRANSLATE ON TYPING
 // ============================================================
-let translateTimeout = null;
 
 inputText.addEventListener('input', () => {
     const text = inputText.value.trim();
@@ -1690,14 +1686,19 @@ if (SpeechRecognition) {
                     if (detectedLang && detectedLang !== 'auto') {
                         updateSourceLanguage(detectedLang);
                     }
+                    // After detection, perform translation
+                    clearTimeout(translateTimeout);
+                    translateTimeout = setTimeout(() => {
+                        performTranslation();
+                    }, 200);
                 });
+            } else {
+                // Manual language selected, just translate
+                clearTimeout(translateTimeout);
+                translateTimeout = setTimeout(() => {
+                    performTranslation();
+                }, 200);
             }
-            
-            // Auto-translate the final text
-            clearTimeout(translateTimeout);
-            translateTimeout = setTimeout(() => {
-                performTranslation();
-            }, 200);
         }
     };
     
