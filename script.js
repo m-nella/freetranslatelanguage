@@ -16,6 +16,7 @@ let verificationDone = false;
 let pendingResetEmail = '';
 let pendingResetUser = null;
 let isRecording = false;
+let lastTranslatedText = '';
 
 // ============================================================
 // DOM ELEMENTS
@@ -1350,7 +1351,7 @@ async function saveToHistory(original, translated, sourceLang, targetLang) {
 }
 
 // ============================================================
-// TRANSLATION ENGINE
+// TRANSLATION ENGINE - INSTANT TRANSLATION
 // ============================================================
 const translateBtn = document.getElementById('translateBtn');
 const inputText = document.getElementById('inputText');
@@ -1417,7 +1418,9 @@ function populateLanguages() {
 }
 populateLanguages();
 
+// Detect language using Google Translate API
 async function detectLanguage(text) {
+    if (!text || text.length < 2) return 'auto';
     try {
         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(text)}`;
         const response = await fetch(url);
@@ -1467,13 +1470,35 @@ function resetSourceLanguage() {
     }
 }
 
+function stopRecordingIfActive() {
+    if (isRecording) {
+        try {
+            if (recognition) {
+                recognition.stop();
+            }
+        } catch (e) {}
+        isRecording = false;
+        if (micBtn) {
+            micBtn.classList.remove('recording');
+            micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+            recordingStatus.textContent = 'Click mic to speak';
+        }
+    }
+}
+
+// Translation function with auto-detect - INSTANT
 async function translateText(text, sourceLangCode, targetLangCode) {
+    if (!text || text.trim().length === 0) {
+        return '';
+    }
+    
     let actualSource = sourceLangCode;
     
+    // If auto-detect is selected, detect language
     if (sourceLangCode === 'auto' && text.length > 2) {
         const detectedLang = await detectLanguage(text);
-        actualSource = detectedLang;
         if (detectedLang && detectedLang !== 'auto') {
+            actualSource = detectedLang;
             updateSourceLanguage(detectedLang);
         }
     }
@@ -1491,6 +1516,7 @@ async function translateText(text, sourceLangCode, targetLangCode) {
     throw new Error('Translation failed');
 }
 
+// Perform translation - NO DELAY
 async function performTranslation() {
     const text = inputText.value.trim();
     if (!text) {
@@ -1501,6 +1527,12 @@ async function performTranslation() {
                 resetSourceLanguage();
             }
         }
+        lastTranslatedText = '';
+        return;
+    }
+    
+    // Skip if text hasn't changed
+    if (text === lastTranslatedText) {
         return;
     }
     
@@ -1510,6 +1542,7 @@ async function performTranslation() {
     try {
         const translated = await translateText(text, sourceLang.value, targetLang.value);
         outputDisplay.textContent = translated;
+        lastTranslatedText = text;
         if (isLoggedIn && currentUser) {
             await saveToHistory(text, translated, sourceLang.value, targetLang.value);
         }
@@ -1523,17 +1556,29 @@ async function performTranslation() {
 }
 
 // ============================================================
-// INPUT HANDLERS
+// INPUT HANDLERS - INSTANT TRANSLATION (NO DELAY)
 // ============================================================
-let typingTimeout = null;
 
+// On input change - translate immediately
 inputText.addEventListener('input', () => {
     const text = inputText.value.trim();
     if (text) {
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => {
+        // Check if source is auto-detect and text changed significantly
+        if (sourceLang.value === 'auto' && text.length > 2) {
+            // Detect language and translate
+            detectLanguage(text).then(detectedLang => {
+                if (detectedLang && detectedLang !== 'auto') {
+                    updateSourceLanguage(detectedLang);
+                }
+                // Translate immediately after detection
+                performTranslation();
+            }).catch(() => {
+                performTranslation();
+            });
+        } else {
+            // Manual language - translate immediately
             performTranslation();
-        }, 400);
+        }
     } else {
         outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
         if (sourceLang.value !== 'auto') {
@@ -1542,6 +1587,7 @@ inputText.addEventListener('input', () => {
                 resetSourceLanguage();
             }
         }
+        lastTranslatedText = '';
     }
 });
 
@@ -1551,14 +1597,11 @@ inputText.addEventListener('keydown', (e) => {
     }
 });
 
+// ============================================================
+// LANGUAGE CHANGE HANDLERS
+// ============================================================
 sourceLang.addEventListener('change', () => {
-    if (isRecording) {
-        try { recognition.stop(); } catch(e) {}
-        isRecording = false;
-        micBtn.classList.remove('recording');
-        micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-        recordingStatus.textContent = 'Click mic to speak';
-    }
+    stopRecordingIfActive();
     
     if (sourceLang.value !== 'auto') {
         const detected = sourceLang.querySelector('option[data-detected="true"]');
@@ -1577,14 +1620,7 @@ sourceLang.addEventListener('change', () => {
 });
 
 targetLang.addEventListener('change', () => {
-    if (isRecording) {
-        try { recognition.stop(); } catch(e) {}
-        isRecording = false;
-        micBtn.classList.remove('recording');
-        micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-        recordingStatus.textContent = 'Click mic to speak';
-    }
-    
+    stopRecordingIfActive();
     const text = inputText.value.trim();
     if (text) {
         performTranslation();
@@ -1592,19 +1628,14 @@ targetLang.addEventListener('change', () => {
 });
 
 document.getElementById('swapLang').addEventListener('click', () => {
-    if (isRecording) {
-        try { recognition.stop(); } catch(e) {}
-        isRecording = false;
-        micBtn.classList.remove('recording');
-        micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-        recordingStatus.textContent = 'Click mic to speak';
-    }
+    stopRecordingIfActive();
     
     const temp = sourceLang.value;
     sourceLang.value = targetLang.value;
     targetLang.value = temp;
     outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
     inputText.value = '';
+    lastTranslatedText = '';
     resetSourceLanguage();
 });
 
@@ -1626,21 +1657,16 @@ document.getElementById('speakOutput').addEventListener('click', () => {
 });
 
 document.getElementById('clearInput').addEventListener('click', () => {
-    if (isRecording) {
-        try { recognition.stop(); } catch(e) {}
-        isRecording = false;
-        micBtn.classList.remove('recording');
-        micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-        recordingStatus.textContent = 'Click mic to speak';
-    }
+    stopRecordingIfActive();
     
     inputText.value = '';
     outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+    lastTranslatedText = '';
     resetSourceLanguage();
 });
 
 // ============================================================
-// MIC - RECORDING SYSTEM (SIMPLIFIED)
+// MIC - RECORDING WITH INSTANT TRANSLATION
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
@@ -1660,55 +1686,48 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
         recordingStatus.textContent = '🎤 Recording... Click to stop';
         micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
         showNotification('🎤 Recording started. Speak now!', 'info', 2000);
-        console.log('🎤 Recording started');
     };
     
     recognition.onresult = (event) => {
-        console.log('🎤 Speech result received');
         let finalText = '';
         let interimText = '';
         
         for (let i = event.resultIndex; i < event.results.length; i++) {
             if (event.results[i].isFinal) {
                 finalText += event.results[i][0].transcript;
-                console.log('🎤 Final text:', finalText);
             } else {
                 interimText += event.results[i][0].transcript;
             }
         }
         
+        // Update input field with what's being recognized
         if (interimText) {
             inputText.value = finalText + interimText;
         }
         
+        // When final text is received, process it
         if (finalText) {
             inputText.value = finalText;
-            console.log('🎤 Processing final text:', finalText);
             
-            // Check if auto-detect is selected
+            // If auto-detect is selected, detect language
             if (sourceLang.value === 'auto' && finalText.length > 2) {
-                console.log('🎤 Auto-detect enabled, detecting language...');
                 detectLanguage(finalText).then(detectedLang => {
-                    console.log('🎤 Detected language:', detectedLang);
                     if (detectedLang && detectedLang !== 'auto') {
                         updateSourceLanguage(detectedLang);
                     }
-                    // Translate after detection
-                    console.log('🎤 Translating...');
+                    // Translate immediately after detection
                     performTranslation();
-                }).catch(err => {
-                    console.error('🎤 Detection error:', err);
+                }).catch(() => {
                     performTranslation();
                 });
             } else {
-                console.log('🎤 Manual language, translating...');
+                // Manual language - translate immediately
                 performTranslation();
             }
         }
     };
     
     recognition.onerror = (event) => {
-        console.error('🎤 Speech error:', event.error);
         if (event.error === 'no-speech') {
             return;
         }
@@ -1725,13 +1744,10 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
     };
     
     recognition.onend = () => {
-        console.log('🎤 Recognition ended, isRecording:', isRecording);
         if (isRecording) {
             try {
                 recognition.start();
-                console.log('🎤 Restarted recognition');
             } catch (e) {
-                console.error('🎤 Failed to restart:', e);
                 isRecording = false;
                 micBtn.classList.remove('recording');
                 micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
@@ -1745,15 +1761,11 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
     };
     
     micBtn.addEventListener('click', () => {
-        console.log('🎤 Mic clicked, isRecording:', isRecording);
         if (isRecording) {
             isRecording = false;
             try {
                 recognition.stop();
-                console.log('🎤 Stopped recording');
-            } catch (e) {
-                console.error('🎤 Stop error:', e);
-            }
+            } catch (e) {}
             micBtn.classList.remove('recording');
             micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
             recordingStatus.textContent = 'Click mic to speak';
@@ -1761,12 +1773,9 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
         } else {
             const lang = sourceLang.value === 'auto' ? 'en' : sourceLang.value;
             recognition.lang = lang;
-            console.log('🎤 Starting recording with lang:', lang);
             try {
                 recognition.start();
-                console.log('🎤 Started recording');
             } catch (e) {
-                console.error('🎤 Start error:', e);
                 showNotification('Error starting microphone. Please try again.', 'error');
             }
         }
@@ -1812,4 +1821,3 @@ aboutModal.addEventListener('click', (e) => {
 // ============================================================
 checkAuthStatus();
 console.log('✅ FreeTranslate initialized');
-console.log('🎤 Speech recognition available:', !!window.SpeechRecognition || !!window.webkitSpeechRecognition);
