@@ -1,5 +1,5 @@
 // ============================================================
-// FREE TRANSLATE LANGUAGE - Complete Application (FINAL - NO DELAYS)
+// FREE TRANSLATE LANGUAGE - Complete Application (FINAL - WORKING)
 // ============================================================
 
 // ============================================================
@@ -17,7 +17,9 @@ let pendingResetEmail = '';
 let pendingResetUser = null;
 let isRecording = false;
 let isTranslating = false;
+let translateTimeout = null;
 let lastDetectedLanguage = '';
+let detectionTimeout = null;
 
 // ============================================================
 // DOM ELEMENTS
@@ -1352,25 +1354,13 @@ async function saveToHistory(original, translated, sourceLang, targetLang) {
 }
 
 // ============================================================
-// TRANSLATION ENGINE - INSTANT (NO DELAYS)
+// TRANSLATION ENGINE - FINAL WORKING VERSION
 // ============================================================
 const translateBtn = document.getElementById('translateBtn');
 const inputText = document.getElementById('inputText');
 const outputDisplay = document.getElementById('outputText');
 const sourceLang = document.getElementById('sourceLang');
 const targetLang = document.getElementById('targetLang');
-const translateFromLabel = document.createElement('span');
-translateFromLabel.className = 'translate-from-label';
-translateFromLabel.style.cssText = 'font-size: 0.7rem; color: var(--text-light); margin-top: 4px; display: block;';
-
-// Add translate from label after source language
-if (sourceLang && sourceLang.parentNode) {
-    const label = document.createElement('div');
-    label.style.cssText = 'display: flex; flex-direction: column; width: 100%;';
-    sourceLang.parentNode.insertBefore(label, sourceLang);
-    label.appendChild(sourceLang);
-    label.appendChild(translateFromLabel);
-}
 
 const LANGUAGES = [
     { code: 'auto', name: '🔍 Auto-detect' },
@@ -1430,15 +1420,6 @@ function populateLanguages() {
 }
 populateLanguages();
 
-function updateTranslateFromLabel(langCode) {
-    const langName = LANGUAGES.find(l => l.code === langCode)?.name || langCode;
-    if (langCode === 'auto') {
-        translateFromLabel.textContent = '';
-    } else {
-        translateFromLabel.textContent = `Translate from: ${langName}`;
-    }
-}
-
 // Detect language using Google Translate API
 async function detectLanguage(text) {
     if (!text || text.length < 2) return 'auto';
@@ -1451,7 +1432,6 @@ async function detectLanguage(text) {
         }
         return 'en';
     } catch (error) {
-        console.warn('Detection error:', error);
         return 'en';
     }
 }
@@ -1461,16 +1441,19 @@ function updateSourceLanguage(detectedCode) {
     
     const detectedName = LANGUAGES.find(l => l.code === detectedCode)?.name || detectedCode;
     
+    // Remove existing detected option
     const existingDetected = sourceLang.querySelector('option[data-detected="true"]');
     if (existingDetected) {
         existingDetected.remove();
     }
     
+    // Reset auto option
     const autoOption = sourceLang.querySelector('option[value="auto"]');
     if (autoOption) {
         autoOption.textContent = '🔍 Auto-detect';
     }
     
+    // Create new detected option
     const option = document.createElement('option');
     option.value = detectedCode;
     option.textContent = `${detectedName} - detected`;
@@ -1479,9 +1462,6 @@ function updateSourceLanguage(detectedCode) {
     
     sourceLang.insertBefore(option, sourceLang.children[1]);
     sourceLang.value = detectedCode;
-    
-    // Update the translate from label
-    updateTranslateFromLabel(detectedCode);
 }
 
 function resetSourceLanguage() {
@@ -1495,7 +1475,22 @@ function resetSourceLanguage() {
         autoOption.textContent = '🔍 Auto-detect';
     }
     lastDetectedLanguage = '';
-    updateTranslateFromLabel('auto');
+}
+
+function stopRecordingIfActive() {
+    if (isRecording) {
+        try {
+            if (recognition) {
+                recognition.stop();
+            }
+        } catch (e) {}
+        isRecording = false;
+        if (micBtn) {
+            micBtn.classList.remove('recording');
+            micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+            recordingStatus.textContent = 'Click mic to speak';
+        }
+    }
 }
 
 // Translation function
@@ -1505,13 +1500,13 @@ async function translateText(text, sourceLangCode, targetLangCode) {
     }
     
     let actualSource = sourceLangCode;
-    let detectedLang = null;
     
     // If auto-detect, detect language
     if (sourceLangCode === 'auto' && text.length > 2) {
-        detectedLang = await detectLanguage(text);
+        const detectedLang = await detectLanguage(text);
         if (detectedLang && detectedLang !== 'auto') {
             actualSource = detectedLang;
+            // Only update if different from last detected
             if (detectedLang !== lastDetectedLanguage) {
                 lastDetectedLanguage = detectedLang;
                 updateSourceLanguage(detectedLang);
@@ -1532,19 +1527,24 @@ async function translateText(text, sourceLangCode, targetLangCode) {
     throw new Error('Translation failed');
 }
 
-// Perform translation - INSTANT with spinning button
+// Perform translation with spinning button
 async function performTranslation() {
     const text = inputText.value.trim();
     if (!text) {
         outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
         translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
         translateBtn.disabled = false;
+        if (sourceLang.value !== 'auto') {
+            const detected = sourceLang.querySelector('option[data-detected="true"]');
+            if (detected) {
+                resetSourceLanguage();
+            }
+        }
         return;
     }
     
     if (isTranslating) return;
     
-    // Immediately show spinning
     translateBtn.disabled = true;
     translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
     isTranslating = true;
@@ -1565,32 +1565,38 @@ async function performTranslation() {
 }
 
 // ============================================================
-// INPUT HANDLERS - INSTANT (NO DELAY)
+// INPUT HANDLERS
 // ============================================================
 
 inputText.addEventListener('input', () => {
     const text = inputText.value.trim();
     
+    if (translateTimeout) {
+        clearTimeout(translateTimeout);
+        translateTimeout = null;
+    }
+    
     if (text) {
-        // Start spinning immediately
-        translateBtn.disabled = true;
-        translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
-        
-        // If auto-detect, detect language
+        // Check if auto-detect and text length > 2
         if (sourceLang.value === 'auto' && text.length > 2) {
-            detectLanguage(text).then(detectedLang => {
-                if (detectedLang && detectedLang !== 'auto' && detectedLang !== lastDetectedLanguage) {
-                    lastDetectedLanguage = detectedLang;
-                    updateSourceLanguage(detectedLang);
-                }
-                // Translate immediately
-                performTranslation();
-            }).catch(() => {
-                performTranslation();
-            });
+            translateTimeout = setTimeout(() => {
+                // Detect language first
+                detectLanguage(text).then(detectedLang => {
+                    if (detectedLang && detectedLang !== 'auto' && detectedLang !== lastDetectedLanguage) {
+                        lastDetectedLanguage = detectedLang;
+                        updateSourceLanguage(detectedLang);
+                    }
+                    performTranslation();
+                }).catch(() => {
+                    performTranslation();
+                });
+                translateTimeout = null;
+            }, 150);
         } else {
-            // Manual language - translate immediately
-            performTranslation();
+            translateTimeout = setTimeout(() => {
+                performTranslation();
+                translateTimeout = null;
+            }, 150);
         }
     } else {
         outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
@@ -1621,13 +1627,10 @@ sourceLang.addEventListener('change', () => {
             autoOption.textContent = '🔍 Auto-detect';
         }
         lastDetectedLanguage = '';
-        updateTranslateFromLabel(sourceLang.value);
         const text = inputText.value.trim();
         if (text) {
             performTranslation();
         }
-    } else {
-        updateTranslateFromLabel('auto');
     }
 });
 
@@ -1682,7 +1685,7 @@ document.getElementById('clearInput').addEventListener('click', () => {
 });
 
 // ============================================================
-// MIC - RECORDING SYSTEM (INSTANT)
+// MIC - RECORDING SYSTEM
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
@@ -1717,9 +1720,6 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
         
         if (interimText) {
             inputText.value = finalText + interimText;
-            // Show spinning immediately
-            translateBtn.disabled = true;
-            translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
         }
         
         if (finalText) {
@@ -1728,6 +1728,11 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
                 inputText.value = finalText;
             } else {
                 inputText.value = currentText + ' ' + finalText;
+            }
+            
+            if (translateTimeout) {
+                clearTimeout(translateTimeout);
+                translateTimeout = null;
             }
             
             // If auto-detect, detect language
@@ -1836,4 +1841,4 @@ aboutModal.addEventListener('click', (e) => {
 // INIT
 // ============================================================
 checkAuthStatus();
-console.log('✅ FreeTranslate Language initialized - No delays mode');
+console.log('✅ FreeTranslate Language initialized');
