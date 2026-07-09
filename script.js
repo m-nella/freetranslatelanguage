@@ -1,5 +1,5 @@
 // ============================================================
-// FREE TRANSLATE LANGUAGE - Complete Application (FINAL - WORKING)
+// FREE TRANSLATE LANGUAGE - Complete Application
 // ============================================================
 
 // ============================================================
@@ -17,9 +17,17 @@ let pendingResetEmail = '';
 let pendingResetUser = null;
 let isRecording = false;
 let isTranslating = false;
-let translateTimeout = null;
 let lastDetectedLanguage = '';
-let detectionTimeout = null;
+let debugMode = true; // Set to false when done
+
+// ============================================================
+// DEBUG LOGGING
+// ============================================================
+function debugLog(...args) {
+    if (debugMode) {
+        console.log('[Debug]', ...args);
+    }
+}
 
 // ============================================================
 // DOM ELEMENTS
@@ -1354,13 +1362,27 @@ async function saveToHistory(original, translated, sourceLang, targetLang) {
 }
 
 // ============================================================
-// TRANSLATION ENGINE - FINAL WORKING VERSION
+// TRANSLATION ENGINE - COMPLETE FIX
 // ============================================================
 const translateBtn = document.getElementById('translateBtn');
 const inputText = document.getElementById('inputText');
 const outputDisplay = document.getElementById('outputText');
 const sourceLang = document.getElementById('sourceLang');
 const targetLang = document.getElementById('targetLang');
+
+// Create Translate From label
+const translateFromLabel = document.createElement('span');
+translateFromLabel.className = 'translate-from-label';
+translateFromLabel.style.cssText = 'font-size: 0.7rem; color: var(--text-light); margin-top: 4px; display: block; min-height: 18px;';
+
+// Add translate from label
+if (sourceLang && sourceLang.parentNode) {
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display: flex; flex-direction: column; width: 100%;';
+    sourceLang.parentNode.insertBefore(wrapper, sourceLang);
+    wrapper.appendChild(sourceLang);
+    wrapper.appendChild(translateFromLabel);
+}
 
 const LANGUAGES = [
     { code: 'auto', name: '🔍 Auto-detect' },
@@ -1420,96 +1442,84 @@ function populateLanguages() {
 }
 populateLanguages();
 
-// Detect language using Google Translate API
-async function detectLanguage(text) {
-    if (!text || text.length < 2) return 'auto';
-    try {
-        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(text)}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        if (data && data[2]) {
-            return data[2];
-        }
-        return 'en';
-    } catch (error) {
-        return 'en';
+function updateTranslateFromLabel(langCode, text) {
+    if (!langCode || langCode === 'auto' || !text || text.length < 2) {
+        translateFromLabel.textContent = '';
+        return;
+    }
+    const langName = LANGUAGES.find(l => l.code === langCode)?.name || langCode;
+    translateFromLabel.textContent = `Translate from: ${langName}`;
+    
+    // Also update the source language dropdown to match
+    const detected = sourceLang.querySelector('option[data-detected="true"]');
+    if (!detected || detected.value !== langCode) {
+        // Remove existing detected option
+        if (detected) detected.remove();
+        
+        const option = document.createElement('option');
+        option.value = langCode;
+        option.textContent = `${langName} - detected`;
+        option.setAttribute('data-detected', 'true');
+        option.selected = true;
+        
+        const autoOption = sourceLang.querySelector('option[value="auto"]');
+        if (autoOption) autoOption.textContent = '🔍 Auto-detect';
+        
+        sourceLang.insertBefore(option, sourceLang.children[1]);
+        sourceLang.value = langCode;
     }
 }
 
-function updateSourceLanguage(detectedCode) {
-    if (!detectedCode || detectedCode === 'auto') return;
-    
-    const detectedName = LANGUAGES.find(l => l.code === detectedCode)?.name || detectedCode;
-    
-    // Remove existing detected option
-    const existingDetected = sourceLang.querySelector('option[data-detected="true"]');
-    if (existingDetected) {
-        existingDetected.remove();
-    }
-    
-    // Reset auto option
-    const autoOption = sourceLang.querySelector('option[value="auto"]');
-    if (autoOption) {
-        autoOption.textContent = '🔍 Auto-detect';
-    }
-    
-    // Create new detected option
-    const option = document.createElement('option');
-    option.value = detectedCode;
-    option.textContent = `${detectedName} - detected`;
-    option.setAttribute('data-detected', 'true');
-    option.selected = true;
-    
-    sourceLang.insertBefore(option, sourceLang.children[1]);
-    sourceLang.value = detectedCode;
-}
-
-function resetSourceLanguage() {
-    sourceLang.value = 'auto';
+function resetTranslateFromLabel() {
+    translateFromLabel.textContent = '';
     const detected = sourceLang.querySelector('option[data-detected="true"]');
     if (detected) {
         detected.remove();
     }
     const autoOption = sourceLang.querySelector('option[value="auto"]');
-    if (autoOption) {
-        autoOption.textContent = '🔍 Auto-detect';
-    }
+    if (autoOption) autoOption.textContent = '🔍 Auto-detect';
+    sourceLang.value = 'auto';
     lastDetectedLanguage = '';
 }
 
-function stopRecordingIfActive() {
-    if (isRecording) {
-        try {
-            if (recognition) {
-                recognition.stop();
-            }
-        } catch (e) {}
-        isRecording = false;
-        if (micBtn) {
-            micBtn.classList.remove('recording');
-            micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-            recordingStatus.textContent = 'Click mic to speak';
+async function detectLanguage(text) {
+    if (!text || text.length < 2) return 'auto';
+    try {
+        debugLog('Detecting language for:', text);
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(text)}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data && data[2]) {
+            debugLog('Detected language:', data[2]);
+            return data[2];
         }
+        return 'en';
+    } catch (error) {
+        debugLog('Detection error:', error);
+        return 'en';
     }
 }
 
-// Translation function
 async function translateText(text, sourceLangCode, targetLangCode) {
     if (!text || text.trim().length === 0) {
         return '';
     }
     
     let actualSource = sourceLangCode;
+    let detectedLang = null;
+    
+    debugLog('Translating text:', text);
+    debugLog('Source:', sourceLangCode, 'Target:', targetLangCode);
     
     // If auto-detect, detect language
     if (sourceLangCode === 'auto' && text.length > 2) {
-        const detectedLang = await detectLanguage(text);
+        detectedLang = await detectLanguage(text);
         if (detectedLang && detectedLang !== 'auto') {
             actualSource = detectedLang;
-            // Only update if different from last detected
             if (detectedLang !== lastDetectedLanguage) {
                 lastDetectedLanguage = detectedLang;
-                updateSourceLanguage(detectedLang);
+                updateTranslateFromLabel(detectedLang, text);
+                debugLog('Language updated to:', detectedLang);
             }
         }
     }
@@ -1522,40 +1532,55 @@ async function translateText(text, sourceLangCode, targetLangCode) {
     const response = await fetch(url);
     const data = await response.json();
     if (data && data[0]) {
-        return data[0].map(item => item[0]).join('');
+        const result = data[0].map(item => item[0]).join('');
+        debugLog('Translation result:', result);
+        return result;
     }
     throw new Error('Translation failed');
 }
 
-// Perform translation with spinning button
 async function performTranslation() {
     const text = inputText.value.trim();
+    debugLog('performTranslation called, text:', text);
+    
     if (!text) {
         outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
         translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
         translateBtn.disabled = false;
-        if (sourceLang.value !== 'auto') {
-            const detected = sourceLang.querySelector('option[data-detected="true"]');
-            if (detected) {
-                resetSourceLanguage();
-            }
-        }
+        resetTranslateFromLabel();
         return;
     }
     
-    if (isTranslating) return;
+    if (isTranslating) {
+        debugLog('Translation already in progress');
+        return;
+    }
     
     translateBtn.disabled = true;
     translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
     isTranslating = true;
     
     try {
+        // Check if source is auto or manual
+        if (sourceLang.value === 'auto') {
+            // For auto-detect, detect language first
+            const detected = await detectLanguage(text);
+            if (detected && detected !== 'auto' && detected !== lastDetectedLanguage) {
+                lastDetectedLanguage = detected;
+                updateTranslateFromLabel(detected, text);
+            }
+        } else {
+            // Manual language - show translate from label
+            updateTranslateFromLabel(sourceLang.value, text);
+        }
+        
         const translated = await translateText(text, sourceLang.value, targetLang.value);
         outputDisplay.textContent = translated;
         if (isLoggedIn && currentUser) {
             await saveToHistory(text, translated, sourceLang.value, targetLang.value);
         }
     } catch (error) {
+        debugLog('Translation error:', error);
         outputDisplay.innerHTML = `<span class="placeholder">Error: ${error.message}</span>`;
     } finally {
         isTranslating = false;
@@ -1564,50 +1589,48 @@ async function performTranslation() {
     }
 }
 
+// Translate button click handler
+translateBtn.addEventListener('click', () => {
+    debugLog('Translate button clicked');
+    performTranslation();
+});
+
 // ============================================================
-// INPUT HANDLERS
+// INPUT HANDLERS - INSTANT
 // ============================================================
 
 inputText.addEventListener('input', () => {
     const text = inputText.value.trim();
-    
-    if (translateTimeout) {
-        clearTimeout(translateTimeout);
-        translateTimeout = null;
-    }
+    debugLog('Input changed:', text);
     
     if (text) {
-        // Check if auto-detect and text length > 2
+        // Show spinning immediately
+        translateBtn.disabled = true;
+        translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+        
+        // If auto-detect, detect language first
         if (sourceLang.value === 'auto' && text.length > 2) {
-            translateTimeout = setTimeout(() => {
-                // Detect language first
-                detectLanguage(text).then(detectedLang => {
-                    if (detectedLang && detectedLang !== 'auto' && detectedLang !== lastDetectedLanguage) {
-                        lastDetectedLanguage = detectedLang;
-                        updateSourceLanguage(detectedLang);
-                    }
-                    performTranslation();
-                }).catch(() => {
-                    performTranslation();
-                });
-                translateTimeout = null;
-            }, 150);
-        } else {
-            translateTimeout = setTimeout(() => {
+            detectLanguage(text).then(detectedLang => {
+                if (detectedLang && detectedLang !== 'auto' && detectedLang !== lastDetectedLanguage) {
+                    lastDetectedLanguage = detectedLang;
+                    updateTranslateFromLabel(detectedLang, text);
+                }
                 performTranslation();
-                translateTimeout = null;
-            }, 150);
+            }).catch(() => {
+                performTranslation();
+            });
+        } else {
+            // Manual language
+            if (sourceLang.value !== 'auto') {
+                updateTranslateFromLabel(sourceLang.value, text);
+            }
+            performTranslation();
         }
     } else {
         outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
         translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
         translateBtn.disabled = false;
-        if (sourceLang.value !== 'auto') {
-            const detected = sourceLang.querySelector('option[data-detected="true"]');
-            if (detected) {
-                resetSourceLanguage();
-            }
-        }
+        resetTranslateFromLabel();
     }
 });
 
@@ -1615,6 +1638,7 @@ inputText.addEventListener('input', () => {
 // LANGUAGE CHANGE HANDLERS
 // ============================================================
 sourceLang.addEventListener('change', () => {
+    debugLog('Source language changed to:', sourceLang.value);
     stopRecordingIfActive();
     
     if (sourceLang.value !== 'auto') {
@@ -1629,12 +1653,20 @@ sourceLang.addEventListener('change', () => {
         lastDetectedLanguage = '';
         const text = inputText.value.trim();
         if (text) {
+            updateTranslateFromLabel(sourceLang.value, text);
+            performTranslation();
+        }
+    } else {
+        resetTranslateFromLabel();
+        const text = inputText.value.trim();
+        if (text) {
             performTranslation();
         }
     }
 });
 
 targetLang.addEventListener('change', () => {
+    debugLog('Target language changed to:', targetLang.value);
     stopRecordingIfActive();
     const text = inputText.value.trim();
     if (text) {
@@ -1643,6 +1675,7 @@ targetLang.addEventListener('change', () => {
 });
 
 document.getElementById('swapLang').addEventListener('click', () => {
+    debugLog('Swap languages clicked');
     stopRecordingIfActive();
     
     const temp = sourceLang.value;
@@ -1653,7 +1686,7 @@ document.getElementById('swapLang').addEventListener('click', () => {
     translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
     translateBtn.disabled = false;
     lastDetectedLanguage = '';
-    resetSourceLanguage();
+    resetTranslateFromLabel();
 });
 
 document.getElementById('copyOutput').addEventListener('click', async () => {
@@ -1674,6 +1707,7 @@ document.getElementById('speakOutput').addEventListener('click', () => {
 });
 
 document.getElementById('clearInput').addEventListener('click', () => {
+    debugLog('Clear input clicked');
     stopRecordingIfActive();
     
     inputText.value = '';
@@ -1681,15 +1715,31 @@ document.getElementById('clearInput').addEventListener('click', () => {
     translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
     translateBtn.disabled = false;
     lastDetectedLanguage = '';
-    resetSourceLanguage();
+    resetTranslateFromLabel();
 });
 
 // ============================================================
-// MIC - RECORDING SYSTEM
+// MIC - RECORDING SYSTEM (FULLY FIXED)
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
 let recognition = null;
+
+function stopRecordingIfActive() {
+    if (isRecording) {
+        try {
+            if (recognition) {
+                recognition.stop();
+            }
+        } catch (e) {}
+        isRecording = false;
+        if (micBtn) {
+            micBtn.classList.remove('recording');
+            micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+            recordingStatus.textContent = 'Click mic to speak';
+        }
+    }
+}
 
 if (window.SpeechRecognition || window.webkitSpeechRecognition) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1704,9 +1754,11 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
         micBtn.classList.add('recording');
         recordingStatus.textContent = '🎤 Recording... Click to stop';
         micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+        debugLog('Recording started');
     };
     
     recognition.onresult = (event) => {
+        debugLog('Speech result received');
         let finalText = '';
         let interimText = '';
         
@@ -1718,11 +1770,17 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
             }
         }
         
+        // Update input with interim results
         if (interimText) {
             inputText.value = finalText + interimText;
+            // Show spinning
+            translateBtn.disabled = true;
+            translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
         }
         
+        // Process final text
         if (finalText) {
+            debugLog('Final text:', finalText);
             const currentText = inputText.value;
             if (currentText.includes(finalText) || currentText === finalText) {
                 inputText.value = finalText;
@@ -1730,29 +1788,28 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
                 inputText.value = currentText + ' ' + finalText;
             }
             
-            if (translateTimeout) {
-                clearTimeout(translateTimeout);
-                translateTimeout = null;
-            }
-            
-            // If auto-detect, detect language
+            // Determine if auto-detect or manual
             if (sourceLang.value === 'auto' && inputText.value.length > 2) {
                 detectLanguage(inputText.value).then(detectedLang => {
                     if (detectedLang && detectedLang !== 'auto' && detectedLang !== lastDetectedLanguage) {
                         lastDetectedLanguage = detectedLang;
-                        updateSourceLanguage(detectedLang);
+                        updateTranslateFromLabel(detectedLang, inputText.value);
                     }
                     performTranslation();
                 }).catch(() => {
                     performTranslation();
                 });
             } else {
+                if (sourceLang.value !== 'auto') {
+                    updateTranslateFromLabel(sourceLang.value, inputText.value);
+                }
                 performTranslation();
             }
         }
     };
     
     recognition.onerror = (event) => {
+        debugLog('Speech error:', event.error);
         if (event.error === 'no-speech') return;
         if (event.error === 'not-allowed') {
             showNotification('Microphone access denied. Please allow microphone access.', 'error');
@@ -1765,10 +1822,13 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
     };
     
     recognition.onend = () => {
+        debugLog('Recognition ended, isRecording:', isRecording);
         if (isRecording) {
             try {
                 recognition.start();
+                debugLog('Recognition restarted');
             } catch (e) {
+                debugLog('Failed to restart recognition:', e);
                 isRecording = false;
                 micBtn.classList.remove('recording');
                 micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
@@ -1782,11 +1842,15 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
     };
     
     micBtn.addEventListener('click', () => {
+        debugLog('Mic clicked, isRecording:', isRecording);
         if (isRecording) {
             isRecording = false;
             try {
                 recognition.stop();
-            } catch (e) {}
+                debugLog('Recording stopped');
+            } catch (e) {
+                debugLog('Stop error:', e);
+            }
             micBtn.classList.remove('recording');
             micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
             recordingStatus.textContent = 'Click mic to speak';
@@ -1794,9 +1858,12 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
         } else {
             const lang = sourceLang.value === 'auto' ? 'en' : sourceLang.value;
             recognition.lang = lang;
+            debugLog('Starting recording with lang:', lang);
             try {
                 recognition.start();
+                debugLog('Recording started');
             } catch (e) {
+                debugLog('Start error:', e);
                 showNotification('Error starting microphone. Please try again.', 'error');
             }
         }
@@ -1841,4 +1908,5 @@ aboutModal.addEventListener('click', (e) => {
 // INIT
 // ============================================================
 checkAuthStatus();
-console.log('✅ FreeTranslate Language initialized');
+debugLog('✅ FreeTranslate Language initialized with debug mode ON');
+debugLog('🎤 Speech recognition available:', !!(window.SpeechRecognition || window.webkitSpeechRecognition));
