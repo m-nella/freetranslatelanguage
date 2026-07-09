@@ -19,6 +19,8 @@ let isRecording = false;
 let isTranslating = false;
 let lastDetectedLanguage = '';
 let debugMode = true; // Set to false when done
+let translateQueue = false;
+let isProcessing = false;
 
 // ============================================================
 // DEBUG LOGGING
@@ -1370,19 +1372,60 @@ const outputDisplay = document.getElementById('outputText');
 const sourceLang = document.getElementById('sourceLang');
 const targetLang = document.getElementById('targetLang');
 
-// Create Translate From Label
+// Create Translate From Label - Placed below source language
+const translateFromWrapper = document.createElement('div');
+translateFromWrapper.style.cssText = 'display: flex; flex-direction: column; width: 100%; position: relative;';
+
+// Move sourceLang into wrapper
+if (sourceLang && sourceLang.parentNode) {
+    sourceLang.parentNode.insertBefore(translateFromWrapper, sourceLang);
+    translateFromWrapper.appendChild(sourceLang);
+}
+
+// Create the clickable "Translate from: Language" label
 const translateFromLabel = document.createElement('span');
 translateFromLabel.className = 'translate-from-label';
-translateFromLabel.style.cssText = 'font-size: 0.7rem; color: var(--text-light); margin-top: 4px; display: block; min-height: 18px;';
+translateFromLabel.style.cssText = `
+    font-size: 0.7rem;
+    color: var(--accent);
+    margin-top: 4px;
+    display: none;
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--accent-light);
+    transition: all 0.2s ease;
+    user-select: none;
+    width: fit-content;
+`;
+translateFromLabel.title = 'Click to switch to this language';
+translateFromWrapper.appendChild(translateFromLabel);
 
-// Add label below source language
-if (sourceLang && sourceLang.parentNode) {
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'display: flex; flex-direction: column; width: 100%;';
-    sourceLang.parentNode.insertBefore(wrapper, sourceLang);
-    wrapper.appendChild(sourceLang);
-    wrapper.appendChild(translateFromLabel);
-}
+// Click handler for "Translate from" label
+translateFromLabel.addEventListener('click', () => {
+    const detectedLang = translateFromLabel.dataset.lang;
+    if (detectedLang && detectedLang !== 'auto') {
+        debugLog('Translate from clicked, switching to:', detectedLang);
+        sourceLang.value = detectedLang;
+        // Remove detected option from dropdown
+        const detectedOption = sourceLang.querySelector('option[data-detected="true"]');
+        if (detectedOption) {
+            detectedOption.remove();
+        }
+        // Reset auto option text
+        const autoOption = sourceLang.querySelector('option[value="auto"]');
+        if (autoOption) {
+            autoOption.textContent = '🔍 Auto-detect';
+        }
+        translateFromLabel.style.display = 'none';
+        lastDetectedLanguage = '';
+        // Re-translate with new source language
+        const text = inputText.value.trim();
+        if (text) {
+            performTranslation();
+        }
+    }
+});
 
 const LANGUAGES = [
     { code: 'auto', name: '🔍 Auto-detect' },
@@ -1442,49 +1485,70 @@ function populateLanguages() {
 }
 populateLanguages();
 
-function updateTranslateFromLabel(langCode, text) {
-    debugLog('updateTranslateFromLabel:', langCode, 'text length:', text?.length || 0);
+function updateTranslateFromLabel(langCode, text, isManualMode) {
+    debugLog('updateTranslateFromLabel:', langCode, 'isManualMode:', isManualMode, 'text length:', text?.length || 0);
     
-    if (!langCode || langCode === 'auto' || !text || text.length < 2) {
+    // Hide label if:
+    // - No text or text too short
+    // - Auto-detect mode and language is 'auto'
+    // - Manual mode and detected language matches selected language
+    if (!text || text.length < 2) {
+        translateFromLabel.style.display = 'none';
         translateFromLabel.textContent = '';
-        debugLog('Label cleared');
+        translateFromLabel.dataset.lang = '';
+        debugLog('Label hidden - no text');
         return;
     }
-    const langName = LANGUAGES.find(l => l.code === langCode)?.name || langCode;
-    translateFromLabel.textContent = `Translate from: ${langName}`;
-    debugLog('Label set to:', translateFromLabel.textContent);
     
-    // Update dropdown to show detected language
-    const detected = sourceLang.querySelector('option[data-detected="true"]');
-    if (!detected || detected.value !== langCode) {
-        if (detected) detected.remove();
-        
-        const option = document.createElement('option');
-        option.value = langCode;
-        option.textContent = `${langName} - detected`;
-        option.setAttribute('data-detected', 'true');
-        option.selected = true;
-        
-        const autoOption = sourceLang.querySelector('option[value="auto"]');
-        if (autoOption) autoOption.textContent = '🔍 Auto-detect';
-        
-        sourceLang.insertBefore(option, sourceLang.children[1]);
-        sourceLang.value = langCode;
-        debugLog('Dropdown updated to:', langCode);
+    // In auto-detect mode, show the detected language
+    if (!isManualMode) {
+        if (langCode && langCode !== 'auto') {
+            const langName = LANGUAGES.find(l => l.code === langCode)?.name || langCode;
+            translateFromLabel.textContent = `Translate from: ${langName}`;
+            translateFromLabel.dataset.lang = langCode;
+            translateFromLabel.style.display = 'block';
+            debugLog('Label shown (auto-detect):', translateFromLabel.textContent);
+        } else {
+            translateFromLabel.style.display = 'none';
+            translateFromLabel.dataset.lang = '';
+            debugLog('Label hidden - auto mode with no detected language');
+        }
+        return;
+    }
+    
+    // Manual mode - only show if detected language differs from selected
+    const selectedLang = sourceLang.value;
+    if (langCode && langCode !== 'auto' && langCode !== selectedLang) {
+        const langName = LANGUAGES.find(l => l.code === langCode)?.name || langCode;
+        translateFromLabel.textContent = `Translate from: ${langName}`;
+        translateFromLabel.dataset.lang = langCode;
+        translateFromLabel.style.display = 'block';
+        debugLog('Label shown (manual - different language):', translateFromLabel.textContent);
+    } else {
+        translateFromLabel.style.display = 'none';
+        translateFromLabel.dataset.lang = '';
+        debugLog('Label hidden - manual mode with matching language');
     }
 }
 
 function resetTranslateFromLabel() {
-    debugLog('Reset translate from label');
+    translateFromLabel.style.display = 'none';
     translateFromLabel.textContent = '';
+    translateFromLabel.dataset.lang = '';
+    // Reset dropdown
     const detected = sourceLang.querySelector('option[data-detected="true"]');
     if (detected) {
         detected.remove();
     }
     const autoOption = sourceLang.querySelector('option[value="auto"]');
-    if (autoOption) autoOption.textContent = '🔍 Auto-detect';
-    sourceLang.value = 'auto';
+    if (autoOption) {
+        autoOption.textContent = '🔍 Auto-detect';
+    }
+    if (sourceLang.value !== 'auto') {
+        sourceLang.value = 'auto';
+    }
     lastDetectedLanguage = '';
+    debugLog('Reset translate from label');
 }
 
 async function detectLanguage(text) {
@@ -1505,44 +1569,6 @@ async function detectLanguage(text) {
     }
 }
 
-async function translateText(text, sourceLangCode, targetLangCode) {
-    if (!text || text.trim().length === 0) {
-        return '';
-    }
-    
-    let actualSource = sourceLangCode;
-    let detectedLang = null;
-    
-    debugLog('Translating, source:', sourceLangCode, 'target:', targetLangCode);
-    
-    // If auto-detect, detect language
-    if (sourceLangCode === 'auto' && text.length > 2) {
-        detectedLang = await detectLanguage(text);
-        if (detectedLang && detectedLang !== 'auto') {
-            actualSource = detectedLang;
-            if (detectedLang !== lastDetectedLanguage) {
-                lastDetectedLanguage = detectedLang;
-                updateTranslateFromLabel(detectedLang, text);
-                debugLog('Language updated to:', detectedLang);
-            }
-        }
-    }
-    
-    if (actualSource === 'auto') {
-        actualSource = 'en';
-    }
-    
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${actualSource}&tl=${targetLangCode}&dt=t&q=${encodeURIComponent(text)}`;
-    const response = await fetch(url);
-    const data = await response.json();
-    if (data && data[0]) {
-        const result = data[0].map(item => item[0]).join('');
-        debugLog('Translation result:', result.substring(0, 50));
-        return result;
-    }
-    throw new Error('Translation failed');
-}
-
 // ============================================================
 // PERFORM TRANSLATION - INSTANT
 // ============================================================
@@ -1558,35 +1584,65 @@ async function performTranslation() {
         return;
     }
     
+    // Queue translation if one is in progress
     if (isTranslating) {
-        debugLog('Translation already in progress');
+        debugLog('Translation in progress, queuing');
+        translateQueue = true;
         return;
     }
+    
+    translateQueue = false;
+    isTranslating = true;
     
     // Show spinning immediately
     translateBtn.disabled = true;
     translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
-    isTranslating = true;
     
     try {
+        // Determine if we're in manual mode or auto-detect mode
+        const isManualMode = sourceLang.value !== 'auto';
+        let detectedLang = null;
+        let actualSource = sourceLang.value;
+        
         // For auto-detect, detect language first
-        if (sourceLang.value === 'auto') {
-            const detected = await detectLanguage(text);
-            if (detected && detected !== 'auto' && detected !== lastDetectedLanguage) {
-                lastDetectedLanguage = detected;
-                updateTranslateFromLabel(detected, text);
+        if (!isManualMode && text.length > 2) {
+            detectedLang = await detectLanguage(text);
+            if (detectedLang && detectedLang !== 'auto') {
+                actualSource = detectedLang;
+                if (detectedLang !== lastDetectedLanguage) {
+                    lastDetectedLanguage = detectedLang;
+                    // Update dropdown with detected language
+                    updateSourceLanguageDropdown(detectedLang);
+                }
             }
-        } else {
-            // Manual language
-            updateTranslateFromLabel(sourceLang.value, text);
+        } else if (isManualMode) {
+            // For manual mode, detect language to show "Translate from" if different
+            if (text.length > 2) {
+                detectedLang = await detectLanguage(text);
+            }
         }
         
-        const translated = await translateText(text, sourceLang.value, targetLang.value);
+        // Update the "Translate from" label
+        if (detectedLang && detectedLang !== 'auto') {
+            updateTranslateFromLabel(detectedLang, text, isManualMode);
+        } else {
+            translateFromLabel.style.display = 'none';
+            translateFromLabel.dataset.lang = '';
+        }
+        
+        // If source is still 'auto', default to 'en'
+        if (actualSource === 'auto') {
+            actualSource = 'en';
+        }
+        
+        debugLog('Translating, source:', actualSource, 'target:', targetLang.value);
+        
+        const translated = await translateText(text, actualSource, targetLang.value);
         outputDisplay.textContent = translated;
         debugLog('Output updated');
         
         if (isLoggedIn && currentUser) {
-            await saveToHistory(text, translated, sourceLang.value, targetLang.value);
+            await saveToHistory(text, translated, actualSource, targetLang.value);
         }
     } catch (error) {
         debugLog('Translation error:', error);
@@ -1595,18 +1651,71 @@ async function performTranslation() {
         isTranslating = false;
         translateBtn.disabled = false;
         translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+        
+        // Process queued translation if any
+        if (translateQueue) {
+            debugLog('Processing queued translation');
+            setTimeout(() => performTranslation(), 50);
+        }
     }
+}
+
+function updateSourceLanguageDropdown(detectedCode) {
+    if (!detectedCode || detectedCode === 'auto') return;
+    
+    const detectedName = LANGUAGES.find(l => l.code === detectedCode)?.name || detectedCode;
+    
+    // Remove existing detected option
+    const existingDetected = sourceLang.querySelector('option[data-detected="true"]');
+    if (existingDetected) {
+        existingDetected.remove();
+    }
+    
+    // Reset auto option
+    const autoOption = sourceLang.querySelector('option[value="auto"]');
+    if (autoOption) {
+        autoOption.textContent = '🔍 Auto-detect';
+    }
+    
+    // Create new detected option
+    const option = document.createElement('option');
+    option.value = detectedCode;
+    option.textContent = `${detectedName} - detected`;
+    option.setAttribute('data-detected', 'true');
+    option.selected = true;
+    
+    sourceLang.insertBefore(option, sourceLang.children[1]);
+    sourceLang.value = detectedCode;
+    debugLog('Dropdown updated to:', detectedCode);
+}
+
+async function translateText(text, sourceLangCode, targetLangCode) {
+    if (!text || text.trim().length === 0) {
+        return '';
+    }
+    
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLangCode}&tl=${targetLangCode}&dt=t&q=${encodeURIComponent(text)}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data && data[0]) {
+        return data[0].map(item => item[0]).join('');
+    }
+    throw new Error('Translation failed');
 }
 
 // Translate button click handler
 translateBtn.addEventListener('click', () => {
     debugLog('Translate button clicked');
-    performTranslation();
+    if (!isTranslating) {
+        performTranslation();
+    }
 });
 
 // ============================================================
 // INPUT HANDLERS - INSTANT
 // ============================================================
+
+let inputTimeout = null;
 
 inputText.addEventListener('input', () => {
     const text = inputText.value.trim();
@@ -1617,23 +1726,37 @@ inputText.addEventListener('input', () => {
         translateBtn.disabled = true;
         translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
         
-        // If auto-detect, detect language first
+        // For auto-detect, detect language on every change
         if (sourceLang.value === 'auto' && text.length > 2) {
             detectLanguage(text).then(detectedLang => {
-                if (detectedLang && detectedLang !== 'auto' && detectedLang !== lastDetectedLanguage) {
-                    lastDetectedLanguage = detectedLang;
-                    updateTranslateFromLabel(detectedLang, text);
+                if (detectedLang && detectedLang !== 'auto') {
+                    const isManualMode = sourceLang.value !== 'auto';
+                    updateTranslateFromLabel(detectedLang, text, isManualMode);
+                    if (detectedLang !== lastDetectedLanguage) {
+                        lastDetectedLanguage = detectedLang;
+                        updateSourceLanguageDropdown(detectedLang);
+                    }
                 }
                 performTranslation();
             }).catch(() => {
                 performTranslation();
             });
         } else {
-            // Manual language
-            if (sourceLang.value !== 'auto') {
-                updateTranslateFromLabel(sourceLang.value, text);
+            // Manual mode - detect language for "Translate from" label
+            if (text.length > 2) {
+                detectLanguage(text).then(detectedLang => {
+                    if (detectedLang && detectedLang !== 'auto') {
+                        updateTranslateFromLabel(detectedLang, text, true);
+                    }
+                    performTranslation();
+                }).catch(() => {
+                    performTranslation();
+                });
+            } else {
+                translateFromLabel.style.display = 'none';
+                translateFromLabel.dataset.lang = '';
+                performTranslation();
             }
-            performTranslation();
         }
     } else {
         outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
@@ -1650,25 +1773,32 @@ sourceLang.addEventListener('change', () => {
     debugLog('Source language changed to:', sourceLang.value);
     stopRecordingIfActive();
     
-    if (sourceLang.value !== 'auto') {
-        const detected = sourceLang.querySelector('option[data-detected="true"]');
-        if (detected) {
-            detected.remove();
-        }
-        const autoOption = sourceLang.querySelector('option[value="auto"]');
-        if (autoOption) {
-            autoOption.textContent = '🔍 Auto-detect';
-        }
-        lastDetectedLanguage = '';
-        const text = inputText.value.trim();
-        if (text) {
-            updateTranslateFromLabel(sourceLang.value, text);
-            performTranslation();
-        }
-    } else {
-        resetTranslateFromLabel();
-        const text = inputText.value.trim();
-        if (text) {
+    // Remove detected option when user manually changes language
+    const detected = sourceLang.querySelector('option[data-detected="true"]');
+    if (detected) {
+        detected.remove();
+    }
+    const autoOption = sourceLang.querySelector('option[value="auto"]');
+    if (autoOption) {
+        autoOption.textContent = '🔍 Auto-detect';
+    }
+    lastDetectedLanguage = '';
+    translateFromLabel.style.display = 'none';
+    translateFromLabel.dataset.lang = '';
+    
+    const text = inputText.value.trim();
+    if (text) {
+        // Re-detect language for "Translate from" label
+        if (text.length > 2) {
+            detectLanguage(text).then(detectedLang => {
+                if (detectedLang && detectedLang !== 'auto') {
+                    updateTranslateFromLabel(detectedLang, text, true);
+                }
+                performTranslation();
+            }).catch(() => {
+                performTranslation();
+            });
+        } else {
             performTranslation();
         }
     }
@@ -1797,22 +1927,41 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
                 inputText.value = currentText + ' ' + finalText;
             }
             
-            // Determine if auto-detect or manual
-            if (sourceLang.value === 'auto' && inputText.value.length > 2) {
-                detectLanguage(inputText.value).then(detectedLang => {
-                    if (detectedLang && detectedLang !== 'auto' && detectedLang !== lastDetectedLanguage) {
-                        lastDetectedLanguage = detectedLang;
-                        updateTranslateFromLabel(detectedLang, inputText.value);
+            // Trigger translation immediately
+            const text = inputText.value.trim();
+            if (text) {
+                // Detect language and translate
+                if (sourceLang.value === 'auto' && text.length > 2) {
+                    detectLanguage(text).then(detectedLang => {
+                        if (detectedLang && detectedLang !== 'auto') {
+                            const isManualMode = sourceLang.value !== 'auto';
+                            updateTranslateFromLabel(detectedLang, text, isManualMode);
+                            if (detectedLang !== lastDetectedLanguage) {
+                                lastDetectedLanguage = detectedLang;
+                                updateSourceLanguageDropdown(detectedLang);
+                            }
+                        }
+                        performTranslation();
+                    }).catch(() => {
+                        performTranslation();
+                    });
+                } else {
+                    // Manual mode - detect for label
+                    if (text.length > 2) {
+                        detectLanguage(text).then(detectedLang => {
+                            if (detectedLang && detectedLang !== 'auto') {
+                                updateTranslateFromLabel(detectedLang, text, true);
+                            }
+                            performTranslation();
+                        }).catch(() => {
+                            performTranslation();
+                        });
+                    } else {
+                        translateFromLabel.style.display = 'none';
+                        translateFromLabel.dataset.lang = '';
+                        performTranslation();
                     }
-                    performTranslation();
-                }).catch(() => {
-                    performTranslation();
-                });
-            } else {
-                if (sourceLang.value !== 'auto') {
-                    updateTranslateFromLabel(sourceLang.value, inputText.value);
                 }
-                performTranslation();
             }
         }
     };
