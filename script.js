@@ -19,17 +19,6 @@ let isRecording = false;
 let isTranslating = false;
 let translateQueue = false;
 let currentSpeech = null;
-let debugMode = true;
-let recordingTranslateTimeout = null;
-
-// ============================================================
-// DEBUG LOGGING
-// ============================================================
-function debugLog(...args) {
-    if (debugMode) {
-        console.log('[Debug]', ...args);
-    }
-}
 
 // ============================================================
 // DOM ELEMENTS
@@ -57,7 +46,7 @@ let settingsModal = null;
 let historyModal = null;
 
 // ============================================================
-// SPEECH FUNCTION - Stop speech when content is deleted
+// SPEECH FUNCTION
 // ============================================================
 function speakText(text, lang) {
     if (window.speechSynthesis.speaking) {
@@ -1686,7 +1675,6 @@ translateBtn.addEventListener('click', () => {
 inputText.addEventListener('input', () => {
     const text = inputText.value.trim();
     
-    // If text is empty, stop any ongoing speech
     if (!text) {
         stopSpeech();
     }
@@ -1772,7 +1760,7 @@ document.getElementById('clearInput').addEventListener('click', () => {
 });
 
 // ============================================================
-// MIC - RECORDING SYSTEM (INSTANT TRANSLATION - NO DELAY)
+// MIC - RECORDING SYSTEM (LOCKED TO SELECTED LANGUAGE)
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
@@ -1862,6 +1850,7 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
     recognition.onend = () => {
         if (isRecording) {
             try {
+                // Always restart with the SELECTED source language
                 recognition.lang = sourceLang.value || 'en';
                 recognition.start();
             } catch (e) {
@@ -1898,6 +1887,7 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
                 }).catch(() => {});
             }
         } else {
+            // Lock to selected source language
             const lang = sourceLang.value || 'en';
             recognition.lang = lang;
             try {
@@ -1947,4 +1937,3 @@ aboutModal.addEventListener('click', (e) => {
 // INIT
 // ============================================================
 checkAuthStatus();
-console.log('✅ FreeTranslate Language initialized');
