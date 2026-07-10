@@ -1,5 +1,5 @@
 // ============================================================
-// FREE TRANSLATE LANGUAGE - Complete Application
+// FREE TRANSLATE LANGUAGE - Complete Application (FULLY FIXED)
 // ============================================================
 
 // ============================================================
@@ -19,6 +19,8 @@ let isRecording = false;
 let isTranslating = false;
 let translateQueue = false;
 let currentSpeech = null;
+let recognition = null;
+let recognitionLang = 'en';
 
 // ============================================================
 // DOM ELEMENTS
@@ -100,16 +102,25 @@ function showNotification(message, type = 'info', duration = 5000) {
         <button class="notif-close">&times;</button>
     `;
     const closeBtn = notification.querySelector('.notif-close');
-    closeBtn.addEventListener('click', () => {
+    closeBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
         notification.style.animation = 'slideOutRight 0.3s ease forwards';
-        setTimeout(() => notification.remove(), 300);
+        setTimeout(function() {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 300);
     });
     container.appendChild(notification);
     
-    notificationTimeout = setTimeout(() => {
+    notificationTimeout = setTimeout(function() {
         if (notification.parentNode) {
             notification.style.animation = 'slideOutRight 0.3s ease forwards';
-            setTimeout(() => notification.remove(), 300);
+            setTimeout(function() {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 300);
         }
         notificationTimeout = null;
     }, duration);
@@ -138,6 +149,14 @@ function createPasswordField(id, placeholder) {
         input.type = isPassword ? 'text' : 'password';
         this.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
     });
+    // Touch support
+    toggle.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const isPassword = input.type === 'password';
+        input.type = isPassword ? 'text' : 'password';
+        this.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+    }, { passive: false });
     wrapper.appendChild(input);
     wrapper.appendChild(toggle);
     return wrapper;
@@ -146,12 +165,13 @@ function createPasswordField(id, placeholder) {
 function bindPasswordToggles(container) {
     if (!container) return;
     const fields = container.querySelectorAll('.password-field');
-    fields.forEach(wrapper => {
+    fields.forEach(function(wrapper) {
         const input = wrapper.querySelector('input');
         const toggle = wrapper.querySelector('.password-toggle');
         if (input && toggle) {
             const newToggle = toggle.cloneNode(true);
             toggle.parentNode.replaceChild(newToggle, toggle);
+            // Add both click and touch events
             newToggle.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -159,6 +179,13 @@ function bindPasswordToggles(container) {
                 input.type = isPassword ? 'text' : 'password';
                 this.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
             });
+            newToggle.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const isPassword = input.type === 'password';
+                input.type = isPassword ? 'text' : 'password';
+                this.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+            }, { passive: false });
         }
     });
 }
@@ -167,7 +194,7 @@ function bindPasswordToggles(container) {
 // CLEAR PASSWORD FIELDS
 // ============================================================
 function clearAllPasswordFields() {
-    document.querySelectorAll('input[type="password"]').forEach(input => {
+    document.querySelectorAll('input[type="password"]').forEach(function(input) {
         input.value = '';
     });
 }
@@ -223,7 +250,7 @@ async function verifyCode(email, code) {
 // ============================================================
 
 function showPasswordConfirmModal(title, message, inputPlaceholder = 'Enter your password', inputType = 'password') {
-    return new Promise((resolve) => {
+    return new Promise(function(resolve) {
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
@@ -251,18 +278,29 @@ function showPasswordConfirmModal(title, message, inputPlaceholder = 'Enter your
         
         input.focus();
         
-        confirmBtn.addEventListener('click', () => {
+        confirmBtn.addEventListener('click', function() {
             const value = input.value;
             modal.remove();
             resolve(value);
         });
+        confirmBtn.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            const value = input.value;
+            modal.remove();
+            resolve(value);
+        }, { passive: false });
         
-        cancelBtn.addEventListener('click', () => {
+        cancelBtn.addEventListener('click', function() {
             modal.remove();
             resolve(null);
         });
+        cancelBtn.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            modal.remove();
+            resolve(null);
+        }, { passive: false });
         
-        input.addEventListener('keydown', (e) => {
+        input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 const value = input.value;
                 modal.remove();
@@ -274,7 +312,7 @@ function showPasswordConfirmModal(title, message, inputPlaceholder = 'Enter your
             }
         });
         
-        modal.addEventListener('click', (e) => {
+        modal.addEventListener('click', function(e) {
             if (e.target === modal) {
                 modal.remove();
                 resolve(null);
@@ -284,7 +322,7 @@ function showPasswordConfirmModal(title, message, inputPlaceholder = 'Enter your
 }
 
 function showPasswordResetModal() {
-    return new Promise((resolve) => {
+    return new Promise(function(resolve) {
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
@@ -317,7 +355,7 @@ function showPasswordResetModal() {
         
         newPassword.focus();
         
-        confirmBtn.addEventListener('click', () => {
+        confirmBtn.addEventListener('click', function() {
             const pass1 = newPassword.value;
             const pass2 = confirmPassword.value;
             
@@ -340,13 +378,42 @@ function showPasswordResetModal() {
             modal.remove();
             resolve(pass1);
         });
+        confirmBtn.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            const pass1 = newPassword.value;
+            const pass2 = confirmPassword.value;
+            
+            if (!pass1 || pass1.length < 8) {
+                showNotification('Password must be at least 8 characters.', 'error');
+                return;
+            }
+            
+            if (pass1 !== pass2) {
+                showNotification('Passwords do not match!', 'error');
+                return;
+            }
+            
+            const validation = DATA_MANAGER.validatePasswordStrength(pass1);
+            if (!validation.valid) {
+                showNotification(validation.message, 'error');
+                return;
+            }
+            
+            modal.remove();
+            resolve(pass1);
+        }, { passive: false });
         
-        cancelBtn.addEventListener('click', () => {
+        cancelBtn.addEventListener('click', function() {
             modal.remove();
             resolve(null);
         });
+        cancelBtn.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            modal.remove();
+            resolve(null);
+        }, { passive: false });
         
-        modal.addEventListener('click', (e) => {
+        modal.addEventListener('click', function(e) {
             if (e.target === modal) {
                 modal.remove();
                 resolve(null);
@@ -359,7 +426,7 @@ function showPasswordResetModal() {
 // CONFIRMATION MODAL
 // ============================================================
 function showConfirmationModal(title, message, confirmText = 'Confirm', cancelText = 'Cancel') {
-    return new Promise((resolve) => {
+    return new Promise(function(resolve) {
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
@@ -375,17 +442,27 @@ function showConfirmationModal(title, message, confirmText = 'Confirm', cancelTe
         `;
         document.body.appendChild(modal);
         
-        modal.querySelector('#cancelConfirm').addEventListener('click', () => {
+        modal.querySelector('#cancelConfirm').addEventListener('click', function() {
             modal.remove();
             resolve(false);
         });
+        modal.querySelector('#cancelConfirm').addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            modal.remove();
+            resolve(false);
+        }, { passive: false });
         
-        modal.querySelector('#confirmAction').addEventListener('click', () => {
+        modal.querySelector('#confirmAction').addEventListener('click', function() {
             modal.remove();
             resolve(true);
         });
+        modal.querySelector('#confirmAction').addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            modal.remove();
+            resolve(true);
+        }, { passive: false });
         
-        modal.addEventListener('click', (e) => {
+        modal.addEventListener('click', function(e) {
             if (e.target === modal) {
                 modal.remove();
                 resolve(false);
@@ -425,24 +502,30 @@ function openVerificationModal(email, action, callback) {
     `;
     document.body.appendChild(modal);
     
-    modal.addEventListener('click', (e) => {
+    modal.addEventListener('click', function(e) {
         if (e.target === modal) {
             e.stopPropagation();
         }
     });
     
     const closeBtn = modal.querySelector('.close-verification');
-    closeBtn.addEventListener('click', () => {
+    closeBtn.addEventListener('click', function() {
         modal.remove();
         isVerifying = false;
         verificationDone = false;
     });
+    closeBtn.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        modal.remove();
+        isVerifying = false;
+        verificationDone = false;
+    }, { passive: false });
     
     const form = modal.querySelector('#verificationForm');
     const submitBtn = modal.querySelector('#verifySubmitBtn');
     const codeInput = document.getElementById('verificationCode');
     
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', async function(e) {
         e.preventDefault();
         e.stopPropagation();
         
@@ -474,7 +557,7 @@ function openVerificationModal(email, action, callback) {
                     localStorage.setItem('authToken', result.token);
                 }
                 
-                setTimeout(() => {
+                setTimeout(function() {
                     modal.remove();
                     if (typeof pendingCallback === 'function') {
                         pendingCallback(result.token);
@@ -503,7 +586,7 @@ function openVerificationModal(email, action, callback) {
     });
     
     const resendBtn = modal.querySelector('#resendCodeBtn');
-    resendBtn.addEventListener('click', async (e) => {
+    resendBtn.addEventListener('click', async function(e) {
         e.preventDefault();
         clearAllNotifications();
         
@@ -523,8 +606,28 @@ function openVerificationModal(email, action, callback) {
             showNotification('Error sending code. Please try again.', 'error');
         }
     });
+    resendBtn.addEventListener('touchstart', async function(e) {
+        e.preventDefault();
+        clearAllNotifications();
+        
+        verificationDone = false;
+        isVerifying = false;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Verify';
+        submitBtn.style.backgroundColor = '';
+        codeInput.disabled = false;
+        codeInput.value = '';
+        codeInput.focus();
+        
+        const result = await sendVerificationCode(email, pendingAction);
+        if (result.success) {
+            showNotification('New code sent! Check your email.', 'success');
+        } else {
+            showNotification('Error sending code. Please try again.', 'error');
+        }
+    }, { passive: false });
     
-    setTimeout(() => {
+    setTimeout(function() {
         codeInput.focus();
     }, 200);
 }
@@ -567,15 +670,23 @@ async function checkAuthStatus() {
 }
 
 // ============================================================
-// AUTH BUTTON
+// AUTH BUTTON - With touch support
 // ============================================================
-authBtn.addEventListener('click', () => {
+authBtn.addEventListener('click', function() {
     if (isLoggedIn) {
         toggleProfileMenu();
     } else {
         openModal('login');
     }
 });
+authBtn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    if (isLoggedIn) {
+        toggleProfileMenu();
+    } else {
+        openModal('login');
+    }
+}, { passive: false });
 
 // ============================================================
 // PROFILE MENU
@@ -617,7 +728,7 @@ function toggleProfileMenu() {
     profileMenu.style.top = rect.bottom + 10 + 'px';
     profileMenu.style.right = window.innerWidth - rect.right + 'px';
     
-    setTimeout(() => {
+    setTimeout(function() {
         document.addEventListener('click', function closeMenu(e) {
             if (profileMenu && !profileMenu.contains(e.target) && e.target !== authBtn) {
                 profileMenu.remove();
@@ -627,9 +738,9 @@ function toggleProfileMenu() {
         });
     }, 10);
     
-    profileMenu.querySelectorAll('.user-menu-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const action = item.dataset.action;
+    profileMenu.querySelectorAll('.user-menu-item').forEach(function(item) {
+        item.addEventListener('click', function() {
+            const action = this.dataset.action;
             if (profileMenu) {
                 profileMenu.remove();
                 profileMenu = null;
@@ -638,6 +749,17 @@ function toggleProfileMenu() {
             else if (action === 'account') openAccountSettings();
             else if (action === 'logout') logoutUser();
         });
+        item.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            const action = this.dataset.action;
+            if (profileMenu) {
+                profileMenu.remove();
+                profileMenu = null;
+            }
+            if (action === 'profile') openProfileModal();
+            else if (action === 'account') openAccountSettings();
+            else if (action === 'logout') logoutUser();
+        }, { passive: false });
     });
 }
 
@@ -690,17 +812,23 @@ function openProfileModal() {
     `;
     document.body.appendChild(modal);
     
-    modal.querySelector('.close-profile').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', (e) => {
+    modal.querySelector('.close-profile').addEventListener('click', function() { modal.remove(); });
+    modal.querySelector('.close-profile').addEventListener('touchstart', function(e) { e.preventDefault(); modal.remove(); }, { passive: false });
+    modal.addEventListener('click', function(e) {
         if (e.target === modal) {
             modal.remove();
         }
     });
     
-    modal.querySelector('#goToSettingsBtn').addEventListener('click', () => {
+    modal.querySelector('#goToSettingsBtn').addEventListener('click', function() {
         modal.remove();
         openAccountSettings();
     });
+    modal.querySelector('#goToSettingsBtn').addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        modal.remove();
+        openAccountSettings();
+    }, { passive: false });
 }
 
 // ============================================================
@@ -752,14 +880,15 @@ function openAccountSettings() {
     
     bindPasswordToggles(modal);
     
-    modal.querySelector('.close-settings').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', (e) => {
+    modal.querySelector('.close-settings').addEventListener('click', function() { modal.remove(); });
+    modal.querySelector('.close-settings').addEventListener('touchstart', function(e) { e.preventDefault(); modal.remove(); }, { passive: false });
+    modal.addEventListener('click', function(e) {
         if (e.target === modal) {
             modal.remove();
         }
     });
     
-    modal.querySelector('#saveSettingsBtn').addEventListener('click', async () => {
+    modal.querySelector('#saveSettingsBtn').addEventListener('click', async function() {
         const newEmail = document.getElementById('settingsEmail').value;
         const currentPassword = document.getElementById('settingsCurrentPassword').value;
         const newPassword = document.getElementById('settingsNewPassword').value;
@@ -799,7 +928,7 @@ function openAccountSettings() {
             saveBtn.textContent = originalText;
             saveBtn.disabled = false;
             
-            openVerificationModal(newEmail, 'email', async (token) => {
+            openVerificationModal(newEmail, 'email', async function(token) {
                 const updateResult = DATA_MANAGER.updateProfile(user.id, { 
                     email: newEmail,
                     username: newEmail.split('@')[0]
@@ -811,7 +940,7 @@ function openAccountSettings() {
                     modal.remove();
                     clearAllPasswordFields();
                     await checkAuthStatus();
-                    setTimeout(() => openProfileModal(), 500);
+                    setTimeout(function() { openProfileModal(); }, 500);
                 } else {
                     showNotification('Error updating email.', 'error');
                 }
@@ -852,7 +981,7 @@ function openAccountSettings() {
             saveBtn.textContent = originalText;
             saveBtn.disabled = false;
             
-            openVerificationModal(user.email, 'password', async (token) => {
+            openVerificationModal(user.email, 'password', async function(token) {
                 const updateResult = DATA_MANAGER.changePassword(user.id, currentPassword, newPassword);
                 if (updateResult.success) {
                     showNotification('Password updated successfully!', 'success');
@@ -869,8 +998,13 @@ function openAccountSettings() {
         modal.remove();
         clearAllPasswordFields();
     });
+    modal.querySelector('#saveSettingsBtn').addEventListener('touchstart', async function(e) {
+        e.preventDefault();
+        // Trigger the same logic
+        this.click();
+    }, { passive: false });
     
-    modal.querySelector('#deleteAccountBtn').addEventListener('click', async () => {
+    modal.querySelector('#deleteAccountBtn').addEventListener('click', async function() {
         const confirmed = await showConfirmationModal(
             'Delete Account',
             'Are you sure you want to delete your account? This action cannot be undone.',
@@ -918,7 +1052,7 @@ function openAccountSettings() {
         deleteBtn.textContent = originalDeleteText;
         deleteBtn.disabled = false;
         
-        openVerificationModal(user.email, 'delete', async (token) => {
+        openVerificationModal(user.email, 'delete', async function(token) {
             const deleteResult = DATA_MANAGER.deleteAccount(user.id, password);
             if (deleteResult.success) {
                 localStorage.removeItem('authToken');
@@ -931,6 +1065,10 @@ function openAccountSettings() {
             }
         });
     });
+    modal.querySelector('#deleteAccountBtn').addEventListener('touchstart', async function(e) {
+        e.preventDefault();
+        this.click();
+    }, { passive: false });
 }
 
 // ============================================================
@@ -959,10 +1097,14 @@ function openModal(mode) {
         bindPasswordToggles(authModal);
         
         forgotPasswordLink.style.display = 'block';
-        forgotPasswordBtn.addEventListener('click', (e) => {
+        forgotPasswordBtn.addEventListener('click', function(e) {
             e.preventDefault();
             openModal('reset');
         });
+        forgotPasswordBtn.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            openModal('reset');
+        }, { passive: false });
         
     } else if (mode === 'reset') {
         authModalTitle.textContent = 'Reset Password';
@@ -1003,7 +1145,7 @@ function openModal(mode) {
     
     const switchLink = document.getElementById('authSwitchLink');
     if (switchLink) {
-        switchLink.addEventListener('click', (e) => {
+        switchLink.addEventListener('click', function(e) {
             e.preventDefault();
             if (mode === 'reset') {
                 openModal('login');
@@ -1013,21 +1155,36 @@ function openModal(mode) {
                 openModal('login');
             }
         });
+        switchLink.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            if (mode === 'reset') {
+                openModal('login');
+            } else if (mode === 'login') {
+                openModal('signup');
+            } else {
+                openModal('login');
+            }
+        }, { passive: false });
     }
 }
 
 // ============================================================
 // CLOSE MODAL
 // ============================================================
-closeAuthModal.addEventListener('click', () => {
+closeAuthModal.addEventListener('click', function() {
     authModal.style.display = 'none';
     clearAllPasswordFields();
 });
+closeAuthModal.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    authModal.style.display = 'none';
+    clearAllPasswordFields();
+}, { passive: false });
 
 // ============================================================
 // AUTH FORM SUBMIT
 // ============================================================
-authForm.addEventListener('submit', async (e) => {
+authForm.addEventListener('submit', async function(e) {
     e.preventDefault();
     e.stopPropagation();
     
@@ -1046,7 +1203,7 @@ authForm.addEventListener('submit', async (e) => {
                     showNotification('Account not found. Redirecting to Create Account...', 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Sign In';
-                    setTimeout(() => openModal('signup'), 1500);
+                    setTimeout(function() { openModal('signup'); }, 1500);
                     return;
                 } else {
                     showNotification(result.error, 'error');
@@ -1066,7 +1223,7 @@ authForm.addEventListener('submit', async (e) => {
             
             authModal.style.display = 'none';
             
-            openVerificationModal(email, 'signin', async (token) => {
+            openVerificationModal(email, 'signin', async function(token) {
                 showNotification('Sign in successful!', 'success');
                 await checkAuthStatus();
                 authSubmitBtn.disabled = false;
@@ -1099,7 +1256,7 @@ authForm.addEventListener('submit', async (e) => {
             
             authModal.style.display = 'none';
             
-            openVerificationModal(email, 'reset', async (token) => {
+            openVerificationModal(email, 'reset', async function(token) {
                 const newPassword = await showPasswordResetModal();
                 
                 if (newPassword === null) {
@@ -1121,7 +1278,7 @@ authForm.addEventListener('submit', async (e) => {
                 }
                 
                 const users = DATA_MANAGER.loadUsers();
-                const index = users.findIndex(u => u.id === pendingResetUser.id);
+                const index = users.findIndex(function(u) { return u.id === pendingResetUser.id; });
                 
                 if (index === -1) {
                     showNotification('User not found. Please try again.', 'error');
@@ -1141,7 +1298,7 @@ authForm.addEventListener('submit', async (e) => {
                 authSubmitBtn.textContent = 'Send Reset Code';
                 pendingResetEmail = '';
                 pendingResetUser = null;
-                setTimeout(() => openModal('login'), 2000);
+                setTimeout(function() { openModal('login'); }, 2000);
             });
             
         } else if (currentMode === 'signup') {
@@ -1174,7 +1331,7 @@ authForm.addEventListener('submit', async (e) => {
                     showNotification('Email already registered. Redirecting to Sign In...', 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Create Account';
-                    setTimeout(() => openModal('login'), 1500);
+                    setTimeout(function() { openModal('login'); }, 1500);
                     return;
                 } else {
                     showNotification(result.error, 'error');
@@ -1194,7 +1351,7 @@ authForm.addEventListener('submit', async (e) => {
             
             authModal.style.display = 'none';
             
-            openVerificationModal(email, 'signup', async (token) => {
+            openVerificationModal(email, 'signup', async function(token) {
                 showNotification('Account created successfully!', 'success');
                 await checkAuthStatus();
                 authSubmitBtn.disabled = false;
@@ -1213,9 +1370,13 @@ authForm.addEventListener('submit', async (e) => {
 // HISTORY MODAL
 // ============================================================
 if (historyNavBtn) {
-    historyNavBtn.addEventListener('click', () => {
+    historyNavBtn.addEventListener('click', function() {
         openHistoryModal();
     });
+    historyNavBtn.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        openHistoryModal();
+    }, { passive: false });
 }
 
 function openHistoryModal() {
@@ -1250,10 +1411,14 @@ function openHistoryModal() {
     `;
     document.body.appendChild(historyModal);
     
-    historyModal.querySelector('.close-history').addEventListener('click', () => {
+    historyModal.querySelector('.close-history').addEventListener('click', function() {
         historyModal.style.display = 'none';
     });
-    historyModal.addEventListener('click', (e) => {
+    historyModal.querySelector('.close-history').addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        historyModal.style.display = 'none';
+    }, { passive: false });
+    historyModal.addEventListener('click', function(e) {
         if (e.target === historyModal) {
             historyModal.style.display = 'none';
         }
@@ -1261,7 +1426,7 @@ function openHistoryModal() {
     
     loadHistoryModal();
     
-    historyModal.querySelector('#deleteAllHistory').addEventListener('click', async () => {
+    historyModal.querySelector('#deleteAllHistory').addEventListener('click', async function() {
         if (!isLoggedIn || !currentUser) {
             showNotification('Please sign in to manage history.', 'warning');
             return;
@@ -1282,6 +1447,10 @@ function openHistoryModal() {
             showNotification('Error deleting history.', 'error');
         }
     });
+    historyModal.querySelector('#deleteAllHistory').addEventListener('touchstart', async function(e) {
+        e.preventDefault();
+        this.click();
+    }, { passive: false });
 }
 
 async function loadHistoryModal() {
@@ -1304,7 +1473,7 @@ async function loadHistoryModal() {
         }
         
         let html = '';
-        history.forEach(item => {
+        history.forEach(function(item) {
             const time = new Date(item.createdAt).toLocaleString();
             html += `
                 <div class="history-item" data-id="${item.id}">
@@ -1322,9 +1491,9 @@ async function loadHistoryModal() {
         });
         historyList.innerHTML = html;
         
-        document.querySelectorAll('.h-delete').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const id = btn.dataset.id;
+        document.querySelectorAll('.h-delete').forEach(function(btn) {
+            btn.addEventListener('click', async function() {
+                const id = this.dataset.id;
                 const confirmed = await showConfirmationModal(
                     'Delete History Item',
                     'Are you sure you want to delete this translation history item?',
@@ -1341,6 +1510,10 @@ async function loadHistoryModal() {
                     showNotification('Error deleting history item.', 'error');
                 }
             });
+            btn.addEventListener('touchstart', async function(e) {
+                e.preventDefault();
+                this.click();
+            }, { passive: false });
         });
     } catch (error) {
         historyList.innerHTML = '<p class="empty-history">Could not load history.</p>';
@@ -1423,26 +1596,40 @@ translateFromBtn.style.cssText = `
 translateFromBtn.textContent = 'Translate from: ';
 translateFromContainer.appendChild(translateFromBtn);
 
-translateFromBtn.addEventListener('mouseenter', () => {
-    translateFromBtn.style.background = '#d2e3fc';
+translateFromBtn.addEventListener('mouseenter', function() {
+    this.style.background = '#d2e3fc';
 });
-translateFromBtn.addEventListener('mouseleave', () => {
-    translateFromBtn.style.background = '#e8f0fe';
+translateFromBtn.addEventListener('mouseleave', function() {
+    this.style.background = '#e8f0fe';
 });
 
-translateFromBtn.addEventListener('click', () => {
-    const detectedLang = translateFromBtn.dataset.lang;
+translateFromBtn.addEventListener('click', function() {
+    const detectedLang = this.dataset.lang;
     if (detectedLang && detectedLang !== 'auto') {
         sourceLang.value = detectedLang;
         translateFromContainer.style.display = 'none';
-        translateFromBtn.dataset.lang = '';
+        this.dataset.lang = '';
         const text = inputText.value.trim();
         if (text) {
             performTranslation();
         }
-        showNotification(`Switched to: ${getLanguageName(detectedLang)}`, 'success', 2000);
+        showNotification('Switched to: ' + getLanguageName(detectedLang), 'success', 2000);
     }
 });
+translateFromBtn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    const detectedLang = this.dataset.lang;
+    if (detectedLang && detectedLang !== 'auto') {
+        sourceLang.value = detectedLang;
+        translateFromContainer.style.display = 'none';
+        this.dataset.lang = '';
+        const text = inputText.value.trim();
+        if (text) {
+            performTranslation();
+        }
+        showNotification('Switched to: ' + getLanguageName(detectedLang), 'success', 2000);
+    }
+}, { passive: false });
 
 // Add Speaker Icon to Input Field
 const inputSpeakerBtn = document.createElement('button');
@@ -1460,13 +1647,12 @@ inputSpeakerBtn.style.cssText = `
 inputSpeakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
 inputSpeakerBtn.title = 'Read input text aloud';
 
-// Add to box-actions in input box
 const inputBoxActions = inputBox?.querySelector('.box-actions');
 if (inputBoxActions) {
     inputBoxActions.appendChild(inputSpeakerBtn);
 }
 
-inputSpeakerBtn.addEventListener('click', () => {
+inputSpeakerBtn.addEventListener('click', function() {
     const text = inputText.value.trim();
     if (text) {
         stopSpeech();
@@ -1477,13 +1663,17 @@ inputSpeakerBtn.addEventListener('click', () => {
         showNotification('No text to read.', 'warning', 2000);
     }
 });
+inputSpeakerBtn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    this.click();
+}, { passive: false });
 
 // Update output speaker
 const outputSpeakerBtn = document.getElementById('speakOutput');
 if (outputSpeakerBtn) {
     const newOutputSpeaker = outputSpeakerBtn.cloneNode(true);
     outputSpeakerBtn.parentNode.replaceChild(newOutputSpeaker, outputSpeakerBtn);
-    newOutputSpeaker.addEventListener('click', () => {
+    newOutputSpeaker.addEventListener('click', function() {
         const text = outputDisplay.textContent;
         if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
             stopSpeech();
@@ -1491,6 +1681,10 @@ if (outputSpeakerBtn) {
             showNotification('🔊 Reading translation...', 'info', 2000);
         }
     });
+    newOutputSpeaker.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        this.click();
+    }, { passive: false });
 }
 
 // Language list - NO AUTO-DETECT
@@ -1529,7 +1723,7 @@ const LANGUAGES = [
 function populateLanguages() {
     if (sourceLang) {
         sourceLang.innerHTML = '';
-        LANGUAGES.forEach(lang => {
+        LANGUAGES.forEach(function(lang) {
             const option = document.createElement('option');
             option.value = lang.code;
             option.textContent = lang.name;
@@ -1540,7 +1734,7 @@ function populateLanguages() {
     
     if (targetLang) {
         targetLang.innerHTML = '';
-        LANGUAGES.forEach(lang => {
+        LANGUAGES.forEach(function(lang) {
             const option = document.createElement('option');
             option.value = lang.code;
             option.textContent = lang.name;
@@ -1561,8 +1755,8 @@ function updateTranslateFromBtn(detectedLang, text) {
     const selectedLang = sourceLang.value;
     
     if (detectedLang && detectedLang !== 'auto' && detectedLang !== selectedLang) {
-        const langName = LANGUAGES.find(l => l.code === detectedLang)?.name || detectedLang;
-        translateFromBtn.textContent = `Translate from: ${langName}`;
+        const langName = LANGUAGES.find(function(l) { return l.code === detectedLang; })?.name || detectedLang;
+        translateFromBtn.textContent = 'Translate from: ' + langName;
         translateFromBtn.dataset.lang = detectedLang;
         translateFromContainer.style.display = 'block';
     } else {
@@ -1579,7 +1773,7 @@ function resetTranslateFromBtn() {
 async function detectLanguage(text) {
     if (!text || text.length < 3) return 'en';
     try {
-        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(text)}`;
+        const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(text);
         const response = await fetch(url);
         const data = await response.json();
         if (data && data[2]) {
@@ -1636,14 +1830,14 @@ async function performTranslation() {
             await saveToHistory(text, translated, sourceLangCode, targetLang.value);
         }
     } catch (error) {
-        outputDisplay.innerHTML = `<span class="placeholder">Error: ${error.message}</span>`;
+        outputDisplay.innerHTML = '<span class="placeholder">Error: ' + error.message + '</span>';
     } finally {
         isTranslating = false;
         translateBtn.disabled = false;
         translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
         
         if (translateQueue) {
-            setTimeout(() => performTranslation(), 30);
+            setTimeout(function() { performTranslation(); }, 30);
         }
     }
 }
@@ -1653,26 +1847,32 @@ async function translateText(text, sourceLangCode, targetLangCode) {
         return '';
     }
     
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLangCode}&tl=${targetLangCode}&dt=t&q=${encodeURIComponent(text)}`;
+    const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + sourceLangCode + '&tl=' + targetLangCode + '&dt=t&q=' + encodeURIComponent(text);
     const response = await fetch(url);
     const data = await response.json();
     if (data && data[0]) {
-        return data[0].map(item => item[0]).join('');
+        return data[0].map(function(item) { return item[0]; }).join('');
     }
     throw new Error('Translation failed');
 }
 
-translateBtn.addEventListener('click', () => {
+translateBtn.addEventListener('click', function() {
     if (!isTranslating) {
         performTranslation();
     }
 });
+translateBtn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    if (!isTranslating) {
+        performTranslation();
+    }
+}, { passive: false });
 
 // ============================================================
 // INPUT HANDLERS - INSTANT (NO DELAY)
 // ============================================================
 
-inputText.addEventListener('input', () => {
+inputText.addEventListener('input', function() {
     const text = inputText.value.trim();
     
     if (!text) {
@@ -1684,12 +1884,12 @@ inputText.addEventListener('input', () => {
         translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
         
         if (!isRecording && text.length > 3) {
-            detectLanguage(text).then(detectedLang => {
+            detectLanguage(text).then(function(detectedLang) {
                 if (detectedLang && detectedLang !== 'auto') {
                     updateTranslateFromBtn(detectedLang, text);
                 }
                 performTranslation();
-            }).catch(() => {
+            }).catch(function() {
                 performTranslation();
             });
         } else {
@@ -1707,7 +1907,7 @@ inputText.addEventListener('input', () => {
 // ============================================================
 // LANGUAGE CHANGE HANDLERS
 // ============================================================
-sourceLang.addEventListener('change', () => {
+sourceLang.addEventListener('change', function() {
     stopRecordingIfActive();
     resetTranslateFromBtn();
     stopSpeech();
@@ -1717,7 +1917,7 @@ sourceLang.addEventListener('change', () => {
     }
 });
 
-targetLang.addEventListener('change', () => {
+targetLang.addEventListener('change', function() {
     stopRecordingIfActive();
     stopSpeech();
     const text = inputText.value.trim();
@@ -1726,7 +1926,7 @@ targetLang.addEventListener('change', () => {
     }
 });
 
-document.getElementById('swapLang').addEventListener('click', () => {
+document.getElementById('swapLang').addEventListener('click', function() {
     stopRecordingIfActive();
     stopSpeech();
     
@@ -1739,16 +1939,38 @@ document.getElementById('swapLang').addEventListener('click', () => {
     translateBtn.disabled = false;
     resetTranslateFromBtn();
 });
+document.getElementById('swapLang').addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    stopRecordingIfActive();
+    stopSpeech();
+    
+    const temp = sourceLang.value;
+    sourceLang.value = targetLang.value;
+    targetLang.value = temp;
+    outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+    inputText.value = '';
+    translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+    translateBtn.disabled = false;
+    resetTranslateFromBtn();
+}, { passive: false });
 
-document.getElementById('copyOutput').addEventListener('click', async () => {
+document.getElementById('copyOutput').addEventListener('click', async function() {
     const text = outputDisplay.textContent;
     if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
         await navigator.clipboard.writeText(text);
         showNotification('Copied!', 'success');
     }
 });
+document.getElementById('copyOutput').addEventListener('touchstart', async function(e) {
+    e.preventDefault();
+    const text = outputDisplay.textContent;
+    if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
+        await navigator.clipboard.writeText(text);
+        showNotification('Copied!', 'success');
+    }
+}, { passive: false });
 
-document.getElementById('clearInput').addEventListener('click', () => {
+document.getElementById('clearInput').addEventListener('click', function() {
     stopRecordingIfActive();
     stopSpeech();
     
@@ -1758,13 +1980,23 @@ document.getElementById('clearInput').addEventListener('click', () => {
     translateBtn.disabled = false;
     resetTranslateFromBtn();
 });
+document.getElementById('clearInput').addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    stopRecordingIfActive();
+    stopSpeech();
+    
+    inputText.value = '';
+    outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+    translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+    translateBtn.disabled = false;
+    resetTranslateFromBtn();
+}, { passive: false });
 
 // ============================================================
 // MIC - RECORDING SYSTEM (LOCKED TO SELECTED LANGUAGE)
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
-let recognition = null;
 
 function stopRecordingIfActive() {
     if (isRecording) {
@@ -1785,94 +2017,100 @@ function stopRecordingIfActive() {
 
 if (window.SpeechRecognition || window.webkitSpeechRecognition) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en';
-    recognition.maxAlternatives = 1;
     
-    recognition.onstart = () => {
-        isRecording = true;
-        micBtn.classList.add('recording');
-        recordingStatus.textContent = '🎤 Recording... Click to stop';
-        micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
-        resetTranslateFromBtn();
-    };
-    
-    recognition.onresult = (event) => {
-        let finalText = '';
-        let interimText = '';
-        
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-                finalText += event.results[i][0].transcript;
-            } else {
-                interimText += event.results[i][0].transcript;
-            }
+    function initRecognition() {
+        if (recognition) {
+            try { recognition.stop(); } catch(e) {}
         }
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = sourceLang.value || 'en';
+        recognition.maxAlternatives = 1;
         
-        // Update input field with interim results immediately
-        if (interimText) {
-            inputText.value = finalText + interimText;
-            translateBtn.disabled = true;
-            translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
-            // Translate interim results immediately
-            performTranslation();
-        }
+        recognition.onstart = function() {
+            isRecording = true;
+            micBtn.classList.add('recording');
+            recordingStatus.textContent = '🎤 Recording... Click to stop';
+            micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+            resetTranslateFromBtn();
+        };
         
-        // When final text is received, update and translate
-        if (finalText) {
-            const currentText = inputText.value;
-            if (currentText.includes(finalText) || currentText === finalText) {
-                inputText.value = finalText;
-            } else {
-                inputText.value = currentText + ' ' + finalText;
+        recognition.onresult = function(event) {
+            let finalText = '';
+            let interimText = '';
+            
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    finalText += event.results[i][0].transcript;
+                } else {
+                    interimText += event.results[i][0].transcript;
+                }
             }
             
-            // Translate immediately
-            performTranslation();
-        }
-    };
-    
-    recognition.onerror = (event) => {
-        if (event.error === 'no-speech') return;
-        if (event.error === 'not-allowed') {
-            showNotification('Microphone access denied. Please allow microphone access.', 'error');
-        }
-        if (!isRecording) {
-            micBtn.classList.remove('recording');
-            micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-            recordingStatus.textContent = 'Click mic to speak';
-            resetTranslateFromBtn();
-        }
-    };
-    
-    recognition.onend = () => {
-        if (isRecording) {
-            try {
-                // Always restart with the SELECTED source language
-                recognition.lang = sourceLang.value || 'en';
-                recognition.start();
-            } catch (e) {
-                isRecording = false;
+            if (interimText) {
+                inputText.value = finalText + interimText;
+                translateBtn.disabled = true;
+                translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+                performTranslation();
+            }
+            
+            if (finalText) {
+                const currentText = inputText.value;
+                if (currentText.includes(finalText) || currentText === finalText) {
+                    inputText.value = finalText;
+                } else {
+                    inputText.value = currentText + ' ' + finalText;
+                }
+                performTranslation();
+            }
+        };
+        
+        recognition.onerror = function(event) {
+            if (event.error === 'no-speech') return;
+            if (event.error === 'not-allowed') {
+                showNotification('Microphone access denied. Please allow microphone access.', 'error');
+            }
+            if (!isRecording) {
                 micBtn.classList.remove('recording');
                 micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
                 recordingStatus.textContent = 'Click mic to speak';
                 resetTranslateFromBtn();
             }
-        } else {
-            micBtn.classList.remove('recording');
-            micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-            recordingStatus.textContent = 'Click mic to speak';
-            resetTranslateFromBtn();
-        }
-    };
+        };
+        
+        recognition.onend = function() {
+            if (isRecording) {
+                try {
+                    // Always restart with the SELECTED source language
+                    recognition.lang = sourceLang.value || 'en';
+                    recognition.start();
+                } catch (e) {
+                    isRecording = false;
+                    micBtn.classList.remove('recording');
+                    micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                    recordingStatus.textContent = 'Click mic to speak';
+                    resetTranslateFromBtn();
+                }
+            } else {
+                micBtn.classList.remove('recording');
+                micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                recordingStatus.textContent = 'Click mic to speak';
+                resetTranslateFromBtn();
+            }
+        };
+    }
     
-    micBtn.addEventListener('click', () => {
+    // Initialize recognition
+    initRecognition();
+    
+    micBtn.addEventListener('click', function() {
         if (isRecording) {
             isRecording = false;
             try {
-                recognition.stop();
+                if (recognition) {
+                    recognition.stop();
+                }
             } catch (e) {}
             micBtn.classList.remove('recording');
             micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
@@ -1880,21 +2118,53 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
             showNotification('⏹ Recording stopped.', 'info', 2000);
             const text = inputText.value.trim();
             if (text && text.length > 3) {
-                detectLanguage(text).then(detectedLang => {
+                detectLanguage(text).then(function(detectedLang) {
                     if (detectedLang && detectedLang !== 'auto') {
                         updateTranslateFromBtn(detectedLang, text);
                     }
-                }).catch(() => {});
+                }).catch(function() {});
             }
         } else {
             // Lock to selected source language
             const lang = sourceLang.value || 'en';
-            recognition.lang = lang;
-            try {
-                recognition.start();
-            } catch (e) {
-                showNotification('Error starting microphone. Please try again.', 'error');
+            if (recognition) {
+                recognition.lang = lang;
+                try {
+                    recognition.start();
+                } catch (e) {
+                    // If recognition failed, reinitialize and try again
+                    initRecognition();
+                    if (recognition) {
+                        recognition.lang = lang;
+                        try {
+                            recognition.start();
+                        } catch (e2) {
+                            showNotification('Error starting microphone. Please try again.', 'error');
+                        }
+                    }
+                }
+            } else {
+                initRecognition();
+                if (recognition) {
+                    recognition.lang = lang;
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        showNotification('Error starting microphone. Please try again.', 'error');
+                    }
+                }
             }
+        }
+    });
+    micBtn.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        this.click();
+    }, { passive: false });
+    
+    // Update recognition language when source language changes
+    sourceLang.addEventListener('change', function() {
+        if (recognition && isRecording) {
+            recognition.lang = sourceLang.value || 'en';
         }
     });
     
@@ -1909,15 +2179,23 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
 }
 
 // ============================================================
-// THEME TOGGLE
+// THEME TOGGLE - With touch support
 // ============================================================
 if (themeToggle) {
-    themeToggle.addEventListener('click', () => {
+    themeToggle.addEventListener('click', function() {
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
-        themeToggle.innerHTML = isDark ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+        this.innerHTML = isDark ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
         localStorage.setItem('theme', isDark ? 'light' : 'dark');
     });
+    themeToggle.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+        this.innerHTML = isDark ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+        localStorage.setItem('theme', isDark ? 'light' : 'dark');
+    }, { passive: false });
+    
     if (localStorage.getItem('theme') === 'dark') {
         document.documentElement.setAttribute('data-theme', 'dark');
         themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
@@ -1925,12 +2203,28 @@ if (themeToggle) {
 }
 
 // ============================================================
-// ABOUT MODAL
+// ABOUT MODAL - With touch support
 // ============================================================
-aboutNavBtn.addEventListener('click', () => aboutModal.style.display = 'flex');
-closeAboutModal.addEventListener('click', () => aboutModal.style.display = 'none');
-aboutModal.addEventListener('click', (e) => {
-    if (e.target === aboutModal) aboutModal.style.display = 'none';
+aboutNavBtn.addEventListener('click', function() {
+    aboutModal.style.display = 'flex';
+});
+aboutNavBtn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    aboutModal.style.display = 'flex';
+}, { passive: false });
+
+closeAboutModal.addEventListener('click', function() {
+    aboutModal.style.display = 'none';
+});
+closeAboutModal.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    aboutModal.style.display = 'none';
+}, { passive: false });
+
+aboutModal.addEventListener('click', function(e) {
+    if (e.target === aboutModal) {
+        aboutModal.style.display = 'none';
+    }
 });
 
 // ============================================================
