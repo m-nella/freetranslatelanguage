@@ -141,6 +141,68 @@
         </div>
     </div>
 
+    <script>
+    // Force populate languages immediately
+    document.addEventListener('DOMContentLoaded', function() {
+        var sourceLang = document.getElementById('sourceLang');
+        var targetLang = document.getElementById('targetLang');
+        if (sourceLang && targetLang) {
+            var langs = [
+                { code: 'en', name: 'English' },
+                { code: 'es', name: 'Spanish' },
+                { code: 'fr', name: 'French' },
+                { code: 'de', name: 'German' },
+                { code: 'it', name: 'Italian' },
+                { code: 'pt', name: 'Portuguese' },
+                { code: 'ru', name: 'Russian' },
+                { code: 'ja', name: 'Japanese' },
+                { code: 'ko', name: 'Korean' },
+                { code: 'zh', name: 'Chinese' },
+                { code: 'ar', name: 'Arabic' },
+                { code: 'hi', name: 'Hindi' },
+                { code: 'rw', name: 'Kinyarwanda' },
+                { code: 'rn', name: 'Kirundi' },
+                { code: 'sw', name: 'Swahili' },
+                { code: 'zu', name: 'Zulu' },
+                { code: 'yo', name: 'Yoruba' },
+                { code: 'ig', name: 'Igbo' },
+                { code: 'ha', name: 'Hausa' },
+                { code: 'ak', name: 'Akan' },
+                { code: 'am', name: 'Amharic' },
+                { code: 'so', name: 'Somali' },
+                { code: 'mg', name: 'Malagasy' },
+                { code: 'xh', name: 'Xhosa' },
+                { code: 'af', name: 'Afrikaans' },
+                { code: 'wo', name: 'Wolof' },
+                { code: 'ki', name: 'Kikuyu' },
+                { code: 'lg', name: 'Luganda' },
+                { code: 'ny', name: 'Chichewa' }
+            ];
+            
+            sourceLang.innerHTML = '';
+            targetLang.innerHTML = '';
+            
+            langs.forEach(function(lang) {
+                var opt1 = document.createElement('option');
+                opt1.value = lang.code;
+                opt1.textContent = lang.name;
+                sourceLang.appendChild(opt1);
+                
+                var opt2 = document.createElement('option');
+                opt2.value = lang.code;
+                opt2.textContent = lang.name;
+                targetLang.appendChild(opt2);
+            });
+            
+            sourceLang.value = 'rw';
+            targetLang.value = 'en';
+            
+            console.log('✅ Languages populated from quick fix!');
+        }
+    });
+</script>
+
+
     <!-- ============================================ -->
     <!-- SCRIPTS - Order is IMPORTANT!                -->
     <!-- ============================================ -->
