@@ -20,6 +20,7 @@ let isTranslating = false;
 let translateQueue = false;
 let currentSpeech = null;
 let debugMode = true;
+let recordingTranslateTimeout = null;
 
 // ============================================================
 // DEBUG LOGGING
@@ -59,7 +60,6 @@ let historyModal = null;
 // SPEECH FUNCTION - Stop speech when content is deleted
 // ============================================================
 function speakText(text, lang) {
-    // Stop any current speech
     if (window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
     }
@@ -1480,7 +1480,6 @@ if (inputBoxActions) {
 inputSpeakerBtn.addEventListener('click', () => {
     const text = inputText.value.trim();
     if (text) {
-        // Stop any ongoing speech first
         stopSpeech();
         const lang = sourceLang.value || 'en';
         speakText(text, lang);
@@ -1490,10 +1489,9 @@ inputSpeakerBtn.addEventListener('click', () => {
     }
 });
 
-// Update output speaker to use stopSpeech
+// Update output speaker
 const outputSpeakerBtn = document.getElementById('speakOutput');
 if (outputSpeakerBtn) {
-    // Remove existing listener and add new one with stop functionality
     const newOutputSpeaker = outputSpeakerBtn.cloneNode(true);
     outputSpeakerBtn.parentNode.replaceChild(newOutputSpeaker, outputSpeakerBtn);
     newOutputSpeaker.addEventListener('click', () => {
@@ -1605,7 +1603,7 @@ async function detectLanguage(text) {
 }
 
 // ============================================================
-// PERFORM TRANSLATION - INSTANT
+// PERFORM TRANSLATION - INSTANT (NO DELAY)
 // ============================================================
 async function performTranslation() {
     const text = inputText.value.trim();
@@ -1682,7 +1680,7 @@ translateBtn.addEventListener('click', () => {
 });
 
 // ============================================================
-// INPUT HANDLERS - INSTANT
+// INPUT HANDLERS - INSTANT (NO DELAY)
 // ============================================================
 
 inputText.addEventListener('input', () => {
@@ -1724,7 +1722,6 @@ inputText.addEventListener('input', () => {
 sourceLang.addEventListener('change', () => {
     stopRecordingIfActive();
     resetTranslateFromBtn();
-    // Stop speech when language changes
     stopSpeech();
     const text = inputText.value.trim();
     if (text) {
@@ -1734,7 +1731,6 @@ sourceLang.addEventListener('change', () => {
 
 targetLang.addEventListener('change', () => {
     stopRecordingIfActive();
-    // Stop speech when language changes
     stopSpeech();
     const text = inputText.value.trim();
     if (text) {
@@ -1764,8 +1760,6 @@ document.getElementById('copyOutput').addEventListener('click', async () => {
     }
 });
 
-// Remove old output speaker listener (already handled above)
-
 document.getElementById('clearInput').addEventListener('click', () => {
     stopRecordingIfActive();
     stopSpeech();
@@ -1778,7 +1772,7 @@ document.getElementById('clearInput').addEventListener('click', () => {
 });
 
 // ============================================================
-// MIC - RECORDING SYSTEM (INSTANT TRANSLATION)
+// MIC - RECORDING SYSTEM (INSTANT TRANSLATION - NO DELAY)
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
@@ -1829,12 +1823,16 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
             }
         }
         
+        // Update input field with interim results immediately
         if (interimText) {
             inputText.value = finalText + interimText;
             translateBtn.disabled = true;
             translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+            // Translate interim results immediately
+            performTranslation();
         }
         
+        // When final text is received, update and translate
         if (finalText) {
             const currentText = inputText.value;
             if (currentText.includes(finalText) || currentText === finalText) {
@@ -1843,11 +1841,8 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
                 inputText.value = currentText + ' ' + finalText;
             }
             
-            const text = inputText.value.trim();
-            if (text) {
-                resetTranslateFromBtn();
-                performTranslation();
-            }
+            // Translate immediately
+            performTranslation();
         }
     };
     
