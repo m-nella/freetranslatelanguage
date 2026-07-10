@@ -1362,7 +1362,7 @@ async function saveToHistory(original, translated, sourceLang, targetLang) {
 }
 
 // ============================================================
-// TRANSLATION ENGINE - MANUAL LANGUAGES ONLY
+// TRANSLATION ENGINE
 // ============================================================
 const translateBtn = document.getElementById('translateBtn');
 const inputText = document.getElementById('inputText');
@@ -1370,11 +1370,10 @@ const outputDisplay = document.getElementById('outputText');
 const sourceLang = document.getElementById('sourceLang');
 const targetLang = document.getElementById('targetLang');
 
-// Create Translate From Button - Placed inside input box (below text) - Google Translate Style
+// Create Translate From Button - Google Translate Style
 const translateFromContainer = document.createElement('div');
-translateFromContainer.style.cssText = 'display: none; margin-top: 8px; padding: 0 4px;';
+translateFromContainer.style.cssText = 'display: none; margin-top: 6px; padding: 0 4px;';
 
-// Find the input box header or parent to append the translate from button
 const inputBox = inputText.closest('.input-box');
 if (inputBox) {
     const inputTools = inputBox.querySelector('.input-tools');
@@ -1385,17 +1384,17 @@ if (inputBox) {
     }
 }
 
-// Create the clickable "Translate from: Language" button - Google Translate Style
+// Create the clickable "Translate from: Language" button
 const translateFromBtn = document.createElement('button');
 translateFromBtn.className = 'translate-from-btn';
 translateFromBtn.style.cssText = `
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: #1a73e8;
     cursor: pointer;
-    padding: 4px 14px;
-    border-radius: 16px;
+    padding: 3px 12px;
+    border-radius: 14px;
     background: #e8f0fe;
-    border: none;
+    border: 1px solid #dadce0;
     transition: all 0.2s ease;
     user-select: none;
     font-family: var(--font);
@@ -1403,11 +1402,18 @@ translateFromBtn.style.cssText = `
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    letter-spacing: 0.3px;
 `;
 translateFromBtn.textContent = 'Translate from: ';
 translateFromContainer.appendChild(translateFromBtn);
 
-// Click handler for "Translate from" button
+translateFromBtn.addEventListener('mouseenter', () => {
+    translateFromBtn.style.background = '#d2e3fc';
+});
+translateFromBtn.addEventListener('mouseleave', () => {
+    translateFromBtn.style.background = '#e8f0fe';
+});
+
 translateFromBtn.addEventListener('click', () => {
     const detectedLang = translateFromBtn.dataset.lang;
     if (detectedLang && detectedLang !== 'auto') {
@@ -1420,6 +1426,41 @@ translateFromBtn.addEventListener('click', () => {
             performTranslation();
         }
         showNotification(`Switched to: ${getLanguageName(detectedLang)}`, 'success', 2000);
+    }
+});
+
+// Add Speaker Icon to Input Field
+const inputSpeakerBtn = document.createElement('button');
+inputSpeakerBtn.className = 'action-btn input-speaker-btn';
+inputSpeakerBtn.style.cssText = `
+    background: transparent;
+    border: none;
+    color: var(--text-light);
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 0.85rem;
+`;
+inputSpeakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+inputSpeakerBtn.title = 'Read input text aloud';
+
+// Add to box-actions in input box
+const inputBoxActions = inputBox?.querySelector('.box-actions');
+if (inputBoxActions) {
+    inputBoxActions.appendChild(inputSpeakerBtn);
+}
+
+inputSpeakerBtn.addEventListener('click', () => {
+    const text = inputText.value.trim();
+    if (text) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        const lang = sourceLang.value || 'en';
+        utterance.lang = lang;
+        window.speechSynthesis.speak(utterance);
+        showNotification('🔊 Reading input text...', 'info', 2000);
+    } else {
+        showNotification('No text to read.', 'warning', 2000);
     }
 });
 
@@ -1481,14 +1522,10 @@ function populateLanguages() {
 }
 populateLanguages();
 
-// Show "Translate from" button (Google Translate style)
 function updateTranslateFromBtn(detectedLang, text) {
-    debugLog('updateTranslateFromBtn:', detectedLang, 'text length:', text?.length || 0);
-    
     if (!text || text.length < 2 || isRecording) {
         translateFromContainer.style.display = 'none';
         translateFromBtn.dataset.lang = '';
-        debugLog('Button hidden');
         return;
     }
     
@@ -1499,11 +1536,9 @@ function updateTranslateFromBtn(detectedLang, text) {
         translateFromBtn.textContent = `Translate from: ${langName}`;
         translateFromBtn.dataset.lang = detectedLang;
         translateFromContainer.style.display = 'block';
-        debugLog('Button shown:', translateFromBtn.textContent);
     } else {
         translateFromContainer.style.display = 'none';
         translateFromBtn.dataset.lang = '';
-        debugLog('Button hidden - matching language');
     }
 }
 
@@ -1512,20 +1547,18 @@ function resetTranslateFromBtn() {
     translateFromBtn.dataset.lang = '';
 }
 
+// Improved language detection with minimum text length requirement
 async function detectLanguage(text) {
-    if (!text || text.length < 2) return 'en';
+    if (!text || text.length < 3) return 'en';
     try {
-        debugLog('Detecting language for:', text.substring(0, 50));
         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(text)}`;
         const response = await fetch(url);
         const data = await response.json();
         if (data && data[2]) {
-            debugLog('Detected language:', data[2]);
             return data[2];
         }
         return 'en';
     } catch (error) {
-        debugLog('Detection error:', error);
         return 'en';
     }
 }
@@ -1535,7 +1568,6 @@ async function detectLanguage(text) {
 // ============================================================
 async function performTranslation() {
     const text = inputText.value.trim();
-    debugLog('performTranslation called, text length:', text.length);
     
     if (!text) {
         outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
@@ -1546,7 +1578,6 @@ async function performTranslation() {
     }
     
     if (isTranslating) {
-        debugLog('Translation in progress, queuing');
         translateQueue = true;
         return;
     }
@@ -1559,9 +1590,8 @@ async function performTranslation() {
     
     try {
         let detectedLang = null;
-        if (!isRecording && text.length > 2) {
+        if (!isRecording && text.length > 3) {
             detectedLang = await detectLanguage(text);
-            debugLog('Detected language for button:', detectedLang);
         }
         
         if (!isRecording && detectedLang && detectedLang !== 'auto') {
@@ -1571,17 +1601,13 @@ async function performTranslation() {
         }
         
         const sourceLangCode = sourceLang.value;
-        debugLog('Translating, source:', sourceLangCode, 'target:', targetLang.value);
-        
         const translated = await translateText(text, sourceLangCode, targetLang.value);
         outputDisplay.textContent = translated;
-        debugLog('Output updated');
         
         if (isLoggedIn && currentUser) {
             await saveToHistory(text, translated, sourceLangCode, targetLang.value);
         }
     } catch (error) {
-        debugLog('Translation error:', error);
         outputDisplay.innerHTML = `<span class="placeholder">Error: ${error.message}</span>`;
     } finally {
         isTranslating = false;
@@ -1589,8 +1615,7 @@ async function performTranslation() {
         translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
         
         if (translateQueue) {
-            debugLog('Processing queued translation');
-            setTimeout(() => performTranslation(), 50);
+            setTimeout(() => performTranslation(), 30);
         }
     }
 }
@@ -1610,7 +1635,6 @@ async function translateText(text, sourceLangCode, targetLangCode) {
 }
 
 translateBtn.addEventListener('click', () => {
-    debugLog('Translate button clicked');
     if (!isTranslating) {
         performTranslation();
     }
@@ -1622,13 +1646,12 @@ translateBtn.addEventListener('click', () => {
 
 inputText.addEventListener('input', () => {
     const text = inputText.value.trim();
-    debugLog('Input changed, text length:', text.length);
     
     if (text) {
         translateBtn.disabled = true;
         translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
         
-        if (!isRecording && text.length > 2) {
+        if (!isRecording && text.length > 3) {
             detectLanguage(text).then(detectedLang => {
                 if (detectedLang && detectedLang !== 'auto') {
                     updateTranslateFromBtn(detectedLang, text);
@@ -1653,7 +1676,6 @@ inputText.addEventListener('input', () => {
 // LANGUAGE CHANGE HANDLERS
 // ============================================================
 sourceLang.addEventListener('change', () => {
-    debugLog('Source language changed to:', sourceLang.value);
     stopRecordingIfActive();
     resetTranslateFromBtn();
     const text = inputText.value.trim();
@@ -1663,7 +1685,6 @@ sourceLang.addEventListener('change', () => {
 });
 
 targetLang.addEventListener('change', () => {
-    debugLog('Target language changed to:', targetLang.value);
     stopRecordingIfActive();
     const text = inputText.value.trim();
     if (text) {
@@ -1672,7 +1693,6 @@ targetLang.addEventListener('change', () => {
 });
 
 document.getElementById('swapLang').addEventListener('click', () => {
-    debugLog('Swap languages clicked');
     stopRecordingIfActive();
     
     const temp = sourceLang.value;
@@ -1703,7 +1723,6 @@ document.getElementById('speakOutput').addEventListener('click', () => {
 });
 
 document.getElementById('clearInput').addEventListener('click', () => {
-    debugLog('Clear input clicked');
     stopRecordingIfActive();
     
     inputText.value = '';
@@ -1714,7 +1733,7 @@ document.getElementById('clearInput').addEventListener('click', () => {
 });
 
 // ============================================================
-// MIC - RECORDING SYSTEM (ONLY DETECTS SELECTED LANGUAGE)
+// MIC - RECORDING SYSTEM (INSTANT TRANSLATION)
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
@@ -1734,7 +1753,6 @@ function stopRecordingIfActive() {
             recordingStatus.textContent = 'Click mic to speak';
         }
         resetTranslateFromBtn();
-        debugLog('Recording stopped');
     }
 }
 
@@ -1752,11 +1770,9 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
         recordingStatus.textContent = '🎤 Recording... Click to stop';
         micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
         resetTranslateFromBtn();
-        debugLog('Recording started with language:', recognition.lang);
     };
     
     recognition.onresult = (event) => {
-        debugLog('Speech result received');
         let finalText = '';
         let interimText = '';
         
@@ -1775,7 +1791,6 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
         }
         
         if (finalText) {
-            debugLog('Final text received:', finalText.substring(0, 50));
             const currentText = inputText.value;
             if (currentText.includes(finalText) || currentText === finalText) {
                 inputText.value = finalText;
@@ -1785,16 +1800,14 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
             
             const text = inputText.value.trim();
             if (text) {
-                // During recording, DO NOT show "Translate from" button
                 resetTranslateFromBtn();
-                // Translate using the SELECTED source language (not detected)
+                // Translate IMMEDIATELY with no delay
                 performTranslation();
             }
         }
     };
     
     recognition.onerror = (event) => {
-        debugLog('Speech error:', event.error);
         if (event.error === 'no-speech') return;
         if (event.error === 'not-allowed') {
             showNotification('Microphone access denied. Please allow microphone access.', 'error');
@@ -1808,15 +1821,11 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
     };
     
     recognition.onend = () => {
-        debugLog('Recognition ended, isRecording:', isRecording);
         if (isRecording) {
             try {
-                // Restart with the same language
                 recognition.lang = sourceLang.value || 'en';
                 recognition.start();
-                debugLog('Recognition restarted with language:', recognition.lang);
             } catch (e) {
-                debugLog('Failed to restart:', e);
                 isRecording = false;
                 micBtn.classList.remove('recording');
                 micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
@@ -1832,22 +1841,17 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
     };
     
     micBtn.addEventListener('click', () => {
-        debugLog('Mic clicked, isRecording:', isRecording);
         if (isRecording) {
             isRecording = false;
             try {
                 recognition.stop();
-                debugLog('Recording stopped');
-            } catch (e) {
-                debugLog('Stop error:', e);
-            }
+            } catch (e) {}
             micBtn.classList.remove('recording');
             micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
             recordingStatus.textContent = 'Click mic to speak';
             showNotification('⏹ Recording stopped.', 'info', 2000);
-            // Check for translate from button after recording stops
             const text = inputText.value.trim();
-            if (text && text.length > 2) {
+            if (text && text.length > 3) {
                 detectLanguage(text).then(detectedLang => {
                     if (detectedLang && detectedLang !== 'auto') {
                         updateTranslateFromBtn(detectedLang, text);
@@ -1857,12 +1861,9 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
         } else {
             const lang = sourceLang.value || 'en';
             recognition.lang = lang;
-            debugLog('Starting recording with language:', lang);
             try {
                 recognition.start();
-                debugLog('Recording started');
             } catch (e) {
-                debugLog('Start error:', e);
                 showNotification('Error starting microphone. Please try again.', 'error');
             }
         }
@@ -1907,5 +1908,4 @@ aboutModal.addEventListener('click', (e) => {
 // INIT
 // ============================================================
 checkAuthStatus();
-debugLog('✅ FreeTranslate Language initialized');
-debugLog('🎤 Speech recognition available:', !!(window.SpeechRecognition || window.webkitSpeechRecognition));
+console.log('✅ FreeTranslate Language initialized');
