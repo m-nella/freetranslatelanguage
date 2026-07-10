@@ -18,6 +18,7 @@ let pendingResetUser = null;
 let isRecording = false;
 let isTranslating = false;
 let translateQueue = false;
+let currentSpeech = null;
 let debugMode = true;
 
 // ============================================================
@@ -53,6 +54,32 @@ const historyNavBtn = document.getElementById('historyNavBtn');
 let profileMenu = null;
 let settingsModal = null;
 let historyModal = null;
+
+// ============================================================
+// SPEECH FUNCTION - Stop speech when content is deleted
+// ============================================================
+function speakText(text, lang) {
+    // Stop any current speech
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+    }
+    
+    if (!text || text.trim() === '') {
+        return;
+    }
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang || 'en';
+    currentSpeech = utterance;
+    window.speechSynthesis.speak(utterance);
+}
+
+function stopSpeech() {
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        currentSpeech = null;
+    }
+}
 
 // ============================================================
 // NOTIFICATION SYSTEM
@@ -1417,7 +1444,6 @@ translateFromBtn.addEventListener('mouseleave', () => {
 translateFromBtn.addEventListener('click', () => {
     const detectedLang = translateFromBtn.dataset.lang;
     if (detectedLang && detectedLang !== 'auto') {
-        debugLog('Translate from clicked, switching to:', detectedLang);
         sourceLang.value = detectedLang;
         translateFromContainer.style.display = 'none';
         translateFromBtn.dataset.lang = '';
@@ -1454,15 +1480,31 @@ if (inputBoxActions) {
 inputSpeakerBtn.addEventListener('click', () => {
     const text = inputText.value.trim();
     if (text) {
-        const utterance = new SpeechSynthesisUtterance(text);
+        // Stop any ongoing speech first
+        stopSpeech();
         const lang = sourceLang.value || 'en';
-        utterance.lang = lang;
-        window.speechSynthesis.speak(utterance);
+        speakText(text, lang);
         showNotification('🔊 Reading input text...', 'info', 2000);
     } else {
         showNotification('No text to read.', 'warning', 2000);
     }
 });
+
+// Update output speaker to use stopSpeech
+const outputSpeakerBtn = document.getElementById('speakOutput');
+if (outputSpeakerBtn) {
+    // Remove existing listener and add new one with stop functionality
+    const newOutputSpeaker = outputSpeakerBtn.cloneNode(true);
+    outputSpeakerBtn.parentNode.replaceChild(newOutputSpeaker, outputSpeakerBtn);
+    newOutputSpeaker.addEventListener('click', () => {
+        const text = outputDisplay.textContent;
+        if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
+            stopSpeech();
+            speakText(text, targetLang.value);
+            showNotification('🔊 Reading translation...', 'info', 2000);
+        }
+    });
+}
 
 // Language list - NO AUTO-DETECT
 const LANGUAGES = [
@@ -1547,7 +1589,6 @@ function resetTranslateFromBtn() {
     translateFromBtn.dataset.lang = '';
 }
 
-// Improved language detection with minimum text length requirement
 async function detectLanguage(text) {
     if (!text || text.length < 3) return 'en';
     try {
@@ -1647,6 +1688,11 @@ translateBtn.addEventListener('click', () => {
 inputText.addEventListener('input', () => {
     const text = inputText.value.trim();
     
+    // If text is empty, stop any ongoing speech
+    if (!text) {
+        stopSpeech();
+    }
+    
     if (text) {
         translateBtn.disabled = true;
         translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
@@ -1678,6 +1724,8 @@ inputText.addEventListener('input', () => {
 sourceLang.addEventListener('change', () => {
     stopRecordingIfActive();
     resetTranslateFromBtn();
+    // Stop speech when language changes
+    stopSpeech();
     const text = inputText.value.trim();
     if (text) {
         performTranslation();
@@ -1686,6 +1734,8 @@ sourceLang.addEventListener('change', () => {
 
 targetLang.addEventListener('change', () => {
     stopRecordingIfActive();
+    // Stop speech when language changes
+    stopSpeech();
     const text = inputText.value.trim();
     if (text) {
         performTranslation();
@@ -1694,6 +1744,7 @@ targetLang.addEventListener('change', () => {
 
 document.getElementById('swapLang').addEventListener('click', () => {
     stopRecordingIfActive();
+    stopSpeech();
     
     const temp = sourceLang.value;
     sourceLang.value = targetLang.value;
@@ -1713,17 +1764,11 @@ document.getElementById('copyOutput').addEventListener('click', async () => {
     }
 });
 
-document.getElementById('speakOutput').addEventListener('click', () => {
-    const text = outputDisplay.textContent;
-    if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = targetLang.value;
-        window.speechSynthesis.speak(utterance);
-    }
-});
+// Remove old output speaker listener (already handled above)
 
 document.getElementById('clearInput').addEventListener('click', () => {
     stopRecordingIfActive();
+    stopSpeech();
     
     inputText.value = '';
     outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
@@ -1801,7 +1846,6 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
             const text = inputText.value.trim();
             if (text) {
                 resetTranslateFromBtn();
-                // Translate IMMEDIATELY with no delay
                 performTranslation();
             }
         }
