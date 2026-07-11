@@ -1008,7 +1008,7 @@
         profileMenu.style.padding = '6px 0';
         
         profileMenu.innerHTML = 
-            '<div class="user-menu-header" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg-input);">' +
+            '<div class="user-menu-header" style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-input);">' +
                 '<i class="fas fa-user-circle" style="font-size:1.8rem;color:var(--accent);"></i>' +
                 '<div style="display:flex;flex-direction:column;">' +
                     '<strong style="color:var(--text-primary);font-size:0.9rem;">' + currentUser.username + '</strong>' +
@@ -1016,14 +1016,14 @@
                 '</div>' +
             '</div>' +
             '<div class="user-menu-divider" style="height:1px;background:var(--border-color);margin:4px 12px;"></div>' +
-            '<div class="user-menu-item" data-action="profile" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--text-secondary);transition:var(--transition);font-size:0.85rem;">' +
+            '<div class="user-menu-item" data-action="profile" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;color:var(--text-secondary);transition:var(--transition);font-size:0.85rem;">' +
                 '<i class="fas fa-user"></i> <span>Profile</span>' +
             '</div>' +
-            '<div class="user-menu-item" data-action="account" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--text-secondary);transition:var(--transition);font-size:0.85rem;">' +
+            '<div class="user-menu-item" data-action="account" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;color:var(--text-secondary);transition:var(--transition);font-size:0.85rem;">' +
                 '<i class="fas fa-cog"></i> <span>Account Settings</span>' +
             '</div>' +
             '<div class="user-menu-divider" style="height:1px;background:var(--border-color);margin:4px 12px;"></div>' +
-            '<div class="user-menu-item logout" data-action="logout" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--danger);transition:var(--transition);font-size:0.85rem;">' +
+            '<div class="user-menu-item logout" data-action="logout" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;color:var(--danger);transition:var(--transition);font-size:0.85rem;">' +
                 '<i class="fas fa-sign-out-alt"></i> <span>Log Out</span>' +
             '</div>';
         
@@ -1502,7 +1502,74 @@
     }
 
     // ============================================================
-    // TRANSLATION ENGINE - INSTANT DETECTION, NO DELAY
+    // THEME TOGGLE - FIXED: Works on ALL devices
+    // ============================================================
+    function setupThemeToggle() {
+        var themeToggle = $('themeToggle');
+        if (themeToggle) {
+            // Set initial icon based on theme
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            var icon = themeToggle.querySelector('i');
+            if (icon) {
+                icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+            }
+            
+            bindClick(themeToggle, function() {
+                var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                var newTheme = isDark ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', newTheme);
+                
+                // Update icon - works on ALL devices
+                var icon = this.querySelector('i');
+                if (icon) {
+                    icon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+                }
+                
+                localStorage.setItem('theme', newTheme);
+            });
+            
+            // Load saved theme
+            if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                var icon = themeToggle.querySelector('i');
+                if (icon) {
+                    icon.className = 'fas fa-sun';
+                }
+            }
+        }
+    }
+
+    // ============================================================
+    // ABOUT MODAL
+    // ============================================================
+    function setupAboutModal() {
+        var aboutNavBtn = $('aboutNavBtn');
+        var aboutModal = $('aboutModal');
+        var closeAboutModal = $('closeAboutModal');
+        
+        if (aboutNavBtn) {
+            bindClick(aboutNavBtn, function() {
+                if (aboutModal) aboutModal.style.display = 'flex';
+            });
+        }
+        
+        if (closeAboutModal) {
+            bindClick(closeAboutModal, function() {
+                if (aboutModal) aboutModal.style.display = 'none';
+            });
+        }
+        
+        if (aboutModal) {
+            aboutModal.addEventListener('click', function(e) {
+                if (e.target === aboutModal) {
+                    aboutModal.style.display = 'none';
+                }
+            });
+        }
+    }
+
+    // ============================================================
+    // TRANSLATION ENGINE
     // ============================================================
     function setupTranslation() {
         var sourceLang = $('sourceLang');
@@ -1669,9 +1736,6 @@
             translateFromBtn.textContent = 'Translate from: ';
         }
 
-        // ============================================================
-        // INSTANT DETECTION - NO DELAY, WITH CACHING
-        // ============================================================
         function detectLanguage(text) {
             return new Promise(function(resolve) {
                 if (!text || text.length < 3) {
@@ -1679,13 +1743,11 @@
                     return;
                 }
                 
-                // Cache: if text hasn't changed significantly, return cached result
-                if (lastDetectedText === text) {
-                    resolve(lastDetectedLangResult || 'en');
+                if (lastDetectedText === text && lastDetectedLangResult) {
+                    resolve(lastDetectedLangResult);
                     return;
                 }
                 
-                // Store current text for caching
                 lastDetectedText = text;
                 
                 var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(text);
@@ -1742,9 +1804,6 @@
             });
         }
 
-        // ============================================================
-        // PERFORM TRANSLATION
-        // ============================================================
         function performTranslation() {
             var text = inputText ? inputText.value.trim() : '';
             if (!text) {
@@ -1785,7 +1844,6 @@
                 translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
             }
             
-            // If we're forcing translation with a detected language
             if (forceTranslationWithDetectedLang && pendingDetectedLang) {
                 var detectedLang = pendingDetectedLang;
                 forceTranslationWithDetectedLang = false;
@@ -1824,7 +1882,6 @@
                 return;
             }
             
-            // Normal flow - detect language first (INSTANT - no delay)
             detectLanguage(text).then(function(detectedLang) {
                 if (!isRecording && detectedLang && detectedLang !== 'auto') {
                     updateTranslateFromBtn(detectedLang, text);
@@ -1865,9 +1922,6 @@
             }
         });
 
-        // ============================================================
-        // INSTANT DETECTION ON EVERY KEYSTROKE - NO DELAY
-        // ============================================================
         if (inputText) {
             inputText.addEventListener('input', function() {
                 var text = inputText.value.trim();
@@ -1886,20 +1940,16 @@
                     return;
                 }
                 
-                // Show translating state
                 if (translateBtn) {
                     translateBtn.disabled = true;
                     translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
                 }
                 
-                // INSTANT detection - NO delay, but with caching
                 if (!isRecording && text.length > 2) {
-                    // If text is same as last detected, use cached result
                     if (lastDetectedText === text && lastDetectedLangResult) {
                         updateTranslateFromBtn(lastDetectedLangResult, text);
                         performTranslation();
                     } else {
-                        // Detect and update instantly
                         detectLanguage(text).then(function(detectedLang) {
                             if (detectedLang && detectedLang !== 'auto') {
                                 updateTranslateFromBtn(detectedLang, text);
@@ -2298,55 +2348,6 @@
             if (recordingStatus) {
                 recordingStatus.textContent = '⚠️ Not supported';
             }
-        }
-    }
-
-    // ============================================================
-    // THEME TOGGLE
-    // ============================================================
-    function setupThemeToggle() {
-        var themeToggle = $('themeToggle');
-        if (themeToggle) {
-            bindClick(themeToggle, function() {
-                var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-                document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
-                this.innerHTML = isDark ? '<i class="fas fa-moon"></i> <span>Theme</span>' : '<i class="fas fa-sun"></i> <span>Theme</span>';
-                localStorage.setItem('theme', isDark ? 'light' : 'dark');
-            });
-            
-            if (localStorage.getItem('theme') === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                themeToggle.innerHTML = '<i class="fas fa-sun"></i> <span>Theme</span>';
-            }
-        }
-    }
-
-    // ============================================================
-    // ABOUT MODAL
-    // ============================================================
-    function setupAboutModal() {
-        var aboutNavBtn = $('aboutNavBtn');
-        var aboutModal = $('aboutModal');
-        var closeAboutModal = $('closeAboutModal');
-        
-        if (aboutNavBtn) {
-            bindClick(aboutNavBtn, function() {
-                if (aboutModal) aboutModal.style.display = 'flex';
-            });
-        }
-        
-        if (closeAboutModal) {
-            bindClick(closeAboutModal, function() {
-                if (aboutModal) aboutModal.style.display = 'none';
-            });
-        }
-        
-        if (aboutModal) {
-            aboutModal.addEventListener('click', function(e) {
-                if (e.target === aboutModal) {
-                    aboutModal.style.display = 'none';
-                }
-            });
         }
     }
 
