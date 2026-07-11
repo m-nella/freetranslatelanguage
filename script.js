@@ -35,6 +35,7 @@
     var currentRecordingLang = 'en';
     var detectedLanguageCache = '';
     var lastTranslationText = '';
+    var isDetectingLanguage = false;
 
     // ============================================================
     // LANGUAGE LIST
@@ -329,7 +330,7 @@
     }
 
     // ============================================================
-    // CUSTOM PASSWORD PROMPT MODAL - REPLACES BROWSER PROMPT
+    // CUSTOM PASSWORD PROMPT MODAL
     // ============================================================
     function showPasswordPromptModal(title, message, placeholder) {
         placeholder = placeholder || 'Enter your password';
@@ -664,6 +665,7 @@
             }
             if (historyNavBtn) {
                 historyNavBtn.style.display = 'flex';
+                historyNavBtn.innerHTML = '<i class="fas fa-history"></i> <span>History</span>';
             }
         } else {
             localStorage.removeItem('authToken');
@@ -1145,7 +1147,7 @@
     }
 
     // ============================================================
-    // ACCOUNT SETTINGS - FIXED DELETE ACCOUNT
+    // ACCOUNT SETTINGS
     // ============================================================
     function openAccountSettings() {
         var user = DATA_MANAGER.getCurrentUser();
@@ -1288,9 +1290,6 @@
             modal.remove();
         });
         
-        // ============================================================
-        // DELETE ACCOUNT - FIXED: Uses custom modal instead of browser prompt
-        // ============================================================
         bindClick(modal.querySelector('#deleteAccountBtn'), function() {
             showConfirmationModal(
                 'Delete Account',
@@ -1300,7 +1299,6 @@
             ).then(function(confirmed) {
                 if (!confirmed) return;
                 
-                // Use custom password prompt modal instead of browser prompt
                 showPasswordPromptModal(
                     'Confirm Deletion',
                     'Enter your password to confirm account deletion:',
@@ -1492,7 +1490,7 @@
     }
 
     // ============================================================
-    // TRANSLATION ENGINE - FIXED LANGUAGE DETECTION
+    // TRANSLATION ENGINE - COMPLETELY FIXED
     // ============================================================
     function setupTranslation() {
         var sourceLang = $('sourceLang');
@@ -1529,34 +1527,42 @@
             }
         }
 
-        // Create Translate From Button - FIXED CLICK HANDLING
+        // Create Translate From Button - FIXED: Proper click handling
         translateFromBtn = document.createElement('button');
         translateFromBtn.className = 'translate-from-btn';
         translateFromBtn.textContent = 'Translate from: ';
         translateFromContainer.appendChild(translateFromBtn);
 
-        // FIXED: Proper click/touch handling for Translate From button
+        // FIXED: Click handler for Translate From button
         translateFromBtn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
             var detectedLang = this.getAttribute('data-lang');
             if (detectedLang && detectedLang !== 'auto' && detectedLang !== '') {
-                if (sourceLang) {
+                // Check if detected language is in our list
+                var langExists = false;
+                for (var i = 0; i < LANGUAGES.length; i++) {
+                    if (LANGUAGES[i].code === detectedLang) {
+                        langExists = true;
+                        break;
+                    }
+                }
+                if (langExists && sourceLang) {
                     sourceLang.value = detectedLang;
                     // Trigger change event
                     var evt = document.createEvent('HTMLEvents');
                     evt.initEvent('change', false, true);
                     sourceLang.dispatchEvent(evt);
+                    translateFromContainer.style.display = 'none';
+                    this.setAttribute('data-lang', '');
+                    this.textContent = 'Translate from: ';
+                    var text = inputText ? inputText.value.trim() : '';
+                    if (text) {
+                        performTranslation();
+                    }
+                    var langName = getLanguageName(detectedLang);
+                    showNotification('Switched to: ' + langName, 'success', 2000);
                 }
-                translateFromContainer.style.display = 'none';
-                this.setAttribute('data-lang', '');
-                this.textContent = 'Translate from: ';
-                var text = inputText ? inputText.value.trim() : '';
-                if (text) {
-                    performTranslation();
-                }
-                var langName = getLanguageName(detectedLang);
-                showNotification('Switched to: ' + langName, 'success', 2000);
             }
         });
         
@@ -1565,21 +1571,28 @@
             e.stopPropagation();
             var detectedLang = this.getAttribute('data-lang');
             if (detectedLang && detectedLang !== 'auto' && detectedLang !== '') {
-                if (sourceLang) {
+                var langExists = false;
+                for (var i = 0; i < LANGUAGES.length; i++) {
+                    if (LANGUAGES[i].code === detectedLang) {
+                        langExists = true;
+                        break;
+                    }
+                }
+                if (langExists && sourceLang) {
                     sourceLang.value = detectedLang;
                     var evt = document.createEvent('HTMLEvents');
                     evt.initEvent('change', false, true);
                     sourceLang.dispatchEvent(evt);
+                    translateFromContainer.style.display = 'none';
+                    this.setAttribute('data-lang', '');
+                    this.textContent = 'Translate from: ';
+                    var text = inputText ? inputText.value.trim() : '';
+                    if (text) {
+                        performTranslation();
+                    }
+                    var langName = getLanguageName(detectedLang);
+                    showNotification('Switched to: ' + langName, 'success', 2000);
                 }
-                translateFromContainer.style.display = 'none';
-                this.setAttribute('data-lang', '');
-                this.textContent = 'Translate from: ';
-                var text = inputText ? inputText.value.trim() : '';
-                if (text) {
-                    performTranslation();
-                }
-                var langName = getLanguageName(detectedLang);
-                showNotification('Switched to: ' + langName, 'success', 2000);
             }
         }, { passive: false });
 
@@ -1634,12 +1647,26 @@
             
             var selectedLang = sourceLang ? sourceLang.value : 'en';
             
-            // If detected language is same as selected, hide the button
+            // Only show if detected language is different from selected
             if (detectedLang && detectedLang !== 'auto' && detectedLang !== selectedLang) {
-                var langName = getLanguageName(detectedLang);
-                translateFromBtn.textContent = 'Translate from: ' + langName;
-                translateFromBtn.setAttribute('data-lang', detectedLang);
-                translateFromContainer.style.display = 'block';
+                // Verify the detected language exists in our list
+                var langExists = false;
+                for (var i = 0; i < LANGUAGES.length; i++) {
+                    if (LANGUAGES[i].code === detectedLang) {
+                        langExists = true;
+                        break;
+                    }
+                }
+                if (langExists) {
+                    var langName = getLanguageName(detectedLang);
+                    translateFromBtn.textContent = 'Translate from: ' + langName;
+                    translateFromBtn.setAttribute('data-lang', detectedLang);
+                    translateFromContainer.style.display = 'block';
+                } else {
+                    translateFromContainer.style.display = 'none';
+                    translateFromBtn.setAttribute('data-lang', '');
+                    translateFromBtn.textContent = 'Translate from: ';
+                }
             } else {
                 translateFromContainer.style.display = 'none';
                 translateFromBtn.setAttribute('data-lang', '');
@@ -1661,18 +1688,19 @@
                     return;
                 }
                 
-                // Check if text is mostly in a specific language using Google Translate API
+                // Use Google Translate API for detection
                 var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(text);
                 fetch(url).then(function(response) {
                     return response.json();
                 }).then(function(data) {
                     if (data && data[2]) {
                         var detected = data[2];
-                        // If detected language is different from selected, update button
                         if (detected && detected !== 'auto') {
                             detectedLanguageCache = detected;
+                            resolve(detected);
+                        } else {
+                            resolve('en');
                         }
-                        resolve(detected);
                     } else {
                         resolve('en');
                     }
@@ -1686,6 +1714,11 @@
             return new Promise(function(resolve, reject) {
                 if (!text || text.trim().length === 0) {
                     resolve('');
+                    return;
+                }
+                // Check if source and target are the same
+                if (sourceLangCode === targetLangCode) {
+                    resolve(text);
                     return;
                 }
                 var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + sourceLangCode + '&tl=' + targetLangCode + '&dt=t&q=' + encodeURIComponent(text);
@@ -1720,6 +1753,20 @@
                 return;
             }
             
+            // Check if source and target are the same
+            var sourceLangCode = sourceLang ? sourceLang.value : 'en';
+            var targetLangCode = targetLang ? targetLang.value : 'en';
+            
+            if (sourceLangCode === targetLangCode) {
+                if (outputDisplay) outputDisplay.textContent = text;
+                if (translateBtn) {
+                    translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+                    translateBtn.disabled = false;
+                }
+                resetTranslateFromBtn();
+                return;
+            }
+            
             if (isTranslating) {
                 translateQueue = true;
                 return;
@@ -1731,9 +1778,6 @@
                 translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
             }
             
-            var sourceLangCode = sourceLang ? sourceLang.value : 'en';
-            var targetLangCode = targetLang ? targetLang.value : 'en';
-            
             // First detect language
             detectLanguage(text).then(function(detectedLang) {
                 // Update the "Translate from" button with detected language
@@ -1743,8 +1787,7 @@
                     resetTranslateFromBtn();
                 }
                 
-                // If detected language is different from selected, we still use selected for translation
-                // This is how Google Translate works - it detects but translates from selected
+                // Use the selected source language for translation
                 return translateText(text, sourceLangCode, targetLangCode);
             }).then(function(translated) {
                 if (outputDisplay) outputDisplay.textContent = translated;
@@ -1814,6 +1857,7 @@
             });
         }
 
+        // FIXED: Prevent source and target from being the same
         if (sourceLang) {
             sourceLang.addEventListener('change', function() {
                 stopRecordingIfActive();
@@ -1822,6 +1866,18 @@
                 currentRecordingLang = sourceLang.value || 'en';
                 if (recognition && isRecording) {
                     recognition.lang = currentRecordingLang;
+                }
+                // If source and target become the same, change target
+                if (targetLang && sourceLang.value === targetLang.value) {
+                    var allLangs = LANGUAGES.map(function(l) { return l.code; });
+                    var newTarget = 'en';
+                    for (var i = 0; i < allLangs.length; i++) {
+                        if (allLangs[i] !== sourceLang.value) {
+                            newTarget = allLangs[i];
+                            break;
+                        }
+                    }
+                    targetLang.value = newTarget;
                 }
                 var text = inputText ? inputText.value.trim() : '';
                 if (text) {
@@ -1834,6 +1890,18 @@
             targetLang.addEventListener('change', function() {
                 stopRecordingIfActive();
                 stopSpeech();
+                // If source and target become the same, change source
+                if (sourceLang && sourceLang.value === targetLang.value) {
+                    var allLangs = LANGUAGES.map(function(l) { return l.code; });
+                    var newSource = 'rw';
+                    for (var i = 0; i < allLangs.length; i++) {
+                        if (allLangs[i] !== targetLang.value) {
+                            newSource = allLangs[i];
+                            break;
+                        }
+                    }
+                    sourceLang.value = newSource;
+                }
                 var text = inputText ? inputText.value.trim() : '';
                 if (text) {
                     performTranslation();
