@@ -61,7 +61,7 @@ body {
 }
 
 /* ============================================================
-   NAVBAR - WITH TEXT LABELS
+   NAVBAR - WITH TEXT LABELS - ADAPTS TO ALL SCREENS
    ============================================================ */
 .navbar {
     background: var(--bg-card);
@@ -140,7 +140,7 @@ body {
     min-height: 36px;
 }
 
-/* Ensure text labels are always visible */
+/* Text labels - always visible by default */
 .theme-btn span,
 .auth-btn span,
 .nav-btn span {
@@ -1395,7 +1395,7 @@ body {
 }
 
 /* ============================================================
-   RESPONSIVE - ALL DEVICES
+   RESPONSIVE - ADAPTS TO ALL DEVICES AUTOMATICALLY
    ============================================================ */
 
 /* Tablets and smaller */
@@ -1459,10 +1459,12 @@ body {
         font-size: 0.8rem;
     }
 
+    /* Text labels remain visible - just smaller */
     .theme-btn span,
     .auth-btn span,
     .nav-btn span {
-        font-size: 0.65rem;
+        font-size: 0.65rem !important;
+        display: inline !important;
     }
 
     .nav-controls { gap: 4px; }
@@ -1640,7 +1642,7 @@ body {
     }
 }
 
-/* Very small phones */
+/* Very small phones - Text remains visible, just smaller and compact */
 @media (max-width: 480px) {
     :root {
         --navbar-height: 48px;
@@ -1649,26 +1651,29 @@ body {
     .nav-logo img { height: 24px; }
     .logo-text { font-size: 0.8rem; }
 
+    /* Text labels remain visible - just smaller */
     .theme-btn span,
     .auth-btn span,
     .nav-btn span {
-        display: none !important;
+        display: inline !important;
+        font-size: 0.55rem !important;
     }
 
     .theme-btn,
     .auth-btn,
     .nav-btn {
-        padding: 4px 8px !important;
-        min-width: 32px !important;
-        min-height: 32px !important;
+        padding: 3px 5px !important;
+        min-width: 26px !important;
+        min-height: 26px !important;
         justify-content: center !important;
         border-radius: 4px !important;
+        gap: 2px !important;
     }
 
     .theme-btn i,
     .auth-btn i,
     .nav-btn i {
-        font-size: 0.8rem !important;
+        font-size: 0.65rem !important;
     }
 
     .nav-controls { gap: 2px; }
