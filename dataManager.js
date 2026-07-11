@@ -1,11 +1,9 @@
 // ============================================================
 // DATA MANAGER - localStorage Account System
-// COMPLETELY REWRITTEN FOR ALL DEVICES & BROWSERS
-// ES5 Compatible - Works on Chrome 74+
+// NO CONSOLE LOGS - Clean Email Sending
 // ============================================================
 
 var DATA_MANAGER = {
-    // Storage keys
     KEYS: {
         USERS: 'users',
         LOGGED_IN_USER: 'loggedInUser',
@@ -13,9 +11,6 @@ var DATA_MANAGER = {
         HISTORY: 'history'
     },
 
-    // ============================================================
-    // INITIALIZATION
-    // ============================================================
     init: function() {
         if (!localStorage.getItem(this.KEYS.USERS)) {
             localStorage.setItem(this.KEYS.USERS, JSON.stringify([]));
@@ -29,15 +24,11 @@ var DATA_MANAGER = {
         this.cleanExpiredCodes();
     },
 
-    // ============================================================
-    // USER MANAGEMENT
-    // ============================================================
     loadUsers: function() {
         try {
             var data = localStorage.getItem(this.KEYS.USERS);
             return data ? JSON.parse(data) : [];
         } catch (error) {
-            console.error('Error loading users:', error);
             return [];
         }
     },
@@ -47,7 +38,6 @@ var DATA_MANAGER = {
             localStorage.setItem(this.KEYS.USERS, JSON.stringify(users));
             return true;
         } catch (error) {
-            console.error('Error saving users:', error);
             return false;
         }
     },
@@ -84,9 +74,6 @@ var DATA_MANAGER = {
         return this.findUserById(userId) !== null;
     },
 
-    // ============================================================
-    // ACCOUNT OPERATIONS
-    // ============================================================
     createUser: function(email, password, username) {
         if (!email || !password || !username) {
             return { success: false, error: 'All fields are required.' };
@@ -224,9 +211,6 @@ var DATA_MANAGER = {
         return { success: true };
     },
 
-    // ============================================================
-    // VERIFICATION CODE SYSTEM
-    // ============================================================
     generateCode: function() {
         return Math.floor(100000 + Math.random() * 900000).toString();
     },
@@ -253,49 +237,44 @@ var DATA_MANAGER = {
         });
         localStorage.setItem(this.KEYS.VERIFICATION_CODES, JSON.stringify(filtered));
 
-        // Show code in console for testing (since email might not work on local/dev)
-        console.log('📧 Verification Code for ' + email + ': ' + code);
-        console.log('📋 Action: ' + action);
-        
-        // Try to send email via API (if configured)
+        // Send email via API - FAST delivery
         this.sendEmailViaAPI(email, code, action);
 
         return { success: true, code: code };
     },
 
-    // ============================================================
-    // EMAIL SENDING VIA API
-    // ============================================================
     sendEmailViaAPI: function(email, code, action) {
-        // This is a placeholder - you'll need to implement your email API
-        // For now, we just show the code in console
-        console.log('📧 [API] Would send email to: ' + email);
-        console.log('📧 [API] Code: ' + code);
-        console.log('📧 [API] Action: ' + action);
+        // Your email API endpoint
+        var apiUrl = 'https://freetranslatelanguage.onrender.com/api/send-email';
         
-        // If you have an email API endpoint, uncomment and use this:
-        /*
         var xhr = new XMLHttpRequest();
-        var url = 'https://your-email-api-endpoint.com/send';
-        xhr.open('POST', url, true);
+        xhr.open('POST', apiUrl, true);
         xhr.setRequestHeader('Content-Type', 'application/json');
+        
         xhr.onload = function() {
-            if (xhr.status === 200) {
-                console.log('✅ Email sent successfully');
+            if (xhr.status === 200 || xhr.status === 201) {
+                // Email sent successfully - silent success
             } else {
-                console.error('❌ Email sending failed:', xhr.statusText);
+                // Email failed - but we already have code stored locally
+                // The user can still use the code from the notification
             }
         };
+        
         xhr.onerror = function() {
-            console.error('❌ Email sending failed');
+            // Network error - but code is still stored locally
         };
+        
         var data = JSON.stringify({
             email: email,
             code: code,
             action: action
         });
-        xhr.send(data);
-        */
+        
+        try {
+            xhr.send(data);
+        } catch (e) {
+            // Silent fail - code is still stored
+        }
     },
 
     verifyCode: function(email, code, action) {
@@ -358,9 +337,6 @@ var DATA_MANAGER = {
         localStorage.setItem(this.KEYS.VERIFICATION_CODES, JSON.stringify(filtered));
     },
 
-    // ============================================================
-    // HISTORY MANAGEMENT
-    // ============================================================
     saveHistory: function(email, entry) {
         var history = JSON.parse(localStorage.getItem(this.KEYS.HISTORY) || '{}');
         
@@ -414,9 +390,6 @@ var DATA_MANAGER = {
         return this.clearUserHistory(email);
     },
 
-    // ============================================================
-    // UTILITY FUNCTIONS
-    // ============================================================
     generateId: function() {
         return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
     },
@@ -495,9 +468,6 @@ var DATA_MANAGER = {
         return result;
     },
 
-    // ============================================================
-    // AUTO-CLEANUP
-    // ============================================================
     startAutoCleanup: function() {
         setInterval(function() {
             DATA_MANAGER.cleanExpiredCodes();
@@ -505,11 +475,9 @@ var DATA_MANAGER = {
     }
 };
 
-// Initialize on load
 DATA_MANAGER.init();
 DATA_MANAGER.startAutoCleanup();
 
-// Export for use
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = DATA_MANAGER;
 }
