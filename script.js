@@ -38,9 +38,12 @@
     var isDetectingLanguage = false;
     var forceTranslationWithDetectedLang = false;
     var pendingDetectedLang = '';
+    var lastDetectedText = '';
+    var lastDetectedLangResult = '';
+    var isDetectionRunning = false;
 
     // ============================================================
-    // LANGUAGE LIST - Includes all languages for detection
+    // LANGUAGE LIST
     // ============================================================
     var LANGUAGES = [
         { code: 'en', name: 'English' },
@@ -631,7 +634,7 @@
     }
 
     // ============================================================
-    // AUTH STATE - FIXED: Navigation button text
+    // AUTH STATE
     // ============================================================
     function checkAuthStatus() {
         var token = localStorage.getItem('authToken');
@@ -684,7 +687,7 @@
     }
 
     // ============================================================
-    // OPEN AUTH MODAL - FIXED: Better spacing for input fields
+    // OPEN AUTH MODAL
     // ============================================================
     function openModal(mode) {
         currentMode = mode;
@@ -1499,7 +1502,7 @@
     }
 
     // ============================================================
-    // TRANSLATION ENGINE - COMPLETELY FIXED
+    // TRANSLATION ENGINE - INSTANT DETECTION, NO DELAY
     // ============================================================
     function setupTranslation() {
         var sourceLang = $('sourceLang');
@@ -1520,6 +1523,9 @@
         detectedLanguageCache = '';
         forceTranslationWithDetectedLang = false;
         pendingDetectedLang = '';
+        lastDetectedText = '';
+        lastDetectedLangResult = '';
+        isDetectionRunning = false;
         
         // Create Translate From Container
         translateFromContainer = document.createElement('div');
@@ -1544,7 +1550,7 @@
         translateFromBtn.textContent = 'Translate from: ';
         translateFromContainer.appendChild(translateFromBtn);
 
-        // FIXED: Click handler for Translate From button
+        // Click handler for Translate From button
         function handleTranslateFromClick(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -1663,12 +1669,25 @@
             translateFromBtn.textContent = 'Translate from: ';
         }
 
+        // ============================================================
+        // INSTANT DETECTION - NO DELAY, WITH CACHING
+        // ============================================================
         function detectLanguage(text) {
             return new Promise(function(resolve) {
                 if (!text || text.length < 3) {
                     resolve('en');
                     return;
                 }
+                
+                // Cache: if text hasn't changed significantly, return cached result
+                if (lastDetectedText === text) {
+                    resolve(lastDetectedLangResult || 'en');
+                    return;
+                }
+                
+                // Store current text for caching
+                lastDetectedText = text;
+                
                 var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(text);
                 fetch(url).then(function(response) {
                     return response.json();
@@ -1677,14 +1696,18 @@
                         var detected = data[2];
                         if (detected && detected !== 'auto') {
                             detectedLanguageCache = detected;
+                            lastDetectedLangResult = detected;
                             resolve(detected);
                         } else {
+                            lastDetectedLangResult = 'en';
                             resolve('en');
                         }
                     } else {
+                        lastDetectedLangResult = 'en';
                         resolve('en');
                     }
                 }).catch(function() {
+                    lastDetectedLangResult = 'en';
                     resolve('en');
                 });
             });
@@ -1720,7 +1743,7 @@
         }
 
         // ============================================================
-        // FIXED: Translation with proper language detection
+        // PERFORM TRANSLATION
         // ============================================================
         function performTranslation() {
             var text = inputText ? inputText.value.trim() : '';
@@ -1801,7 +1824,7 @@
                 return;
             }
             
-            // Normal flow - detect language first
+            // Normal flow - detect language first (INSTANT - no delay)
             detectLanguage(text).then(function(detectedLang) {
                 if (!isRecording && detectedLang && detectedLang !== 'auto') {
                     updateTranslateFromBtn(detectedLang, text);
@@ -1842,31 +1865,14 @@
             }
         });
 
+        // ============================================================
+        // INSTANT DETECTION ON EVERY KEYSTROKE - NO DELAY
+        // ============================================================
         if (inputText) {
             inputText.addEventListener('input', function() {
                 var text = inputText.value.trim();
                 if (!text) {
                     stopSpeech();
-                }
-                if (text) {
-                    if (translateBtn) {
-                        translateBtn.disabled = true;
-                        translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
-                    }
-                    if (!isRecording && text.length > 3) {
-                        detectLanguage(text).then(function(detectedLang) {
-                            if (detectedLang && detectedLang !== 'auto') {
-                                updateTranslateFromBtn(detectedLang, text);
-                            }
-                            performTranslation();
-                        }).catch(function() {
-                            performTranslation();
-                        });
-                    } else {
-                        resetTranslateFromBtn();
-                        performTranslation();
-                    }
-                } else {
                     if (outputDisplay) outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
                     if (translateBtn) {
                         translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
@@ -1875,6 +1881,37 @@
                     resetTranslateFromBtn();
                     forceTranslationWithDetectedLang = false;
                     pendingDetectedLang = '';
+                    lastDetectedText = '';
+                    lastDetectedLangResult = '';
+                    return;
+                }
+                
+                // Show translating state
+                if (translateBtn) {
+                    translateBtn.disabled = true;
+                    translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+                }
+                
+                // INSTANT detection - NO delay, but with caching
+                if (!isRecording && text.length > 2) {
+                    // If text is same as last detected, use cached result
+                    if (lastDetectedText === text && lastDetectedLangResult) {
+                        updateTranslateFromBtn(lastDetectedLangResult, text);
+                        performTranslation();
+                    } else {
+                        // Detect and update instantly
+                        detectLanguage(text).then(function(detectedLang) {
+                            if (detectedLang && detectedLang !== 'auto') {
+                                updateTranslateFromBtn(detectedLang, text);
+                            }
+                            performTranslation();
+                        }).catch(function() {
+                            performTranslation();
+                        });
+                    }
+                } else {
+                    resetTranslateFromBtn();
+                    performTranslation();
                 }
             });
         }
@@ -1944,6 +1981,8 @@
             resetTranslateFromBtn();
             forceTranslationWithDetectedLang = false;
             pendingDetectedLang = '';
+            lastDetectedText = '';
+            lastDetectedLangResult = '';
         });
 
         bindClick(copyOutputBtn, function() {
@@ -1985,6 +2024,8 @@
             resetTranslateFromBtn();
             forceTranslationWithDetectedLang = false;
             pendingDetectedLang = '';
+            lastDetectedText = '';
+            lastDetectedLangResult = '';
         });
 
         // ============================================================
@@ -2261,7 +2302,7 @@
     }
 
     // ============================================================
-    // THEME TOGGLE - FIXED: Navigation button text
+    // THEME TOGGLE
     // ============================================================
     function setupThemeToggle() {
         var themeToggle = $('themeToggle');
@@ -2281,7 +2322,7 @@
     }
 
     // ============================================================
-    // ABOUT MODAL - FIXED: Navigation button text
+    // ABOUT MODAL
     // ============================================================
     function setupAboutModal() {
         var aboutNavBtn = $('aboutNavBtn');
