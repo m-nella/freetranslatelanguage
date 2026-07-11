@@ -402,7 +402,7 @@
     }
 
     // ============================================================
-    // CONFIRMATION MODAL
+    // CONFIRMATION MODAL - FIXED: Better button spacing
     // ============================================================
     function showConfirmationModal(title, message, confirmText, cancelText) {
         confirmText = confirmText || 'Confirm';
@@ -415,9 +415,9 @@
                 '<div class="modal-content confirmation-content">' +
                     '<h2>' + title + '</h2>' +
                     '<p>' + message + '</p>' +
-                    '<div class="confirmation-buttons">' +
-                        '<button class="auth-submit-btn cancel-btn" id="cancelConfirm">' + cancelText + '</button>' +
-                        '<button class="auth-submit-btn delete-btn" id="confirmAction">' + confirmText + '</button>' +
+                    '<div class="confirmation-buttons" style="display:flex; gap:16px; justify-content:center; margin-top:16px; width:100%;">' +
+                        '<button class="auth-submit-btn cancel-btn" id="cancelConfirm" style="flex:1; max-width:160px; min-height:44px;">' + cancelText + '</button>' +
+                        '<button class="auth-submit-btn delete-btn" id="confirmAction" style="flex:1; max-width:160px; min-height:44px;">' + confirmText + '</button>' +
                     '</div>' +
                 '</div>';
             document.body.appendChild(modal);
@@ -454,9 +454,9 @@
                         '<label>Confirm New Password</label>' +
                         createPasswordField('resetConfirmPassword', 'Confirm new password').outerHTML +
                     '</div>' +
-                    '<div class="confirmation-buttons" style="margin-top: 16px;">' +
-                        '<button class="auth-submit-btn cancel-btn" id="resetCancel" style="flex:1;">Cancel</button>' +
-                        '<button class="auth-submit-btn" id="resetConfirm" style="flex:1; background: var(--accent);">Reset Password</button>' +
+                    '<div class="confirmation-buttons" style="display:flex; gap:16px; justify-content:center; margin-top:16px; width:100%;">' +
+                        '<button class="auth-submit-btn cancel-btn" id="resetCancel" style="flex:1; max-width:160px; min-height:44px;">Cancel</button>' +
+                        '<button class="auth-submit-btn" id="resetConfirm" style="flex:1; max-width:160px; min-height:44px; background: var(--accent);">Reset Password</button>' +
                     '</div>' +
                 '</div>';
             document.body.appendChild(modal);
@@ -529,7 +529,7 @@
                 '<p class="verification-desc">Enter the 6-digit verification code sent to your email. Also check SPAM/JUNK folder.</p>' +
                 '<form id="verificationForm">' +
                     '<input type="text" id="verificationCode" placeholder="Enter 6-digit code" maxlength="6" autocomplete="off" required>' +
-                    '<button type="submit" class="auth-submit-btn" id="verifySubmitBtn">Verify</button>' +
+                    '<button type="submit" class="auth-submit-btn" id="verifySubmitBtn" style="width:100%; min-height:44px; margin-top:10px;">Verify</button>' +
                 '</form>' +
                 '<p class="auth-switch">Didn\'t receive code? <a href="#" id="resendCodeBtn">Resend Code</a></p>' +
             '</div>';
@@ -1005,25 +1005,25 @@
         profileMenu.style.boxShadow = 'var(--shadow-hover)';
         profileMenu.style.border = '1px solid var(--border-color)';
         profileMenu.style.overflow = 'hidden';
-        profileMenu.style.padding = '6px 0';
+        profileMenu.style.padding = '8px 0';
         
         profileMenu.innerHTML = 
-            '<div class="user-menu-header" style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-input);">' +
+            '<div class="user-menu-header" style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-input);">' +
                 '<i class="fas fa-user-circle" style="font-size:1.8rem;color:var(--accent);"></i>' +
                 '<div style="display:flex;flex-direction:column;">' +
                     '<strong style="color:var(--text-primary);font-size:0.9rem;">' + currentUser.username + '</strong>' +
                     '<small style="color:var(--text-light);font-size:0.7rem;word-break:break-all;">' + currentUser.email + '</small>' +
                 '</div>' +
             '</div>' +
-            '<div class="user-menu-divider" style="height:1px;background:var(--border-color);margin:4px 12px;"></div>' +
-            '<div class="user-menu-item" data-action="profile" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;color:var(--text-secondary);transition:var(--transition);font-size:0.85rem;">' +
+            '<div class="user-menu-divider" style="height:1px;background:var(--border-color);margin:4px 16px;"></div>' +
+            '<div class="user-menu-item" data-action="profile" style="padding:10px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;color:var(--text-secondary);transition:var(--transition);font-size:0.85rem;">' +
                 '<i class="fas fa-user"></i> <span>Profile</span>' +
             '</div>' +
-            '<div class="user-menu-item" data-action="account" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;color:var(--text-secondary);transition:var(--transition);font-size:0.85rem;">' +
+            '<div class="user-menu-item" data-action="account" style="padding:10px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;color:var(--text-secondary);transition:var(--transition);font-size:0.85rem;">' +
                 '<i class="fas fa-cog"></i> <span>Account Settings</span>' +
             '</div>' +
-            '<div class="user-menu-divider" style="height:1px;background:var(--border-color);margin:4px 12px;"></div>' +
-            '<div class="user-menu-item logout" data-action="logout" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;color:var(--danger);transition:var(--transition);font-size:0.85rem;">' +
+            '<div class="user-menu-divider" style="height:1px;background:var(--border-color);margin:4px 16px;"></div>' +
+            '<div class="user-menu-item logout" data-action="logout" style="padding:10px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;color:var(--danger);transition:var(--transition);font-size:0.85rem;">' +
                 '<i class="fas fa-sign-out-alt"></i> <span>Log Out</span>' +
             '</div>';
         
@@ -1362,7 +1362,7 @@
     }
 
     // ============================================================
-    // HISTORY MODAL
+    // HISTORY MODAL - FIXED: Individual delete working
     // ============================================================
     function setupHistoryButton() {
         var historyNavBtn = $('historyNavBtn');
@@ -1415,7 +1415,7 @@
             }
             showConfirmationModal(
                 'Delete All History',
-                'Are you sure? This cannot be undone.',
+                'Are you sure you want to delete ALL your translation history? This action cannot be undone.',
                 'Delete All',
                 'Cancel'
             ).then(function(confirmed) {
@@ -1450,31 +1450,42 @@
                 var time = new Date(item.createdAt).toLocaleString();
                 html += 
                     '<div class="history-item" data-id="' + item.id + '">' +
-                        '<button class="h-delete" data-id="' + item.id + '" title="Delete"><i class="fas fa-times"></i></button>' +
+                        '<button class="h-delete" data-id="' + item.id + '" title="Delete this translation"><i class="fas fa-times"></i></button>' +
                         '<div class="h-source">' + getLanguageName(item.sourceLang) + ' → ' + getLanguageName(item.targetLang) + '<span class="h-time">' + time + '</span></div>' +
                         '<div class="h-original">"' + item.original.substring(0, 60) + (item.original.length > 60 ? '...' : '') + '"</div>' +
                         '<div class="h-translation">"' + item.translated.substring(0, 60) + (item.translated.length > 60 ? '...' : '') + '"</div>' +
                     '</div>';
             }
             historyList.innerHTML = html;
+            
+            // FIXED: Individual delete buttons - properly bound
             var deleteBtns = historyList.querySelectorAll('.h-delete');
             for (var j = 0; j < deleteBtns.length; j++) {
                 (function(btn) {
-                    bindClick(btn, function() {
-                        var id = this.dataset.id;
+                    // Use bindClick for both click and touch support
+                    bindClick(btn, function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var id = this.getAttribute('data-id');
+                        if (!id) return;
+                        
                         showConfirmationModal(
                             'Delete History',
-                            'Delete this translation?',
+                            'Delete this translation from history?',
                             'Delete',
                             'Cancel'
                         ).then(function(confirmed) {
                             if (!confirmed) return;
+                            if (!isLoggedIn || !currentUser) {
+                                showNotification('Please sign in.', 'warning');
+                                return;
+                            }
                             var result = DATA_MANAGER.deleteHistoryItem(currentUser.email, id);
                             if (result.success) {
                                 loadHistoryModal();
-                                showNotification('Deleted.', 'info');
+                                showNotification('History item deleted.', 'info');
                             } else {
-                                showNotification('Error deleting.', 'error');
+                                showNotification('Error deleting history item.', 'error');
                             }
                         });
                     });
@@ -1502,53 +1513,50 @@
     }
 
     // ============================================================
-// THEME TOGGLE - FIXED: Works on ALL devices
-// ============================================================
-function setupThemeToggle() {
-    var themeToggle = $('themeToggle');
-    if (themeToggle) {
-        // Set initial icon based on theme
-        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        var icon = themeToggle.querySelector('i');
-        if (icon) {
-            icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
-        }
-        
-        // Use both click and touch events for reliability
-        function toggleTheme(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
+    // THEME TOGGLE - FIXED: Works on ALL devices
+    // ============================================================
+    function setupThemeToggle() {
+        var themeToggle = $('themeToggle');
+        if (themeToggle) {
+            // Set initial icon based on theme
             var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-            var newTheme = isDark ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', newTheme);
-            
-            // Update icon - works on ALL devices
             var icon = themeToggle.querySelector('i');
             if (icon) {
-                icon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+                icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
             }
             
-            localStorage.setItem('theme', newTheme);
-        }
-        
-        themeToggle.addEventListener('click', toggleTheme);
-        themeToggle.addEventListener('touchstart', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleTheme(e);
-        }, { passive: false });
-        
-        // Load saved theme
-        if (localStorage.getItem('theme') === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
-            var icon = themeToggle.querySelector('i');
-            if (icon) {
-                icon.className = 'fas fa-sun';
+            function toggleTheme(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                var newTheme = isDark ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', newTheme);
+                
+                var icon = themeToggle.querySelector('i');
+                if (icon) {
+                    icon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+                }
+                
+                localStorage.setItem('theme', newTheme);
+            }
+            
+            themeToggle.addEventListener('click', toggleTheme);
+            themeToggle.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleTheme(e);
+            }, { passive: false });
+            
+            if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                var icon = themeToggle.querySelector('i');
+                if (icon) {
+                    icon.className = 'fas fa-sun';
+                }
             }
         }
     }
-}
 
     // ============================================================
     // ABOUT MODAL
@@ -1977,7 +1985,25 @@ function setupThemeToggle() {
             });
         }
 
-        // Prevent source and target from being the same
+        // ============================================================
+        // FIXED: Prevent source and target from being the same
+        // ============================================================
+        function ensureDifferentLanguages() {
+            if (!sourceLang || !targetLang) return;
+            
+            if (sourceLang.value === targetLang.value) {
+                var allLangs = LANGUAGES.map(function(l) { return l.code; });
+                var newLang = 'en';
+                for (var i = 0; i < allLangs.length; i++) {
+                    if (allLangs[i] !== sourceLang.value) {
+                        newLang = allLangs[i];
+                        break;
+                    }
+                }
+                targetLang.value = newLang;
+            }
+        }
+
         if (sourceLang) {
             sourceLang.addEventListener('change', function() {
                 stopRecordingIfActive();
@@ -1987,17 +2013,7 @@ function setupThemeToggle() {
                 if (recognition && isRecording) {
                     recognition.lang = currentRecordingLang;
                 }
-                if (targetLang && sourceLang.value === targetLang.value) {
-                    var allLangs = LANGUAGES.map(function(l) { return l.code; });
-                    var newTarget = 'en';
-                    for (var i = 0; i < allLangs.length; i++) {
-                        if (allLangs[i] !== sourceLang.value) {
-                            newTarget = allLangs[i];
-                            break;
-                        }
-                    }
-                    targetLang.value = newTarget;
-                }
+                ensureDifferentLanguages();
                 var text = inputText ? inputText.value.trim() : '';
                 if (text) {
                     performTranslation();
@@ -2009,17 +2025,7 @@ function setupThemeToggle() {
             targetLang.addEventListener('change', function() {
                 stopRecordingIfActive();
                 stopSpeech();
-                if (sourceLang && sourceLang.value === targetLang.value) {
-                    var allLangs = LANGUAGES.map(function(l) { return l.code; });
-                    var newSource = 'rw';
-                    for (var i = 0; i < allLangs.length; i++) {
-                        if (allLangs[i] !== targetLang.value) {
-                            newSource = allLangs[i];
-                            break;
-                        }
-                    }
-                    sourceLang.value = newSource;
-                }
+                ensureDifferentLanguages();
                 var text = inputText ? inputText.value.trim() : '';
                 if (text) {
                     performTranslation();
@@ -2033,6 +2039,7 @@ function setupThemeToggle() {
             var temp = sourceLang ? sourceLang.value : 'rw';
             if (sourceLang) sourceLang.value = targetLang ? targetLang.value : 'en';
             if (targetLang) targetLang.value = temp;
+            ensureDifferentLanguages();
             if (outputDisplay) outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
             if (inputText) inputText.value = '';
             if (translateBtn) {
