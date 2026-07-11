@@ -578,7 +578,6 @@
                 authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
                 removeClass(authBtn, 'logged-in');
             }
-            // HIDE History tab when logged out
             if (historyNavBtn) {
                 historyNavBtn.style.display = 'none';
             }
@@ -599,7 +598,6 @@
                 authBtn.innerHTML = '<i class="fas fa-user-circle"></i> <span>' + currentUser.username + '</span>';
                 addClass(authBtn, 'logged-in');
             }
-            // SHOW History tab only for logged in users
             if (historyNavBtn) {
                 historyNavBtn.style.display = 'flex';
             }
@@ -611,7 +609,6 @@
                 authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
                 removeClass(authBtn, 'logged-in');
             }
-            // HIDE History tab when logged out
             if (historyNavBtn) {
                 historyNavBtn.style.display = 'none';
             }
@@ -904,18 +901,25 @@
     }
 
     // ============================================================
-    // PROFILE MENU
+    // PROFILE MENU - FIXED TO WORK ON MOBILE
     // ============================================================
     function toggleProfileMenu() {
+        // Remove existing menu if open
         if (profileMenu) {
             profileMenu.remove();
             profileMenu = null;
             return;
         }
-        if (!currentUser) return;
         
+        if (!currentUser) {
+            showNotification('Please sign in first.', 'warning');
+            return;
+        }
+        
+        // Create the profile menu
         profileMenu = document.createElement('div');
         profileMenu.className = 'user-menu';
+        profileMenu.id = 'profileMenu';
         profileMenu.innerHTML = 
             '<div class="user-menu-header">' +
                 '<i class="fas fa-user-circle"></i>' +
@@ -925,42 +929,79 @@
                 '</div>' +
             '</div>' +
             '<div class="user-menu-divider"></div>' +
-            '<div class="user-menu-item" data-action="profile"><i class="fas fa-user"></i> Profile</div>' +
-            '<div class="user-menu-item" data-action="account"><i class="fas fa-cog"></i> Account Settings</div>' +
+            '<div class="user-menu-item" data-action="profile"><i class="fas fa-user"></i> <span>Profile</span></div>' +
+            '<div class="user-menu-item" data-action="account"><i class="fas fa-cog"></i> <span>Account Settings</span></div>' +
             '<div class="user-menu-divider"></div>' +
-            '<div class="user-menu-item logout" data-action="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>';
+            '<div class="user-menu-item logout" data-action="logout"><i class="fas fa-sign-out-alt"></i> <span>Log Out</span></div>';
         document.body.appendChild(profileMenu);
         
+        // Position the menu
         var authBtn = $('authBtn');
-        var rect = authBtn ? authBtn.getBoundingClientRect() : { bottom: 0, right: 0 };
-        profileMenu.style.top = (rect.bottom + 10) + 'px';
-        profileMenu.style.right = (window.innerWidth - rect.right) + 'px';
+        if (authBtn) {
+            var rect = authBtn.getBoundingClientRect();
+            profileMenu.style.position = 'fixed';
+            profileMenu.style.top = (rect.bottom + 8) + 'px';
+            profileMenu.style.right = (window.innerWidth - rect.right) + 'px';
+            profileMenu.style.zIndex = '10000';
+            profileMenu.style.minWidth = '220px';
+            profileMenu.style.maxWidth = 'calc(100% - 16px)';
+        } else {
+            profileMenu.style.position = 'fixed';
+            profileMenu.style.top = '60px';
+            profileMenu.style.right = '8px';
+            profileMenu.style.zIndex = '10000';
+            profileMenu.style.minWidth = '200px';
+            profileMenu.style.maxWidth = 'calc(100% - 16px)';
+        }
         
+        // Add click events to menu items - FIXED for mobile
+        var items = profileMenu.querySelectorAll('.user-menu-item');
+        for (var i = 0; i < items.length; i++) {
+            (function(item) {
+                // Use both click and touch events
+                on(item, 'click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var action = this.dataset.action;
+                    var menu = document.getElementById('profileMenu');
+                    if (menu) {
+                        menu.remove();
+                        profileMenu = null;
+                    }
+                    if (action === 'profile') {
+                        openProfileModal();
+                    } else if (action === 'account') {
+                        openAccountSettings();
+                    } else if (action === 'logout') {
+                        logoutUser();
+                    }
+                });
+            })(items[i]);
+        }
+        
+        // Close menu when clicking outside
         setTimeout(function() {
             document.addEventListener('click', function closeMenu(e) {
-                if (profileMenu && !profileMenu.contains(e.target) && e.target !== authBtn) {
-                    profileMenu.remove();
+                var menu = document.getElementById('profileMenu');
+                var authBtnEl = $('authBtn');
+                if (menu && !menu.contains(e.target) && e.target !== authBtnEl) {
+                    menu.remove();
                     profileMenu = null;
                     document.removeEventListener('click', closeMenu);
                 }
             });
-        }, 10);
-        
-        var items = profileMenu.querySelectorAll('.user-menu-item');
-        for (var i = 0; i < items.length; i++) {
-            (function(item) {
-                on(item, 'click', function() {
-                    var action = this.dataset.action;
-                    if (profileMenu) {
-                        profileMenu.remove();
-                        profileMenu = null;
-                    }
-                    if (action === 'profile') openProfileModal();
-                    else if (action === 'account') openAccountSettings();
-                    else if (action === 'logout') logoutUser();
-                });
-            })(items[i]);
-        }
+            
+            // Also close on touch outside
+            document.addEventListener('touchstart', function closeMenuTouch(e) {
+                var menu = document.getElementById('profileMenu');
+                var authBtnEl = $('authBtn');
+                if (menu && !menu.contains(e.target) && e.target !== authBtnEl) {
+                    menu.remove();
+                    profileMenu = null;
+                    document.removeEventListener('touchstart', closeMenuTouch);
+                }
+            });
+        }, 100);
     }
 
     // ============================================================
@@ -977,12 +1018,14 @@
             authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
             removeClass(authBtn, 'logged-in');
         }
-        // HIDE History tab on logout
         if (historyNavBtn) {
             historyNavBtn.style.display = 'none';
         }
-        showNotification('Logged out.', 'info');
-        if (profileMenu) profileMenu.remove();
+        showNotification('Logged out successfully.', 'info');
+        if (profileMenu) {
+            profileMenu.remove();
+            profileMenu = null;
+        }
     }
 
     // ============================================================
@@ -991,7 +1034,7 @@
     function openProfileModal() {
         var user = DATA_MANAGER.getCurrentUser();
         if (!user) {
-            showNotification('Please sign in.', 'warning');
+            showNotification('Please sign in to view profile.', 'warning');
             return;
         }
         var modal = document.createElement('div');
@@ -1029,7 +1072,7 @@
     function openAccountSettings() {
         var user = DATA_MANAGER.getCurrentUser();
         if (!user) {
-            showNotification('Please sign in.', 'warning');
+            showNotification('Please sign in to access settings.', 'warning');
             return;
         }
         var modal = document.createElement('div');
@@ -1227,7 +1270,6 @@
     }
 
     function openHistoryModal() {
-        // Check if user is logged in
         if (!isLoggedIn || !currentUser) {
             showNotification('Please sign in to view your translation history.', 'warning');
             return;
@@ -1343,7 +1385,6 @@
     // SAVE TO HISTORY - Only for Logged In Users
     // ============================================================
     function saveToHistory(original, translated, sourceLang, targetLang) {
-        // ONLY save if user is logged in
         if (!isLoggedIn || !currentUser) {
             return;
         }
@@ -1357,7 +1398,7 @@
     }
 
     // ============================================================
-    // TRANSLATION ENGINE - With Fixed Recording for ALL Languages
+    // TRANSLATION ENGINE
     // ============================================================
     function setupTranslation() {
         var sourceLang = $('sourceLang');
@@ -1372,7 +1413,6 @@
         var copyOutputBtn = $('copyOutput');
         var speakOutputBtn = $('speakOutput');
         
-        // Reset transcripts
         finalTranscript = '';
         interimTranscript = '';
         currentRecordingLang = sourceLang ? sourceLang.value || 'en' : 'en';
@@ -1556,7 +1596,6 @@
                 return translateText(text, sourceLangCode, targetLangCode);
             }).then(function(translated) {
                 if (outputDisplay) outputDisplay.textContent = translated;
-                // Only save if logged in
                 if (isLoggedIn && currentUser) {
                     saveToHistory(text, translated, sourceLangCode, targetLangCode);
                 }
@@ -1628,7 +1667,6 @@
                 stopRecordingIfActive();
                 resetTranslateFromBtn();
                 stopSpeech();
-                // Update recording language for next session
                 currentRecordingLang = sourceLang.value || 'en';
                 if (recognition && isRecording) {
                     recognition.lang = currentRecordingLang;
@@ -1706,7 +1744,7 @@
         });
 
         // ============================================================
-        // MIC - RECORDING SYSTEM - FIXED FOR ALL LANGUAGES
+        // MIC - RECORDING SYSTEM
         // ============================================================
         function stopRecordingIfActive() {
             if (isRecording) {
@@ -1723,10 +1761,9 @@
                 if (micBtn) {
                     removeClass(micBtn, 'recording');
                     micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-                    if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
+                    if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
                 }
                 resetTranslateFromBtn();
-                // Process final transcript
                 if (finalTranscript.trim()) {
                     inputText.value = finalTranscript.trim();
                     performTranslation();
@@ -1746,7 +1783,6 @@
                 recognition = new SpeechRecognition();
                 recognition.continuous = true;
                 recognition.interimResults = true;
-                // Set language from dropdown - supports ALL 30+ languages
                 var selectedLang = sourceLang ? sourceLang.value || 'en' : 'en';
                 currentRecordingLang = selectedLang;
                 recognition.lang = selectedLang;
@@ -1782,7 +1818,7 @@
                                 removeClass(micBtn, 'recording');
                                 micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
                             }
-                            if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
+                            if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
                             if (finalTranscript.trim()) {
                                 inputText.value = finalTranscript.trim();
                                 performTranslation();
@@ -1806,12 +1842,10 @@
                         }
                     }
                     
-                    // Accumulate final results - this handles mixed language words naturally
                     if (currentFinal) {
                         finalTranscript += ' ' + currentFinal;
                     }
                     
-                    // Show interim results
                     if (currentInterim || finalTranscript) {
                         var displayText = (finalTranscript + ' ' + currentInterim).trim();
                         if (inputText) {
@@ -1844,7 +1878,7 @@
                             removeClass(micBtn, 'recording');
                             micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
                         }
-                        if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
+                        if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
                         resetTranslateFromBtn();
                     }
                 };
@@ -1867,7 +1901,7 @@
                                 removeClass(micBtn, 'recording');
                                 micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
                             }
-                            if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
+                            if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
                             resetTranslateFromBtn();
                             if (finalTranscript.trim()) {
                                 inputText.value = finalTranscript.trim();
@@ -1881,7 +1915,7 @@
                             removeClass(micBtn, 'recording');
                             micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
                         }
-                        if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
+                        if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
                         resetTranslateFromBtn();
                         if (finalTranscript.trim()) {
                             inputText.value = finalTranscript.trim();
@@ -1909,7 +1943,7 @@
                     }
                     removeClass(micBtn, 'recording');
                     micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-                    if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
+                    if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
                     showNotification('⏹ Recording stopped.', 'info', 2000);
                     
                     if (finalTranscript.trim()) {
