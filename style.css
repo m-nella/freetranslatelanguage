@@ -120,9 +120,7 @@ body {
     flex-wrap: nowrap;
 }
 
-/* ============================================================
-   NAV BUTTONS
-   ============================================================ */
+/* Theme button - ICON ONLY */
 .theme-btn {
     background: var(--bg-input);
     border: 1px solid var(--border-color);
@@ -141,7 +139,6 @@ body {
     min-width: 36px;
 }
 
-/* Theme button - ICON ONLY */
 .theme-btn i {
     font-size: 1rem;
 }
@@ -149,6 +146,7 @@ body {
     display: none !important;
 }
 
+/* Auth and Nav buttons - ICON + TEXT */
 .auth-btn,
 .nav-btn {
     background: var(--bg-input);
@@ -168,14 +166,12 @@ body {
     min-height: 36px;
 }
 
-/* Text labels - visible with proper spacing */
 .auth-btn span,
 .nav-btn span {
     display: inline !important;
     font-size: 0.75rem !important;
 }
 
-/* Icons with proper spacing */
 .auth-btn i,
 .nav-btn i {
     font-size: 0.9rem;
@@ -343,12 +339,12 @@ body {
 }
 
 /* ============================================================
-   TRANSLATION AREA
+   TRANSLATION AREA - FIXED Translate Button Spacing
    ============================================================ */
 .translation-area.side-by-side {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
-    gap: 12px;
+    gap: 16px;
     align-items: stretch;
     flex: 1;
     min-height: 0;
@@ -413,17 +409,18 @@ body {
     font-style: italic;
 }
 
+/* Translate Button - Proper spacing and styling */
 .translation-area.side-by-side .translate-btn {
     align-self: center;
     width: auto;
-    padding: 14px 16px;
+    padding: 16px 20px;
     border-radius: 50px;
     min-height: 80px;
-    gap: 8px;
+    gap: 10px;
     background: linear-gradient(135deg, var(--accent), #7c3aed);
     color: white;
     border: none;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
     transition: var(--transition);
@@ -434,7 +431,8 @@ body {
     justify-content: center;
     letter-spacing: 0.5px;
     flex-shrink: 0;
-    min-width: 60px;
+    min-width: 70px;
+    margin: 0 4px;
 }
 
 .translation-area.side-by-side .translate-btn:hover {
@@ -453,7 +451,7 @@ body {
 }
 
 .translation-area.side-by-side .translate-btn i {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
 }
 
 .box-header {
@@ -495,7 +493,6 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
 }
 
 .action-btn:hover {
@@ -1304,7 +1301,6 @@ body {
 .notification .notif-icon { 
     font-size: 1rem; 
     flex-shrink: 0; 
-    margin-right: 2px;
 }
 .notification .notif-content { 
     flex: 1; 
@@ -1331,7 +1327,7 @@ body {
 }
 
 /* ============================================================
-   USER MENU
+   USER MENU - FIXED Spacing
    ============================================================ */
 .user-menu {
     position: fixed;
@@ -1432,7 +1428,7 @@ body {
 }
 
 /* ============================================================
-   RESPONSIVE
+   RESPONSIVE - ALL DEVICES
    ============================================================ */
 
 /* Tablets and smaller */
@@ -1446,7 +1442,7 @@ body {
 @media (max-width: 900px) {
     .translation-area.side-by-side {
         grid-template-columns: 1fr 1fr;
-        gap: 10px;
+        gap: 12px;
     }
 
     .translation-area.side-by-side .input-box,
@@ -1458,10 +1454,11 @@ body {
         grid-column: span 2;
         flex-direction: row;
         min-height: auto;
-        padding: 10px 20px;
+        padding: 12px 24px;
         width: 100%;
-        min-height: 44px;
+        min-height: 48px;
         border-radius: 30px;
+        margin: 0;
     }
 
     .translation-area.side-by-side .translate-btn i {
@@ -1480,6 +1477,7 @@ body {
     .nav-logo img { height: 28px; }
     .logo-text { font-size: 0.95rem; }
 
+    /* Theme button - ICON ONLY */
     .theme-btn {
         padding: 4px 8px;
         font-size: 0.8rem;
@@ -1491,6 +1489,7 @@ body {
         font-size: 0.9rem;
     }
 
+    /* Auth and Nav buttons - ICON + TEXT with spacing */
     .auth-btn,
     .nav-btn {
         padding: 4px 10px;
@@ -1508,6 +1507,20 @@ body {
     .auth-btn span,
     .nav-btn span {
         font-size: 0.65rem !important;
+    }
+
+    /* PROFILE BUTTON - Hide username on mobile, show only icon */
+    .auth-btn.logged-in span {
+        display: none !important;
+    }
+    .auth-btn.logged-in {
+        padding: 4px 10px;
+        min-width: 32px;
+        justify-content: center;
+    }
+    .auth-btn.logged-in i {
+        font-size: 0.9rem;
+        margin: 0;
     }
 
     .nav-controls { gap: 4px; }
@@ -1545,7 +1558,7 @@ body {
     .translation-area.side-by-side {
         display: flex !important;
         flex-direction: column !important;
-        gap: 8px !important;
+        gap: 10px !important;
     }
 
     .translation-area.side-by-side .input-box,
@@ -1572,12 +1585,13 @@ body {
     .translation-area.side-by-side .translate-btn {
         order: 2 !important;
         flex-direction: row !important;
-        min-height: 40px !important;
-        padding: 8px 16px !important;
+        min-height: 44px !important;
+        padding: 10px 20px !important;
         width: 100% !important;
         font-size: 0.8rem !important;
         border-radius: 25px !important;
-        gap: 6px !important;
+        gap: 8px !important;
+        margin: 0 !important;
     }
 
     .translation-area.side-by-side .translate-btn i {
@@ -1596,7 +1610,6 @@ body {
         padding: 2px 5px !important;
         min-width: 24px !important;
         min-height: 24px !important;
-        gap: 3px !important;
     }
 
     .input-tools {
@@ -1669,6 +1682,7 @@ body {
         gap: 8px !important;
     }
 
+    /* User Menu - FIXED spacing for mobile */
     .user-menu {
         right: 4px !important;
         left: 4px !important;
@@ -1677,9 +1691,15 @@ body {
         min-width: unset !important;
     }
 
-    .user-menu-item {
+    .user-menu-header {
         gap: 8px !important;
+        padding: 8px 12px !important;
+    }
+
+    .user-menu-item {
+        gap: 10px !important;
         padding: 6px 12px !important;
+        font-size: 0.8rem !important;
     }
 
     .confirmation-buttons {
@@ -1731,6 +1751,16 @@ body {
         font-size: 0.55rem !important;
     }
 
+    /* Profile button - icon only on very small screens */
+    .auth-btn.logged-in span {
+        display: none !important;
+    }
+    .auth-btn.logged-in {
+        padding: 3px 6px !important;
+        min-width: 28px !important;
+        justify-content: center !important;
+    }
+
     .nav-controls { gap: 2px; }
 
     .container { padding: 4px 6px 8px; }
@@ -1777,10 +1807,11 @@ body {
     }
 
     .translation-area.side-by-side .translate-btn {
-        min-height: 32px !important;
-        padding: 5px 12px !important;
+        min-height: 36px !important;
+        padding: 6px 14px !important;
         font-size: 0.7rem !important;
         border-radius: 20px !important;
+        gap: 6px !important;
     }
 
     .translation-area.side-by-side .translate-btn i {
@@ -1794,7 +1825,6 @@ body {
         padding: 2px 4px !important; 
         min-width: 20px !important; 
         min-height: 20px !important;
-        gap: 2px !important;
     }
 
     .input-tools { padding: 2px 6px 4px !important; gap: 4px !important; }
@@ -1820,5 +1850,5 @@ body {
     .notification-container { top: 48px !important; }
     .notification { gap: 6px !important; padding: 8px 12px !important; }
     .user-menu { top: 44px !important; }
-    .user-menu-item { gap: 6px !important; padding: 5px 10px !important; font-size: 0.75rem !important; }
+    .user-menu-item { gap: 8px !important; padding: 5px 10px !important; font-size: 0.75rem !important; }
 }
