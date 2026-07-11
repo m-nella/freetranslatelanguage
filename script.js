@@ -1502,42 +1502,53 @@
     }
 
     // ============================================================
-    // THEME TOGGLE - FIXED: Works on ALL devices
-    // ============================================================
-    function setupThemeToggle() {
-        var themeToggle = $('themeToggle');
-        if (themeToggle) {
-            // Set initial icon based on theme
+// THEME TOGGLE - FIXED: Works on ALL devices
+// ============================================================
+function setupThemeToggle() {
+    var themeToggle = $('themeToggle');
+    if (themeToggle) {
+        // Set initial icon based on theme
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        var icon = themeToggle.querySelector('i');
+        if (icon) {
+            icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+        }
+        
+        // Use both click and touch events for reliability
+        function toggleTheme(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
             var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            var newTheme = isDark ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            
+            // Update icon - works on ALL devices
             var icon = themeToggle.querySelector('i');
             if (icon) {
-                icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+                icon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
             }
             
-            bindClick(themeToggle, function() {
-                var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-                var newTheme = isDark ? 'light' : 'dark';
-                document.documentElement.setAttribute('data-theme', newTheme);
-                
-                // Update icon - works on ALL devices
-                var icon = this.querySelector('i');
-                if (icon) {
-                    icon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-                }
-                
-                localStorage.setItem('theme', newTheme);
-            });
-            
-            // Load saved theme
-            if (localStorage.getItem('theme') === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                var icon = themeToggle.querySelector('i');
-                if (icon) {
-                    icon.className = 'fas fa-sun';
-                }
+            localStorage.setItem('theme', newTheme);
+        }
+        
+        themeToggle.addEventListener('click', toggleTheme);
+        themeToggle.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleTheme(e);
+        }, { passive: false });
+        
+        // Load saved theme
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            var icon = themeToggle.querySelector('i');
+            if (icon) {
+                icon.className = 'fas fa-sun';
             }
         }
     }
+}
 
     // ============================================================
     // ABOUT MODAL
