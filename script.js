@@ -38,7 +38,7 @@
     var isDetectingLanguage = false;
 
     // ============================================================
-    // LANGUAGE LIST
+    // LANGUAGE LIST - Includes all languages for detection
     // ============================================================
     var LANGUAGES = [
         { code: 'en', name: 'English' },
@@ -629,7 +629,7 @@
     }
 
     // ============================================================
-    // AUTH STATE
+    // AUTH STATE - FIXED: Navigation button text
     // ============================================================
     function checkAuthStatus() {
         var token = localStorage.getItem('authToken');
@@ -682,7 +682,7 @@
     }
 
     // ============================================================
-    // OPEN AUTH MODAL
+    // OPEN AUTH MODAL - FIXED: Better spacing for input fields
     // ============================================================
     function openModal(mode) {
         currentMode = mode;
@@ -710,10 +710,12 @@
             email.id = 'authEmail';
             email.placeholder = 'Email address';
             email.required = true;
+            email.style.marginBottom = '12px';
             authFields.appendChild(email);
             
-            var password = createPasswordField('authPassword', 'Password');
-            authFields.appendChild(password);
+            var passwordWrapper = createPasswordField('authPassword', 'Password');
+            passwordWrapper.style.marginBottom = '8px';
+            authFields.appendChild(passwordWrapper);
             bindPasswordToggles(authModal);
             
             forgotPasswordLink.style.display = 'block';
@@ -745,16 +747,21 @@
             email.id = 'authEmail';
             email.placeholder = 'Email address';
             email.required = true;
+            email.style.marginBottom = '12px';
             authFields.appendChild(email);
             
             var password = createPasswordField('authPassword', 'Password (min 8 chars)');
+            password.style.marginBottom = '12px';
             authFields.appendChild(password);
+            
             var confirm = createPasswordField('authConfirmPassword', 'Confirm password');
+            confirm.style.marginBottom = '8px';
             authFields.appendChild(confirm);
             bindPasswordToggles(authModal);
             
             var hint = document.createElement('small');
             hint.textContent = 'Password: 8+ chars, uppercase, lowercase, number, special';
+            hint.style.marginTop = '4px';
             authFields.appendChild(hint);
             forgotPasswordLink.style.display = 'none';
         }
@@ -1490,7 +1497,7 @@
     }
 
     // ============================================================
-    // TRANSLATION ENGINE - COMPLETELY FIXED
+    // TRANSLATION ENGINE - COMPLETELY FIXED LANGUAGE DETECTION
     // ============================================================
     function setupTranslation() {
         var sourceLang = $('sourceLang');
@@ -1680,7 +1687,7 @@
             translateFromBtn.textContent = 'Translate from: ';
         }
 
-        // FIXED: Better language detection for mixed languages
+        // FIXED: Better language detection for mixed languages using Google Translate API
         function detectLanguage(text) {
             return new Promise(function(resolve) {
                 if (!text || text.length < 3) {
@@ -1778,7 +1785,7 @@
                 translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
             }
             
-            // First detect language
+            // First detect language - THIS IS THE KEY FIX
             detectLanguage(text).then(function(detectedLang) {
                 // Update the "Translate from" button with detected language
                 if (!isRecording && detectedLang && detectedLang !== 'auto') {
@@ -2237,7 +2244,7 @@
     }
 
     // ============================================================
-    // THEME TOGGLE
+    // THEME TOGGLE - FIXED: Navigation button text
     // ============================================================
     function setupThemeToggle() {
         var themeToggle = $('themeToggle');
@@ -2257,7 +2264,7 @@
     }
 
     // ============================================================
-    // ABOUT MODAL
+    // ABOUT MODAL - FIXED: Navigation button text
     // ============================================================
     function setupAboutModal() {
         var aboutNavBtn = $('aboutNavBtn');
@@ -2265,6 +2272,8 @@
         var closeAboutModal = $('closeAboutModal');
         
         if (aboutNavBtn) {
+            // Ensure button has text
+            aboutNavBtn.innerHTML = '<i class="fas fa-info-circle"></i> <span>About</span>';
             bindClick(aboutNavBtn, function() {
                 if (aboutModal) aboutModal.style.display = 'flex';
             });
