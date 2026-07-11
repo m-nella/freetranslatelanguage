@@ -1,6 +1,5 @@
 // ============================================================
 // DATA MANAGER - localStorage Account System
-// NO CONSOLE LOGS - Clean Email Sending
 // ============================================================
 
 var DATA_MANAGER = {
@@ -66,12 +65,6 @@ var DATA_MANAGER = {
         var userId = localStorage.getItem(this.KEYS.LOGGED_IN_USER);
         if (!userId) return null;
         return this.findUserById(userId);
-    },
-
-    isLoggedIn: function() {
-        var userId = localStorage.getItem(this.KEYS.LOGGED_IN_USER);
-        if (!userId) return false;
-        return this.findUserById(userId) !== null;
     },
 
     createUser: function(email, password, username) {
@@ -237,14 +230,12 @@ var DATA_MANAGER = {
         });
         localStorage.setItem(this.KEYS.VERIFICATION_CODES, JSON.stringify(filtered));
 
-        // Send email via API - FAST delivery
         this.sendEmailViaAPI(email, code, action);
 
         return { success: true, code: code };
     },
 
     sendEmailViaAPI: function(email, code, action) {
-        // Your email API endpoint
         var apiUrl = 'https://freetranslatelanguage.onrender.com/api/send-email';
         
         var xhr = new XMLHttpRequest();
@@ -253,15 +244,12 @@ var DATA_MANAGER = {
         
         xhr.onload = function() {
             if (xhr.status === 200 || xhr.status === 201) {
-                // Email sent successfully - silent success
-            } else {
-                // Email failed - but we already have code stored locally
-                // The user can still use the code from the notification
+                // Email sent successfully
             }
         };
         
         xhr.onerror = function() {
-            // Network error - but code is still stored locally
+            // Network error - but code is stored locally
         };
         
         var data = JSON.stringify({
@@ -273,7 +261,7 @@ var DATA_MANAGER = {
         try {
             xhr.send(data);
         } catch (e) {
-            // Silent fail - code is still stored
+            // Silent fail
         }
     },
 
@@ -428,19 +416,6 @@ var DATA_MANAGER = {
     validateEmail: function(email) {
         var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return re.test(email);
-    },
-
-    validateUsername: function(username) {
-        if (username.length < 3) {
-            return { valid: false, message: 'Username must be at least 3 characters.' };
-        }
-        if (username.length > 30) {
-            return { valid: false, message: 'Username must be less than 30 characters.' };
-        }
-        if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-            return { valid: false, message: 'Username can only contain letters, numbers, and underscores.' };
-        }
-        return { valid: true };
     },
 
     findUserIndexById: function(id, users) {
