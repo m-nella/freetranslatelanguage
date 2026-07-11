@@ -32,6 +32,7 @@
     var finalTranscript = '';
     var interimTranscript = '';
     var recordingTimeout = null;
+    var currentRecordingLang = 'en';
 
     // ============================================================
     // LANGUAGE LIST
@@ -563,7 +564,7 @@
     }
 
     // ============================================================
-    // AUTH STATE
+    // AUTH STATE - History Tab Visibility Fixed
     // ============================================================
     function checkAuthStatus() {
         var token = localStorage.getItem('authToken');
@@ -577,7 +578,10 @@
                 authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
                 removeClass(authBtn, 'logged-in');
             }
-            if (historyNavBtn) historyNavBtn.style.display = 'none';
+            // HIDE History tab when logged out
+            if (historyNavBtn) {
+                historyNavBtn.style.display = 'none';
+            }
             return;
         }
         
@@ -595,7 +599,10 @@
                 authBtn.innerHTML = '<i class="fas fa-user-circle"></i> <span>' + currentUser.username + '</span>';
                 addClass(authBtn, 'logged-in');
             }
-            if (historyNavBtn) historyNavBtn.style.display = 'flex';
+            // SHOW History tab only for logged in users
+            if (historyNavBtn) {
+                historyNavBtn.style.display = 'flex';
+            }
         } else {
             localStorage.removeItem('authToken');
             isLoggedIn = false;
@@ -604,7 +611,10 @@
                 authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
                 removeClass(authBtn, 'logged-in');
             }
-            if (historyNavBtn) historyNavBtn.style.display = 'none';
+            // HIDE History tab when logged out
+            if (historyNavBtn) {
+                historyNavBtn.style.display = 'none';
+            }
         }
     }
 
@@ -967,7 +977,10 @@
             authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
             removeClass(authBtn, 'logged-in');
         }
-        if (historyNavBtn) historyNavBtn.style.display = 'none';
+        // HIDE History tab on logout
+        if (historyNavBtn) {
+            historyNavBtn.style.display = 'none';
+        }
         showNotification('Logged out.', 'info');
         if (profileMenu) profileMenu.remove();
     }
@@ -1202,7 +1215,7 @@
     }
 
     // ============================================================
-    // HISTORY MODAL
+    // HISTORY MODAL - Only for Logged In Users
     // ============================================================
     function setupHistoryButton() {
         var historyNavBtn = $('historyNavBtn');
@@ -1214,8 +1227,9 @@
     }
 
     function openHistoryModal() {
+        // Check if user is logged in
         if (!isLoggedIn || !currentUser) {
-            showNotification('Please sign in.', 'warning');
+            showNotification('Please sign in to view your translation history.', 'warning');
             return;
         }
         if (historyModal) {
@@ -1326,10 +1340,13 @@
     }
 
     // ============================================================
-    // SAVE TO HISTORY
+    // SAVE TO HISTORY - Only for Logged In Users
     // ============================================================
     function saveToHistory(original, translated, sourceLang, targetLang) {
-        if (!isLoggedIn || !currentUser) return;
+        // ONLY save if user is logged in
+        if (!isLoggedIn || !currentUser) {
+            return;
+        }
         var entry = {
             original: original,
             translated: translated,
@@ -1340,7 +1357,7 @@
     }
 
     // ============================================================
-    // TRANSLATION ENGINE WITH FIXED RECORDING
+    // TRANSLATION ENGINE - With Fixed Recording for ALL Languages
     // ============================================================
     function setupTranslation() {
         var sourceLang = $('sourceLang');
@@ -1358,6 +1375,7 @@
         // Reset transcripts
         finalTranscript = '';
         interimTranscript = '';
+        currentRecordingLang = sourceLang ? sourceLang.value || 'en' : 'en';
         
         // Create Translate From Container
         translateFromContainer = document.createElement('div');
@@ -1538,6 +1556,7 @@
                 return translateText(text, sourceLangCode, targetLangCode);
             }).then(function(translated) {
                 if (outputDisplay) outputDisplay.textContent = translated;
+                // Only save if logged in
                 if (isLoggedIn && currentUser) {
                     saveToHistory(text, translated, sourceLangCode, targetLangCode);
                 }
@@ -1609,6 +1628,11 @@
                 stopRecordingIfActive();
                 resetTranslateFromBtn();
                 stopSpeech();
+                // Update recording language for next session
+                currentRecordingLang = sourceLang.value || 'en';
+                if (recognition && isRecording) {
+                    recognition.lang = currentRecordingLang;
+                }
                 var text = inputText ? inputText.value.trim() : '';
                 if (text) {
                     performTranslation();
@@ -1682,7 +1706,7 @@
         });
 
         // ============================================================
-        // MIC - RECORDING SYSTEM - FIXED FOR ALL DEVICES
+        // MIC - RECORDING SYSTEM - FIXED FOR ALL LANGUAGES
         // ============================================================
         function stopRecordingIfActive() {
             if (isRecording) {
@@ -1722,8 +1746,12 @@
                 recognition = new SpeechRecognition();
                 recognition.continuous = true;
                 recognition.interimResults = true;
-                recognition.lang = sourceLang ? sourceLang.value || 'en' : 'en';
-                recognition.maxAlternatives = 3;
+                // Set language from dropdown - supports ALL 30+ languages
+                var selectedLang = sourceLang ? sourceLang.value || 'en' : 'en';
+                currentRecordingLang = selectedLang;
+                recognition.lang = selectedLang;
+                recognition.maxAlternatives = 5;
+                recognition.continuous = true;
                 
                 recognition.onstart = function() {
                     isRecording = true;
@@ -1733,10 +1761,12 @@
                         addClass(micBtn, 'recording');
                         micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
                     }
-                    if (recordingStatus) recordingStatus.textContent = '🎤 Recording... Click to stop';
+                    if (recordingStatus) {
+                        var langName = getLanguageName(sourceLang ? sourceLang.value : 'en');
+                        recordingStatus.textContent = '🎤 Recording in ' + langName + '... Click to stop';
+                    }
                     resetTranslateFromBtn();
                     
-                    // Auto-stop after 30 seconds of silence
                     if (recordingTimeout) {
                         clearTimeout(recordingTimeout);
                     }
@@ -1776,7 +1806,7 @@
                         }
                     }
                     
-                    // Accumulate final results
+                    // Accumulate final results - this handles mixed language words naturally
                     if (currentFinal) {
                         finalTranscript += ' ' + currentFinal;
                     }
@@ -1787,7 +1817,6 @@
                         if (inputText) {
                             inputText.value = displayText;
                         }
-                        // Translate interim results
                         if (translateBtn) {
                             translateBtn.disabled = true;
                             translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
@@ -1798,7 +1827,6 @@
                 
                 recognition.onerror = function(event) {
                     if (event.error === 'no-speech') {
-                        // Ignore no-speech errors
                         return;
                     }
                     if (event.error === 'not-allowed') {
@@ -1806,6 +1834,10 @@
                     }
                     if (event.error === 'audio-capture') {
                         showNotification('No microphone found. Please connect a microphone.', 'error');
+                    }
+                    if (event.error === 'language-not-supported') {
+                        var langName = getLanguageName(sourceLang ? sourceLang.value : 'en');
+                        showNotification('"' + langName + '" may not be fully supported for speech recognition. Trying anyway...', 'warning');
                     }
                     if (!isRecording) {
                         if (micBtn) {
@@ -1824,9 +1856,10 @@
                     }
                     
                     if (isRecording) {
-                        // Try to restart if still recording
                         try {
-                            recognition.lang = sourceLang ? sourceLang.value || 'en' : 'en';
+                            var selectedLang = sourceLang ? sourceLang.value || 'en' : 'en';
+                            currentRecordingLang = selectedLang;
+                            recognition.lang = selectedLang;
                             recognition.start();
                         } catch (e) {
                             isRecording = false;
@@ -1836,7 +1869,6 @@
                             }
                             if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
                             resetTranslateFromBtn();
-                            // Process final transcript
                             if (finalTranscript.trim()) {
                                 inputText.value = finalTranscript.trim();
                                 performTranslation();
@@ -1851,7 +1883,6 @@
                         }
                         if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
                         resetTranslateFromBtn();
-                        // Process final transcript
                         if (finalTranscript.trim()) {
                             inputText.value = finalTranscript.trim();
                             performTranslation();
@@ -1866,7 +1897,6 @@
             
             on(micBtn, 'click', function() {
                 if (isRecording) {
-                    // Stop recording
                     isRecording = false;
                     try {
                         if (recognition) {
@@ -1882,7 +1912,6 @@
                     if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
                     showNotification('⏹ Recording stopped.', 'info', 2000);
                     
-                    // Process final transcript
                     if (finalTranscript.trim()) {
                         inputText.value = finalTranscript.trim();
                         performTranslation();
@@ -1890,18 +1919,22 @@
                     finalTranscript = '';
                     interimTranscript = '';
                 } else {
-                    // Start recording
                     var lang = sourceLang ? sourceLang.value || 'en' : 'en';
+                    var langName = getLanguageName(lang);
+                    currentRecordingLang = lang;
+                    
                     if (recognition) {
                         recognition.lang = lang;
                         try {
                             recognition.start();
+                            showNotification('🎤 Listening in ' + langName + '...', 'info', 2000);
                         } catch (e) {
                             initRecognition();
                             if (recognition) {
                                 recognition.lang = lang;
                                 try {
                                     recognition.start();
+                                    showNotification('🎤 Listening in ' + langName + '...', 'info', 2000);
                                 } catch (e2) {
                                     showNotification('Error starting microphone. Please try again.', 'error');
                                 }
@@ -1913,6 +1946,7 @@
                             recognition.lang = lang;
                             try {
                                 recognition.start();
+                                showNotification('🎤 Listening in ' + langName + '...', 'info', 2000);
                             } catch (e) {
                                 showNotification('Error starting microphone. Please try again.', 'error');
                             }
@@ -1924,7 +1958,13 @@
             if (sourceLang) {
                 sourceLang.addEventListener('change', function() {
                     if (recognition && isRecording) {
-                        recognition.lang = sourceLang.value || 'en';
+                        var newLang = sourceLang.value || 'en';
+                        currentRecordingLang = newLang;
+                        recognition.lang = newLang;
+                        var langName = getLanguageName(newLang);
+                        if (recordingStatus) {
+                            recordingStatus.textContent = '🎤 Recording in ' + langName + '... Click to stop';
+                        }
                     }
                 });
             }
