@@ -2,14 +2,1015 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>FreeTranslateLanguage - Free Language Translator</title>
     <link rel="icon" type="image/png" href="FreeTranslateeFavicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
+    <style>
+        /* ============================================================
+           STYLES - COMPLETE (Same as laptop)
+           ============================================================ */
+        :root {
+            --bg-primary: #f0f4ff;
+            --bg-card: #ffffff;
+            --bg-input: #f8faff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #4a4a6a;
+            --text-light: #8888aa;
+            --border-color: #e0e7ff;
+            --shadow: 0 10px 40px rgba(0, 20, 80, 0.12);
+            --shadow-hover: 0 20px 60px rgba(0, 20, 80, 0.18);
+            --accent: #4f46e5;
+            --accent-hover: #4338ca;
+            --accent-light: #eef2ff;
+            --success: #10b981;
+            --danger: #ef4444;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --navbar-height: 72px;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0f0f1a;
+            --bg-card: #1a1a2e;
+            --bg-input: #1f1f35;
+            --text-primary: #e8e8ff;
+            --text-secondary: #b0b0d0;
+            --text-light: #6a6a8a;
+            --border-color: #2a2a44;
+            --shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+            --shadow-hover: 0 20px 60px rgba(0, 0, 0, 0.6);
+            --accent-light: #1a1a3e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            transition: var(--transition);
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* NAVBAR */
+        .navbar {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 24px;
+            height: var(--navbar-height);
+            display: flex;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.06);
+            flex-shrink: 0;
+        }
+
+        .nav-container {
+            max-width: 1100px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .nav-logo img {
+            height: 36px;
+            width: auto;
+        }
+
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+
+        .nav-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .theme-btn, .auth-btn, .nav-btn {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 14px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            font-family: var(--font);
+        }
+
+        .theme-btn:hover, .auth-btn:hover, .nav-btn:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+
+        .auth-btn.logged-in {
+            background: var(--accent-light);
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        /* CONTAINER */
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 16px 24px 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            width: 100%;
+        }
+
+        .translator-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 28px 32px;
+            transition: var(--transition);
+            border: 1px solid var(--border-color);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            width: 100%;
+        }
+
+        .translator-card:hover {
+            box-shadow: var(--shadow-hover);
+        }
+
+        .app-title {
+            text-align: center;
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            color: var(--text-primary);
+            flex-shrink: 0;
+        }
+
+        .app-title i {
+            color: var(--accent);
+            font-size: 1.5rem;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            font-weight: 400;
+            color: var(--text-light);
+            letter-spacing: 0.3px;
+        }
+
+        /* LANGUAGE SELECTOR */
+        .language-selector {
+            display: flex;
+            gap: 14px;
+            align-items: flex-end;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        .lang-group {
+            flex: 1;
+            min-width: 140px;
+        }
+
+        .lang-group label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .lang-select {
+            width: 100%;
+            padding: 8px 12px;
+            padding-right: 32px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: var(--font);
+            transition: var(--transition);
+            cursor: pointer;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234a4a6a' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+        }
+
+        .lang-select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+        }
+
+        .swap-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 1rem;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .swap-btn:hover {
+            transform: rotate(180deg);
+            background: var(--accent-hover);
+            box-shadow: 0 4px 16px rgba(79, 70, 229, 0.4);
+        }
+
+        /* TRANSLATION AREA */
+        .translation-area.side-by-side {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 16px;
+            align-items: stretch;
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+        }
+
+        .translation-area.side-by-side .input-box,
+        .translation-area.side-by-side .output-box {
+            min-height: 180px;
+            display: flex;
+            flex-direction: column;
+            border-radius: var(--radius-sm);
+            border: 2px solid var(--border-color);
+            background: var(--bg-input);
+            transition: var(--transition);
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .translation-area.side-by-side .input-box:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08);
+        }
+
+        .translation-area.side-by-side .input-box textarea {
+            flex: 1;
+            min-height: 120px;
+            padding: 14px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: var(--font);
+            resize: none;
+            transition: var(--transition);
+            line-height: 1.7;
+            width: 100%;
+        }
+
+        .translation-area.side-by-side .input-box textarea::placeholder {
+            color: var(--text-light);
+        }
+
+        .translation-area.side-by-side .input-box textarea:focus {
+            outline: none;
+        }
+
+        .translation-area.side-by-side .output-box .output-text {
+            flex: 1;
+            min-height: 120px;
+            padding: 14px 16px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            line-height: 1.7;
+            word-wrap: break-word;
+            overflow-y: auto;
+            width: 100%;
+        }
+
+        .translation-area.side-by-side .output-box .output-text .placeholder {
+            color: var(--text-light);
+            font-style: italic;
+        }
+
+        .translation-area.side-by-side .translate-btn {
+            align-self: center;
+            width: auto;
+            padding: 16px 20px;
+            border-radius: 50px;
+            min-height: 100px;
+            gap: 10px;
+            background: linear-gradient(135deg, var(--accent), #7c3aed);
+            color: white;
+            border: none;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: var(--font);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            letter-spacing: 0.5px;
+            flex-shrink: 0;
+        }
+
+        .translation-area.side-by-side .translate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(79, 70, 229, 0.35);
+        }
+
+        .translation-area.side-by-side .translate-btn:active {
+            transform: translateY(0);
+        }
+
+        .translation-area.side-by-side .translate-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .translation-area.side-by-side .translate-btn i {
+            font-size: 1.2rem;
+        }
+
+        .box-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 14px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-card);
+            flex-shrink: 0;
+        }
+
+        .box-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .box-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .action-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-light);
+            padding: 4px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.85rem;
+        }
+
+        .action-btn:hover {
+            background: var(--accent-light);
+            color: var(--accent);
+        }
+
+        .input-tools {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 14px 10px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        .tool-btn {
+            background: var(--accent-light);
+            border: 2px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.8rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font);
+        }
+
+        .tool-btn:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .mic-btn.recording {
+            background: var(--danger);
+            color: white;
+            border-color: var(--danger);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .recording-status {
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+
+        /* FOOTER */
+        .footer {
+            text-align: center;
+            padding: 20px 24px;
+            color: var(--text-light);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border-color);
+            margin-top: auto;
+            flex-shrink: 0;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: var(--text-light);
+            font-size: 1rem;
+            transition: var(--transition);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .footer-links a:hover {
+            color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        /* MODAL */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+            padding: 16px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 32px 28px;
+            max-width: 440px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-hover);
+            position: relative;
+            border: 1px solid var(--border-color);
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-light);
+            transition: var(--transition);
+            line-height: 1;
+            background: none;
+            border: none;
+        }
+
+        .close-modal:hover {
+            color: var(--text-primary);
+            transform: rotate(90deg);
+        }
+
+        .modal-content h2 {
+            margin-bottom: 20px;
+            text-align: center;
+            color: var(--text-primary);
+            font-size: 1.3rem;
+        }
+
+        #authFields {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        #authFields input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            font-family: var(--font);
+            transition: var(--transition);
+        }
+
+        #authFields input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08);
+        }
+
+        .password-field {
+            position: relative;
+            width: 100%;
+        }
+
+        .password-field input {
+            width: 100%;
+            padding: 10px 40px 10px 14px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            font-family: var(--font);
+            transition: var(--transition);
+        }
+
+        .password-field input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08);
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 4px;
+            transition: var(--transition);
+        }
+
+        .password-toggle:hover {
+            color: var(--accent);
+        }
+
+        .auth-submit-btn {
+            width: 100%;
+            padding: 10px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: var(--font);
+            margin-top: 8px;
+        }
+
+        .auth-submit-btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(79, 70, 229, 0.3);
+        }
+
+        .auth-submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .auth-submit-btn.delete-btn {
+            background: var(--danger);
+        }
+
+        .auth-submit-btn.delete-btn:hover {
+            background: #dc2626;
+        }
+
+        .auth-switch {
+            text-align: center;
+            margin-top: 14px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .auth-switch a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .auth-switch a:hover {
+            text-decoration: underline;
+        }
+
+        /* NOTIFICATION */
+        .notification-container {
+            position: fixed;
+            top: 80px;
+            right: 16px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: 380px;
+            width: calc(100% - 32px);
+        }
+
+        .notification {
+            background: var(--bg-card);
+            border-radius: var(--radius-sm);
+            padding: 14px 18px;
+            box-shadow: var(--shadow-hover);
+            border-left: 4px solid var(--accent);
+            animation: slideInRight 0.4s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .notification.success { border-left-color: var(--success); }
+        .notification.error { border-left-color: var(--danger); }
+        .notification.warning { border-left-color: #f59e0b; }
+
+        .notification .notif-icon { font-size: 1.1rem; flex-shrink: 0; }
+        .notification .notif-content { flex: 1; font-size: 0.85rem; color: var(--text-primary); }
+        .notification .notif-close {
+            background: none;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 0 4px;
+        }
+
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(100px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* USER MENU */
+        .user-menu {
+            position: fixed;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-hover);
+            border: 1px solid var(--border-color);
+            min-width: 220px;
+            z-index: 1000;
+            overflow: hidden;
+            padding: 8px 0;
+        }
+
+        .user-menu-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg-input);
+        }
+
+        .user-menu-header i { font-size: 2rem; color: var(--accent); }
+        .user-menu-header div { display: flex; flex-direction: column; }
+        .user-menu-header strong { color: var(--text-primary); font-size: 0.95rem; }
+        .user-menu-header small { color: var(--text-light); font-size: 0.75rem; word-break: break-all; }
+
+        .user-menu-divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 4px 12px;
+        }
+
+        .user-menu-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-secondary);
+            transition: var(--transition);
+            font-size: 0.9rem;
+        }
+
+        .user-menu-item:hover {
+            background: var(--accent-light);
+            color: var(--accent);
+        }
+
+        .user-menu-item.logout { color: var(--danger); }
+        .user-menu-item.logout:hover { background: #fef2f2; }
+
+        /* HISTORY MODAL */
+        .history-modal-content { max-width: 650px; width: 95%; max-height: 85vh; overflow-y: auto; }
+        .history-list-modal { max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .history-item {
+            background: var(--bg-input);
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            border-left: 4px solid var(--accent);
+            font-size: 0.85rem;
+            position: relative;
+        }
+        .history-item .h-source { color: var(--text-light); font-size: 0.7rem; }
+        .history-item .h-time { float: right; font-size: 0.65rem; color: var(--text-light); }
+        .history-item .h-original { color: var(--text-light); font-size: 0.8rem; margin-top: 2px; }
+        .history-item .h-translation { font-weight: 500; margin-top: 2px; }
+        .history-item .h-delete {
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            background: none;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: var(--transition);
+            font-size: 0.8rem;
+        }
+        .history-item .h-delete:hover { color: var(--danger); }
+        .empty-history { color: var(--text-light); text-align: center; padding: 20px; font-style: italic; }
+
+        .delete-all-btn {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 25px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font);
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+        }
+
+        .delete-all-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+        }
+
+        /* PROFILE MODAL */
+        .profile-header { text-align: center; padding: 10px 0 20px; }
+        .profile-icon { font-size: 4rem; color: var(--accent); display: block; margin-bottom: 10px; }
+        .profile-badge {
+            display: inline-block;
+            background: var(--success);
+            color: white;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            margin-top: 8px;
+        }
+        .profile-info {
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin: 16px 0;
+        }
+        .info-item {
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }
+        .info-item:last-child { border-bottom: none; }
+        .info-item strong { color: var(--text-secondary); font-weight: 600; }
+
+        /* SETTINGS */
+        .settings-content { max-width: 480px; }
+        .settings-body { display: flex; flex-direction: column; gap: 16px; }
+        .settings-field { display: flex; flex-direction: column; gap: 4px; }
+        .settings-field label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); }
+        .settings-field input {
+            padding: 10px 14px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            transition: var(--transition);
+            font-family: var(--font);
+        }
+        .settings-field input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08);
+        }
+        .settings-field input:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* ABOUT */
+        .about-content { max-width: 500px; }
+        .about-body { font-size: 0.9rem; line-height: 1.7; color: var(--text-secondary); }
+        .about-body p { margin-bottom: 12px; }
+        .about-body strong { color: var(--text-primary); }
+        .about-contact { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color); }
+        .about-contact h3 { font-size: 0.95rem; color: var(--text-primary); margin-bottom: 10px; }
+        .contact-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+        .contact-item i { color: var(--accent); width: 20px; text-align: center; }
+        .contact-item a { color: var(--accent); text-decoration: none; word-break: break-all; }
+        .contact-item a:hover { text-decoration: underline; }
+
+        /* TRANSLATE FROM BUTTON */
+        .translate-from-container { display: none; margin-top: 6px; padding: 0 4px; }
+        .translate-from-btn {
+            font-size: 0.7rem;
+            color: #1a73e8;
+            cursor: pointer;
+            padding: 3px 12px;
+            border-radius: 14px;
+            background: #e8f0fe;
+            border: 1px solid #dadce0;
+            transition: all 0.2s ease;
+            user-select: none;
+            font-family: var(--font);
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            letter-spacing: 0.3px;
+        }
+
+        /* ============================================================
+           RESPONSIVE - Same as laptop design
+           ============================================================ */
+        @media (max-width: 900px) {
+            .translation-area.side-by-side {
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+            .translation-area.side-by-side .translate-btn {
+                grid-column: span 2;
+                flex-direction: row;
+                min-height: auto;
+                padding: 12px 24px;
+                width: 100%;
+                min-height: 48px;
+                border-radius: 30px;
+            }
+            .translation-area.side-by-side .translate-btn i {
+                transform: rotate(0deg);
+            }
+            .lang-group { min-width: 100px; }
+        }
+
+        @media (max-width: 768px) {
+            :root { --navbar-height: 60px; }
+            .navbar { padding: 0 12px; }
+            .nav-logo img { height: 30px; }
+            .logo-text { font-size: 1rem; }
+            .container { padding: 8px 12px 12px; }
+            .translator-card { padding: 14px 14px; border-radius: 14px; }
+            .app-title { font-size: 1.3rem; margin-bottom: 12px; }
+            
+            .translation-area.side-by-side {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 10px !important;
+            }
+            .translation-area.side-by-side .input-box,
+            .translation-area.side-by-side .output-box {
+                min-height: 130px !important;
+                width: 100% !important;
+            }
+            .translation-area.side-by-side .input-box { order: 1; }
+            .translation-area.side-by-side .output-box { order: 3; }
+            .translation-area.side-by-side .translate-btn {
+                order: 2;
+                flex-direction: row !important;
+                min-height: 44px !important;
+                padding: 10px 20px !important;
+                width: 100% !important;
+                border-radius: 30px !important;
+            }
+            
+            .language-selector {
+                display: flex !important;
+                gap: 10px !important;
+                flex-wrap: nowrap !important;
+            }
+            .lang-group { flex: 1 !important; min-width: 80px !important; }
+            .lang-select { padding: 6px 10px !important; font-size: 0.8rem !important; }
+            .swap-btn { width: 36px !important; height: 36px !important; font-size: 0.85rem !important; }
+            
+            .box-header { padding: 5px 10px !important; }
+            .input-tools { padding: 3px 10px 6px !important; }
+            .tool-btn { padding: 4px 10px !important; font-size: 0.7rem !important; }
+            
+            .modal-content { padding: 24px 16px !important; }
+            .notification-container { top: 68px !important; right: 8px !important; left: 8px !important; max-width: none !important; }
+            .user-menu { right: 6px !important; left: 6px !important; top: 64px !important; width: auto !important; min-width: unset !important; }
+            .history-modal-content { max-width: 100% !important; width: 95% !important; padding: 14px !important; }
+        }
+
+        @media (max-width: 480px) {
+            .nav-logo img { height: 26px; }
+            .logo-text { font-size: 0.9rem; }
+            .theme-btn span, .auth-btn span, .nav-btn span { display: none !important; }
+            .theme-btn, .auth-btn, .nav-btn { padding: 4px 8px !important; min-width: 32px !important; min-height: 32px !important; justify-content: center !important; }
+            .app-title { font-size: 1.1rem; }
+            .subtitle { font-size: 0.55rem; }
+            .lang-group { min-width: 60px !important; }
+            .lang-select { font-size: 0.7rem !important; padding: 4px 8px !important; }
+            .swap-btn { width: 30px !important; height: 30px !important; font-size: 0.7rem !important; }
+            .translation-area.side-by-side .input-box textarea { min-height: 50px !important; font-size: 0.8rem !important; padding: 6px 8px !important; }
+            .footer { padding: 8px 8px !important; font-size: 0.6rem !important; }
+        }
+    </style>
 </head>
 <body>
     <!-- Navbar -->
@@ -141,13 +1142,447 @@
         </div>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- DATA MANAGER - Inline, ES5 compatible                        -->
+    <!-- ============================================================ -->
     <script>
-    // Force populate languages immediately
-    document.addEventListener('DOMContentLoaded', function() {
-        var sourceLang = document.getElementById('sourceLang');
-        var targetLang = document.getElementById('targetLang');
-        if (sourceLang && targetLang) {
-            var langs = [
+        // ============================================================
+        // DATA MANAGER - localStorage Account System
+        // ES5 Compatible (Works on Chrome 74+)
+        // ============================================================
+        
+        var DATA_MANAGER = {
+            KEYS: {
+                USERS: 'users',
+                LOGGED_IN_USER: 'loggedInUser',
+                VERIFICATION_CODES: 'verificationCodes',
+                HISTORY: 'history'
+            },
+
+            init: function() {
+                if (!localStorage.getItem(this.KEYS.USERS)) {
+                    localStorage.setItem(this.KEYS.USERS, JSON.stringify([]));
+                }
+                if (!localStorage.getItem(this.KEYS.VERIFICATION_CODES)) {
+                    localStorage.setItem(this.KEYS.VERIFICATION_CODES, JSON.stringify([]));
+                }
+                if (!localStorage.getItem(this.KEYS.HISTORY)) {
+                    localStorage.setItem(this.KEYS.HISTORY, JSON.stringify({}));
+                }
+                this.cleanExpiredCodes();
+            },
+
+            loadUsers: function() {
+                try {
+                    var data = localStorage.getItem(this.KEYS.USERS);
+                    return data ? JSON.parse(data) : [];
+                } catch (error) {
+                    return [];
+                }
+            },
+
+            saveUsers: function(users) {
+                try {
+                    localStorage.setItem(this.KEYS.USERS, JSON.stringify(users));
+                    return true;
+                } catch (error) {
+                    return false;
+                }
+            },
+
+            findUserByEmail: function(email) {
+                var users = this.loadUsers();
+                for (var i = 0; i < users.length; i++) {
+                    if (users[i].email.toLowerCase() === email.toLowerCase()) {
+                        return users[i];
+                    }
+                }
+                return null;
+            },
+
+            findUserById: function(id) {
+                var users = this.loadUsers();
+                for (var i = 0; i < users.length; i++) {
+                    if (users[i].id === id) {
+                        return users[i];
+                    }
+                }
+                return null;
+            },
+
+            getCurrentUser: function() {
+                var userId = localStorage.getItem(this.KEYS.LOGGED_IN_USER);
+                if (!userId) return null;
+                return this.findUserById(userId);
+            },
+
+            generateId: function() {
+                return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+            },
+
+            hashPassword: function(password) {
+                var hash = '';
+                for (var i = 0; i < password.length; i++) {
+                    var char = password.charCodeAt(i);
+                    hash += ((char << 5) - char).toString(36);
+                }
+                return hash + ':' + password.length;
+            },
+
+            verifyPassword: function(input, stored) {
+                var inputHash = this.hashPassword(input);
+                return inputHash === stored;
+            },
+
+            validatePasswordStrength: function(password) {
+                var requirements = [];
+                if (password.length < 8) requirements.push('at least 8 characters');
+                if (!/[A-Z]/.test(password)) requirements.push('an uppercase letter');
+                if (!/[a-z]/.test(password)) requirements.push('a lowercase letter');
+                if (!/[0-9]/.test(password)) requirements.push('a number');
+                if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) requirements.push('a special character');
+                
+                if (requirements.length === 0) {
+                    return { valid: true };
+                }
+                return { 
+                    valid: false, 
+                    message: 'Password must contain: ' + requirements.join(', ')
+                };
+            },
+
+            validateEmail: function(email) {
+                var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                return re.test(email);
+            },
+
+            createUser: function(email, password, username) {
+                if (!email || !password || !username) {
+                    return { success: false, error: 'All fields are required.' };
+                }
+
+                var existing = this.findUserByEmail(email);
+                if (existing) {
+                    return { success: false, error: 'Email already registered. Please sign in.' };
+                }
+
+                var id = this.generateId();
+                var user = {
+                    id: id,
+                    username: username,
+                    email: email.toLowerCase(),
+                    password: this.hashPassword(password),
+                    profilePhoto: '',
+                    createdAt: new Date().toISOString(),
+                    lastLogin: null,
+                    preferences: {
+                        theme: 'dark',
+                        language: 'en',
+                        notifications: true
+                    }
+                };
+
+                var users = this.loadUsers();
+                users.push(user);
+                this.saveUsers(users);
+
+                return { success: true, user: user };
+            },
+
+            login: function(email, password) {
+                var user = this.findUserByEmail(email);
+                if (!user) {
+                    return { success: false, error: 'Account not found. Please create an account.' };
+                }
+
+                if (!this.verifyPassword(password, user.password)) {
+                    return { success: false, error: 'Incorrect password. Please try again.' };
+                }
+
+                user.lastLogin = new Date().toISOString();
+                var users = this.loadUsers();
+                for (var i = 0; i < users.length; i++) {
+                    if (users[i].id === user.id) {
+                        users[i] = user;
+                        break;
+                    }
+                }
+                this.saveUsers(users);
+
+                localStorage.setItem(this.KEYS.LOGGED_IN_USER, user.id);
+                return { success: true, user: user };
+            },
+
+            logout: function() {
+                localStorage.removeItem(this.KEYS.LOGGED_IN_USER);
+                return { success: true };
+            },
+
+            updateProfile: function(userId, updates) {
+                var users = this.loadUsers();
+                var index = -1;
+                for (var i = 0; i < users.length; i++) {
+                    if (users[i].id === userId) {
+                        index = i;
+                        break;
+                    }
+                }
+                
+                if (index === -1) {
+                    return { success: false, error: 'User not found.' };
+                }
+
+                if (updates.username) users[index].username = updates.username;
+                if (updates.email) {
+                    var existing = this.findUserByEmail(updates.email);
+                    if (existing && existing.id !== userId) {
+                        return { success: false, error: 'Email already in use.' };
+                    }
+                    users[index].email = updates.email.toLowerCase();
+                    users[index].username = updates.email.split('@')[0];
+                }
+                if (updates.profilePhoto !== undefined) users[index].profilePhoto = updates.profilePhoto;
+
+                this.saveUsers(users);
+                return { success: true, user: users[index] };
+            },
+
+            changePassword: function(userId, currentPassword, newPassword) {
+                var user = this.findUserById(userId);
+                if (!user) {
+                    return { success: false, error: 'User not found.' };
+                }
+
+                if (!this.verifyPassword(currentPassword, user.password)) {
+                    return { success: false, error: 'Current password is incorrect.' };
+                }
+
+                var validation = this.validatePasswordStrength(newPassword);
+                if (!validation.valid) {
+                    return { success: false, error: validation.message };
+                }
+
+                var users = this.loadUsers();
+                for (var i = 0; i < users.length; i++) {
+                    if (users[i].id === userId) {
+                        users[i].password = this.hashPassword(newPassword);
+                        break;
+                    }
+                }
+                this.saveUsers(users);
+                return { success: true };
+            },
+
+            deleteAccount: function(userId, password) {
+                var user = this.findUserById(userId);
+                if (!user) {
+                    return { success: false, error: 'User not found.' };
+                }
+
+                if (!this.verifyPassword(password, user.password)) {
+                    return { success: false, error: 'Incorrect password.' };
+                }
+
+                var users = this.loadUsers();
+                var filtered = [];
+                for (var i = 0; i < users.length; i++) {
+                    if (users[i].id !== userId) {
+                        filtered.push(users[i]);
+                    }
+                }
+                this.saveUsers(filtered);
+
+                localStorage.removeItem(this.KEYS.LOGGED_IN_USER);
+                this.clearUserHistory(user.email);
+
+                return { success: true };
+            },
+
+            generateCode: function() {
+                return Math.floor(100000 + Math.random() * 900000).toString();
+            },
+
+            storeVerificationCode: function(email, action) {
+                var code = this.generateCode();
+                var expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+                var codes = JSON.parse(localStorage.getItem(this.KEYS.VERIFICATION_CODES) || '[]');
+                var filtered = [];
+                for (var i = 0; i < codes.length; i++) {
+                    if (!(codes[i].email === email && codes[i].action === action)) {
+                        filtered.push(codes[i]);
+                    }
+                }
+                filtered.push({
+                    email: email,
+                    code: code,
+                    action: action,
+                    expiresAt: expiresAt,
+                    isUsed: false,
+                    attempts: 0,
+                    createdAt: new Date().toISOString()
+                });
+                localStorage.setItem(this.KEYS.VERIFICATION_CODES, JSON.stringify(filtered));
+
+                // Show code in console for testing
+                console.log('📧 Verification Code for ' + email + ': ' + code);
+                console.log('📋 Action: ' + action);
+
+                return { success: true, code: code };
+            },
+
+            verifyCode: function(email, code, action) {
+                var codes = JSON.parse(localStorage.getItem(this.KEYS.VERIFICATION_CODES) || '[]');
+                
+                var index = -1;
+                for (var i = 0; i < codes.length; i++) {
+                    if (codes[i].email === email && codes[i].code === code && codes[i].action === action && !codes[i].isUsed) {
+                        index = i;
+                        break;
+                    }
+                }
+
+                if (index === -1) {
+                    return { success: false, error: 'Invalid or expired verification code.' };
+                }
+
+                var verification = codes[index];
+
+                if (new Date(verification.expiresAt) < new Date()) {
+                    codes.splice(index, 1);
+                    localStorage.setItem(this.KEYS.VERIFICATION_CODES, JSON.stringify(codes));
+                    return { success: false, error: 'Code has expired. Please request a new one.' };
+                }
+
+                if (verification.attempts >= 5) {
+                    codes.splice(index, 1);
+                    localStorage.setItem(this.KEYS.VERIFICATION_CODES, JSON.stringify(codes));
+                    return { success: false, error: 'Too many failed attempts. Please request a new code.' };
+                }
+
+                verification.isUsed = true;
+                codes[index] = verification;
+                localStorage.setItem(this.KEYS.VERIFICATION_CODES, JSON.stringify(codes));
+
+                return { success: true, message: 'Code verified successfully!' };
+            },
+
+            cleanExpiredCodes: function() {
+                var codes = JSON.parse(localStorage.getItem(this.KEYS.VERIFICATION_CODES) || '[]');
+                var now = new Date();
+                var filtered = [];
+                for (var i = 0; i < codes.length; i++) {
+                    if (new Date(codes[i].expiresAt) > now && !codes[i].isUsed) {
+                        filtered.push(codes[i]);
+                    }
+                }
+                localStorage.setItem(this.KEYS.VERIFICATION_CODES, JSON.stringify(filtered));
+            },
+
+            saveHistory: function(email, entry) {
+                var history = JSON.parse(localStorage.getItem(this.KEYS.HISTORY) || '{}');
+                
+                if (!history[email]) {
+                    history[email] = [];
+                }
+
+                entry.id = this.generateId();
+                entry.createdAt = new Date().toISOString();
+                history[email].unshift(entry);
+
+                if (history[email].length > 100) {
+                    history[email] = history[email].slice(0, 100);
+                }
+
+                localStorage.setItem(this.KEYS.HISTORY, JSON.stringify(history));
+                return { success: true };
+            },
+
+            getHistory: function(email) {
+                var history = JSON.parse(localStorage.getItem(this.KEYS.HISTORY) || '{}');
+                return history[email] || [];
+            },
+
+            deleteHistoryItem: function(email, id) {
+                var history = JSON.parse(localStorage.getItem(this.KEYS.HISTORY) || '{}');
+                
+                if (!history[email]) {
+                    return { success: false, error: 'No history found.' };
+                }
+
+                var filtered = [];
+                for (var i = 0; i < history[email].length; i++) {
+                    if (history[email][i].id !== id) {
+                        filtered.push(history[email][i]);
+                    }
+                }
+                history[email] = filtered;
+                localStorage.setItem(this.KEYS.HISTORY, JSON.stringify(history));
+                return { success: true };
+            },
+
+            clearUserHistory: function(email) {
+                var history = JSON.parse(localStorage.getItem(this.KEYS.HISTORY) || '{}');
+                delete history[email];
+                localStorage.setItem(this.KEYS.HISTORY, JSON.stringify(history));
+                return { success: true };
+            },
+
+            clearHistory: function(email) {
+                return this.clearUserHistory(email);
+            },
+
+            startAutoCleanup: function() {
+                setInterval(function() {
+                    DATA_MANAGER.cleanExpiredCodes();
+                }, 60 * 1000);
+            }
+        };
+
+        // Initialize
+        DATA_MANAGER.init();
+        DATA_MANAGER.startAutoCleanup();
+    </script>
+
+    <!-- ============================================================ -->
+    <!-- MAIN APPLICATION - ES5 Compatible                            -->
+    <!-- ============================================================ -->
+    <script>
+        // ============================================================
+        // FREE TRANSLATE LANGUAGE - Complete Application
+        // ES5 Compatible (Works on Chrome 74+)
+        // ============================================================
+        
+        (function() {
+            'use strict';
+
+            // ============================================================
+            // STATE
+            // ============================================================
+            var currentMode = 'login';
+            var currentUser = null;
+            var isLoggedIn = false;
+            var pendingEmail = '';
+            var pendingAction = '';
+            var pendingCallback = null;
+            var isVerifying = false;
+            var verificationDone = false;
+            var pendingResetUser = null;
+            var isRecording = false;
+            var isTranslating = false;
+            var translateQueue = false;
+            var currentSpeech = null;
+            var recognition = null;
+            var profileMenu = null;
+            var historyModal = null;
+            var settingsModal = null;
+            var translateFromContainer = null;
+            var translateFromBtn = null;
+
+            // ============================================================
+            // LANGUAGE LIST
+            // ============================================================
+            var LANGUAGES = [
                 { code: 'en', name: 'English' },
                 { code: 'es', name: 'Spanish' },
                 { code: 'fr', name: 'French' },
@@ -178,40 +1613,1850 @@
                 { code: 'lg', name: 'Luganda' },
                 { code: 'ny', name: 'Chichewa' }
             ];
-            
-            sourceLang.innerHTML = '';
-            targetLang.innerHTML = '';
-            
-            langs.forEach(function(lang) {
-                var opt1 = document.createElement('option');
-                opt1.value = lang.code;
-                opt1.textContent = lang.name;
-                sourceLang.appendChild(opt1);
+
+            // ============================================================
+            // DOM HELPERS
+            // ============================================================
+            function $(id) {
+                return document.getElementById(id);
+            }
+
+            function on(el, event, handler) {
+                if (!el) return;
+                if (event === 'click') {
+                    el.addEventListener('click', handler);
+                    el.addEventListener('touchstart', function(e) {
+                        e.preventDefault();
+                        handler(e);
+                    }, { passive: false });
+                } else {
+                    el.addEventListener(event, handler);
+                }
+            }
+
+            function createElement(tag, className, html) {
+                var el = document.createElement(tag);
+                if (className) el.className = className;
+                if (html) el.innerHTML = html;
+                return el;
+            }
+
+            // ============================================================
+            // LANGUAGE NAMES
+            // ============================================================
+            function getLanguageName(code) {
+                var map = {
+                    'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
+                    'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian', 'ja': 'Japanese',
+                    'ko': 'Korean', 'zh': 'Chinese', 'ar': 'Arabic', 'hi': 'Hindi',
+                    'rw': 'Kinyarwanda', 'rn': 'Kirundi', 'sw': 'Swahili', 'zu': 'Zulu',
+                    'yo': 'Yoruba', 'ig': 'Igbo', 'ha': 'Hausa', 'ak': 'Akan',
+                    'am': 'Amharic', 'so': 'Somali', 'mg': 'Malagasy', 'xh': 'Xhosa',
+                    'af': 'Afrikaans', 'wo': 'Wolof', 'ki': 'Kikuyu', 'lg': 'Luganda',
+                    'ny': 'Chichewa'
+                };
+                return map[code] || code.toUpperCase();
+            }
+
+            // ============================================================
+            // POPULATE LANGUAGES
+            // ============================================================
+            function populateLanguageDropdowns() {
+                var sourceLang = $('sourceLang');
+                var targetLang = $('targetLang');
                 
-                var opt2 = document.createElement('option');
-                opt2.value = lang.code;
-                opt2.textContent = lang.name;
-                targetLang.appendChild(opt2);
+                if (!sourceLang || !targetLang) {
+                    setTimeout(populateLanguageDropdowns, 200);
+                    return;
+                }
+                
+                sourceLang.innerHTML = '';
+                targetLang.innerHTML = '';
+                
+                for (var i = 0; i < LANGUAGES.length; i++) {
+                    var lang = LANGUAGES[i];
+                    var opt1 = document.createElement('option');
+                    opt1.value = lang.code;
+                    opt1.textContent = lang.name;
+                    sourceLang.appendChild(opt1);
+                    
+                    var opt2 = document.createElement('option');
+                    opt2.value = lang.code;
+                    opt2.textContent = lang.name;
+                    targetLang.appendChild(opt2);
+                }
+                
+                sourceLang.value = 'rw';
+                targetLang.value = 'en';
+            }
+
+            // ============================================================
+            // NOTIFICATION SYSTEM
+            // ============================================================
+            var notificationTimeout = null;
+
+            function showNotification(message, type, duration) {
+                type = type || 'info';
+                duration = duration || 5000;
+                
+                var container = $('notificationContainer');
+                if (!container) return;
+                
+                if (notificationTimeout) {
+                    clearTimeout(notificationTimeout);
+                    notificationTimeout = null;
+                }
+                
+                var icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+                var notification = createElement('div', 'notification ' + type);
+                notification.innerHTML = 
+                    '<span class="notif-icon">' + (icons[type] || 'ℹ️') + '</span>' +
+                    '<span class="notif-content">' + message + '</span>' +
+                    '<button class="notif-close">&times;</button>';
+                
+                container.innerHTML = '';
+                container.appendChild(notification);
+                
+                var closeBtn = notification.querySelector('.notif-close');
+                on(closeBtn, 'click', function(e) {
+                    e.stopPropagation();
+                    notification.remove();
+                });
+                
+                notificationTimeout = setTimeout(function() {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                    notificationTimeout = null;
+                }, duration);
+            }
+
+            // ============================================================
+            // SPEECH FUNCTIONS
+            // ============================================================
+            function speakText(text, lang) {
+                try {
+                    if (window.speechSynthesis.speaking) {
+                        window.speechSynthesis.cancel();
+                    }
+                    if (!text || text.trim() === '') {
+                        return;
+                    }
+                    var utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = lang || 'en';
+                    currentSpeech = utterance;
+                    window.speechSynthesis.speak(utterance);
+                } catch (e) {
+                    // Silent fail
+                }
+            }
+
+            function stopSpeech() {
+                try {
+                    if (window.speechSynthesis.speaking) {
+                        window.speechSynthesis.cancel();
+                        currentSpeech = null;
+                    }
+                } catch (e) {}
+            }
+
+            // ============================================================
+            // PASSWORD TOGGLE
+            // ============================================================
+            function createPasswordField(id, placeholder) {
+                var wrapper = document.createElement('div');
+                wrapper.className = 'password-field';
+                
+                var input = document.createElement('input');
+                input.type = 'password';
+                input.id = id;
+                input.placeholder = placeholder;
+                input.required = true;
+                
+                var toggle = document.createElement('button');
+                toggle.type = 'button';
+                toggle.className = 'password-toggle';
+                toggle.innerHTML = '<i class="fas fa-eye"></i>';
+                toggle.setAttribute('aria-label', 'Show password');
+                
+                on(toggle, 'click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var isPassword = input.type === 'password';
+                    input.type = isPassword ? 'text' : 'password';
+                    this.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+                });
+                
+                wrapper.appendChild(input);
+                wrapper.appendChild(toggle);
+                return wrapper;
+            }
+
+            function bindPasswordToggles(container) {
+                if (!container) return;
+                var fields = container.querySelectorAll('.password-field');
+                for (var i = 0; i < fields.length; i++) {
+                    var wrapper = fields[i];
+                    var input = wrapper.querySelector('input');
+                    var toggle = wrapper.querySelector('.password-toggle');
+                    if (input && toggle) {
+                        var newToggle = toggle.cloneNode(true);
+                        toggle.parentNode.replaceChild(newToggle, toggle);
+                        (function(inp, tog) {
+                            on(tog, 'click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                var isPassword = inp.type === 'password';
+                                inp.type = isPassword ? 'text' : 'password';
+                                this.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+                            });
+                        })(input, newToggle);
+                    }
+                }
+            }
+
+            // ============================================================
+            // VERIFICATION CODE SYSTEM
+            // ============================================================
+            function sendVerificationCode(email, action) {
+                return new Promise(function(resolve, reject) {
+                    try {
+                        var result = DATA_MANAGER.storeVerificationCode(email, action);
+                        if (result.success) {
+                            showNotification('📧 Verification code sent! Check your email and spam folder.', 'success');
+                            resolve({ success: true, code: result.code });
+                        } else {
+                            showNotification('⚠️ Error sending code. Please try again.', 'error');
+                            resolve({ success: false });
+                        }
+                    } catch (error) {
+                        showNotification('⚠️ Error sending code. Please try again.', 'error');
+                        resolve({ success: false });
+                    }
+                });
+            }
+
+            function verifyCode(email, code) {
+                isVerifying = true;
+                return new Promise(function(resolve, reject) {
+                    try {
+                        var result = DATA_MANAGER.verifyCode(email, code, pendingAction);
+                        if (result.success) {
+                            resolve({ success: true, token: 'local_' + email });
+                        } else {
+                            resolve({ success: false, error: result.error || 'Invalid code.' });
+                        }
+                    } catch (error) {
+                        resolve({ success: false, error: 'Verification error.' });
+                    } finally {
+                        isVerifying = false;
+                    }
+                });
+            }
+
+            // ============================================================
+            // CONFIRMATION MODAL
+            // ============================================================
+            function showConfirmationModal(title, message, confirmText, cancelText) {
+                confirmText = confirmText || 'Confirm';
+                cancelText = cancelText || 'Cancel';
+                return new Promise(function(resolve) {
+                    var modal = document.createElement('div');
+                    modal.className = 'modal';
+                    modal.style.display = 'flex';
+                    modal.innerHTML = 
+                        '<div class="modal-content confirmation-content">' +
+                            '<h2>' + title + '</h2>' +
+                            '<p>' + message + '</p>' +
+                            '<div class="confirmation-buttons">' +
+                                '<button class="auth-submit-btn cancel-btn" id="cancelConfirm">' + cancelText + '</button>' +
+                                '<button class="auth-submit-btn delete-btn" id="confirmAction">' + confirmText + '</button>' +
+                            '</div>' +
+                        '</div>';
+                    document.body.appendChild(modal);
+                    
+                    on(modal.querySelector('#cancelConfirm'), 'click', function() {
+                        modal.remove();
+                        resolve(false);
+                    });
+                    
+                    on(modal.querySelector('#confirmAction'), 'click', function() {
+                        modal.remove();
+                        resolve(true);
+                    });
+                });
+            }
+
+            // ============================================================
+            // PASSWORD RESET MODAL
+            // ============================================================
+            function showPasswordResetModal() {
+                return new Promise(function(resolve) {
+                    var modal = document.createElement('div');
+                    modal.className = 'modal';
+                    modal.style.display = 'flex';
+                    modal.innerHTML = 
+                        '<div class="modal-content prompt-content" style="max-width: 440px;">' +
+                            '<h2 style="text-align: center; margin-bottom: 12px;">Reset Password</h2>' +
+                            '<p style="text-align: center; color: var(--text-secondary); margin-bottom: 16px;">Enter your new password below.</p>' +
+                            '<div class="settings-field">' +
+                                '<label>New Password (min 8 chars)</label>' +
+                                createPasswordField('resetNewPassword', 'Enter new password').outerHTML +
+                            '</div>' +
+                            '<div class="settings-field">' +
+                                '<label>Confirm New Password</label>' +
+                                createPasswordField('resetConfirmPassword', 'Confirm new password').outerHTML +
+                            '</div>' +
+                            '<div class="confirmation-buttons" style="margin-top: 16px;">' +
+                                '<button class="auth-submit-btn cancel-btn" id="resetCancel" style="flex:1;">Cancel</button>' +
+                                '<button class="auth-submit-btn" id="resetConfirm" style="flex:1; background: var(--accent);">Reset Password</button>' +
+                            '</div>' +
+                        '</div>';
+                    document.body.appendChild(modal);
+                    
+                    bindPasswordToggles(modal);
+                    
+                    var newPassword = $('resetNewPassword');
+                    var confirmPassword = $('resetConfirmPassword');
+                    var confirmBtn = modal.querySelector('#resetConfirm');
+                    var cancelBtn = modal.querySelector('#resetCancel');
+                    
+                    on(confirmBtn, 'click', function() {
+                        var pass1 = newPassword.value;
+                        var pass2 = confirmPassword.value;
+                        
+                        if (!pass1 || pass1.length < 8) {
+                            showNotification('Password must be at least 8 characters.', 'error');
+                            return;
+                        }
+                        if (pass1 !== pass2) {
+                            showNotification('Passwords do not match!', 'error');
+                            return;
+                        }
+                        var validation = DATA_MANAGER.validatePasswordStrength(pass1);
+                        if (!validation.valid) {
+                            showNotification(validation.message, 'error');
+                            return;
+                        }
+                        modal.remove();
+                        resolve(pass1);
+                    });
+                    
+                    on(cancelBtn, 'click', function() {
+                        modal.remove();
+                        resolve(null);
+                    });
+                });
+            }
+
+            // ============================================================
+            // VERIFICATION MODAL
+            // ============================================================
+            function openVerificationModal(email, action, callback) {
+                pendingEmail = email;
+                pendingAction = action;
+                pendingCallback = callback;
+                isVerifying = false;
+                verificationDone = false;
+                
+                var existing = $('verificationModal');
+                if (existing) existing.remove();
+                
+                var modal = document.createElement('div');
+                modal.className = 'modal';
+                modal.id = 'verificationModal';
+                modal.style.display = 'flex';
+                var titleMap = {
+                    'signup': 'Verify Your Email',
+                    'signin': 'Verify Sign In',
+                    'delete': 'Confirm Delete Account',
+                    'email': 'Verify Email Change',
+                    'password': 'Verify Password Change',
+                    'reset': 'Reset Password'
+                };
+                var title = titleMap[action] || 'Verification Required';
+                modal.innerHTML = 
+                    '<div class="modal-content verification-content">' +
+                        '<span class="close-modal close-verification">&times;</span>' +
+                        '<h2>' + title + '</h2>' +
+                        '<p class="verification-desc">Enter the 6-digit verification code sent to your email. Also check SPAM/JUNK folder.</p>' +
+                        '<form id="verificationForm">' +
+                            '<input type="text" id="verificationCode" placeholder="Enter 6-digit code" maxlength="6" autocomplete="off" required>' +
+                            '<button type="submit" class="auth-submit-btn" id="verifySubmitBtn">Verify</button>' +
+                        '</form>' +
+                        '<p class="auth-switch">Didn\'t receive code? <a href="#" id="resendCodeBtn">Resend Code</a></p>' +
+                    '</div>';
+                document.body.appendChild(modal);
+                
+                var closeBtn = modal.querySelector('.close-verification');
+                on(closeBtn, 'click', function() {
+                    modal.remove();
+                    isVerifying = false;
+                    verificationDone = false;
+                });
+                
+                var form = $('verificationForm');
+                var submitBtn = $('verifySubmitBtn');
+                var codeInput = $('verificationCode');
+                
+                on(form, 'submit', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (verificationDone || isVerifying) return;
+                    
+                    var code = codeInput.value.trim();
+                    if (!code || code.length !== 6) {
+                        showNotification('Please enter a valid 6-digit code.', 'error');
+                        return;
+                    }
+                    
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Verifying...';
+                    isVerifying = true;
+                    
+                    verifyCode(email, code).then(function(result) {
+                        if (result.success) {
+                            verificationDone = true;
+                            submitBtn.textContent = '✓ Verified';
+                            submitBtn.style.backgroundColor = '#4CAF50';
+                            codeInput.disabled = true;
+                            showNotification('Verification successful!', 'success');
+                            if (result.token) {
+                                localStorage.setItem('authToken', result.token);
+                            }
+                            setTimeout(function() {
+                                modal.remove();
+                                if (typeof pendingCallback === 'function') {
+                                    pendingCallback(result.token);
+                                }
+                                checkAuthStatus();
+                                isVerifying = false;
+                                verificationDone = false;
+                            }, 800);
+                        } else {
+                            showNotification(result.error || 'Invalid code.', 'error');
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Verify';
+                            submitBtn.style.backgroundColor = '';
+                            isVerifying = false;
+                            codeInput.value = '';
+                            codeInput.focus();
+                        }
+                    }).catch(function() {
+                        showNotification('Verification error.', 'error');
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Verify';
+                        submitBtn.style.backgroundColor = '';
+                        isVerifying = false;
+                    });
+                });
+                
+                var resendBtn = $('resendCodeBtn');
+                on(resendBtn, 'click', function(e) {
+                    e.preventDefault();
+                    verificationDone = false;
+                    isVerifying = false;
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Verify';
+                    submitBtn.style.backgroundColor = '';
+                    codeInput.disabled = false;
+                    codeInput.value = '';
+                    codeInput.focus();
+                    sendVerificationCode(email, pendingAction).then(function(result) {
+                        if (result.success) {
+                            showNotification('New code sent! Check your email.', 'success');
+                        }
+                    });
+                });
+            }
+
+            // ============================================================
+            // AUTH STATE
+            // ============================================================
+            function checkAuthStatus() {
+                var token = localStorage.getItem('authToken');
+                var authBtn = $('authBtn');
+                var historyNavBtn = $('historyNavBtn');
+                
+                if (!token) {
+                    isLoggedIn = false;
+                    currentUser = null;
+                    if (authBtn) {
+                        authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
+                        authBtn.classList.remove('logged-in');
+                    }
+                    if (historyNavBtn) historyNavBtn.style.display = 'none';
+                    return;
+                }
+                
+                var user = DATA_MANAGER.getCurrentUser();
+                if (user) {
+                    currentUser = {
+                        id: user.id,
+                        email: user.email,
+                        username: user.username,
+                        createdAt: user.createdAt,
+                        lastLogin: user.lastLogin
+                    };
+                    isLoggedIn = true;
+                    if (authBtn) {
+                        authBtn.innerHTML = '<i class="fas fa-user-circle"></i> ' + currentUser.username;
+                        authBtn.classList.add('logged-in');
+                    }
+                    if (historyNavBtn) historyNavBtn.style.display = 'flex';
+                } else {
+                    localStorage.removeItem('authToken');
+                    isLoggedIn = false;
+                    currentUser = null;
+                    if (authBtn) {
+                        authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
+                        authBtn.classList.remove('logged-in');
+                    }
+                    if (historyNavBtn) historyNavBtn.style.display = 'none';
+                }
+            }
+
+            // ============================================================
+            // OPEN AUTH MODAL
+            // ============================================================
+            function openModal(mode) {
+                currentMode = mode;
+                var authModal = $('authModal');
+                var authFields = $('authFields');
+                var forgotPasswordLink = $('forgotPasswordLink');
+                var authModalTitle = $('authModalTitle');
+                var authSubmitBtn = $('authSubmitBtn');
+                var authSwitchText = $('authSwitchText');
+                var forgotPasswordBtn = $('forgotPasswordBtn');
+                
+                if (!authModal) return;
+                
+                authModal.style.display = 'flex';
+                authFields.innerHTML = '';
+                forgotPasswordLink.style.display = 'none';
+                
+                if (mode === 'login') {
+                    authModalTitle.textContent = 'Sign In';
+                    authSubmitBtn.textContent = 'Sign In';
+                    authSwitchText.innerHTML = 'Don\'t have an account? <a href="#" id="authSwitchLink">Create Account</a>';
+                    
+                    var email = document.createElement('input');
+                    email.type = 'email';
+                    email.id = 'authEmail';
+                    email.placeholder = 'Email address';
+                    email.required = true;
+                    authFields.appendChild(email);
+                    
+                    var password = createPasswordField('authPassword', 'Password');
+                    authFields.appendChild(password);
+                    bindPasswordToggles(authModal);
+                    
+                    forgotPasswordLink.style.display = 'block';
+                    on(forgotPasswordBtn, 'click', function(e) {
+                        e.preventDefault();
+                        openModal('reset');
+                    });
+                    
+                } else if (mode === 'reset') {
+                    authModalTitle.textContent = 'Reset Password';
+                    authSubmitBtn.textContent = 'Send Reset Code';
+                    authSwitchText.innerHTML = 'Remember password? <a href="#" id="authSwitchLink">Sign In</a>';
+                    
+                    var email = document.createElement('input');
+                    email.type = 'email';
+                    email.id = 'authEmail';
+                    email.placeholder = 'Email address';
+                    email.required = true;
+                    authFields.appendChild(email);
+                    forgotPasswordLink.style.display = 'none';
+                    
+                } else if (mode === 'signup') {
+                    authModalTitle.textContent = 'Create Account';
+                    authSubmitBtn.textContent = 'Create Account';
+                    authSwitchText.innerHTML = 'Already have an account? <a href="#" id="authSwitchLink">Sign In</a>';
+                    
+                    var email = document.createElement('input');
+                    email.type = 'email';
+                    email.id = 'authEmail';
+                    email.placeholder = 'Email address';
+                    email.required = true;
+                    authFields.appendChild(email);
+                    
+                    var password = createPasswordField('authPassword', 'Password (min 8 chars)');
+                    authFields.appendChild(password);
+                    var confirm = createPasswordField('authConfirmPassword', 'Confirm password');
+                    authFields.appendChild(confirm);
+                    bindPasswordToggles(authModal);
+                    
+                    var hint = document.createElement('small');
+                    hint.textContent = 'Password: 8+ chars, uppercase, lowercase, number, special';
+                    authFields.appendChild(hint);
+                    forgotPasswordLink.style.display = 'none';
+                }
+                
+                var switchLink = $('authSwitchLink');
+                if (switchLink) {
+                    on(switchLink, 'click', function(e) {
+                        e.preventDefault();
+                        if (mode === 'reset') {
+                            openModal('login');
+                        } else if (mode === 'login') {
+                            openModal('signup');
+                        } else {
+                            openModal('login');
+                        }
+                    });
+                }
+            }
+
+            // ============================================================
+            // AUTH BUTTON
+            // ============================================================
+            function setupAuthButton() {
+                var authBtn = $('authBtn');
+                if (!authBtn) return;
+                
+                on(authBtn, 'click', function() {
+                    if (isLoggedIn) {
+                        toggleProfileMenu();
+                    } else {
+                        openModal('login');
+                    }
+                });
+            }
+
+            // ============================================================
+            // CLOSE MODAL
+            // ============================================================
+            function setupCloseModal() {
+                var closeAuthModal = $('closeAuthModal');
+                var authModal = $('authModal');
+                
+                if (closeAuthModal) {
+                    on(closeAuthModal, 'click', function() {
+                        if (authModal) authModal.style.display = 'none';
+                    });
+                }
+            }
+
+            // ============================================================
+            // AUTH FORM SUBMIT
+            // ============================================================
+            function setupAuthForm() {
+                var authForm = $('authForm');
+                var authSubmitBtn = $('authSubmitBtn');
+                var authModal = $('authModal');
+                
+                if (!authForm) return;
+                
+                on(authForm, 'submit', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    var email = $('authEmail').value;
+                    var password = $('authPassword') ? $('authPassword').value : '';
+                    
+                    if (currentMode === 'login') {
+                        authSubmitBtn.disabled = true;
+                        authSubmitBtn.textContent = 'Signing in...';
+                        var result = DATA_MANAGER.login(email, password);
+                        if (!result.success) {
+                            if (result.error === 'Account not found. Please create an account.') {
+                                showNotification('Account not found. Redirecting...', 'error');
+                                authSubmitBtn.disabled = false;
+                                authSubmitBtn.textContent = 'Sign In';
+                                setTimeout(function() { openModal('signup'); }, 1500);
+                                return;
+                            } else {
+                                showNotification(result.error, 'error');
+                                authSubmitBtn.disabled = false;
+                                authSubmitBtn.textContent = 'Sign In';
+                                return;
+                            }
+                        }
+                        sendVerificationCode(email, 'signin').then(function(codeResult) {
+                            if (!codeResult.success) {
+                                showNotification('Error sending code.', 'error');
+                                authSubmitBtn.disabled = false;
+                                authSubmitBtn.textContent = 'Sign In';
+                                return;
+                            }
+                            if (authModal) authModal.style.display = 'none';
+                            openVerificationModal(email, 'signin', function(token) {
+                                showNotification('Signed in!', 'success');
+                                checkAuthStatus();
+                                authSubmitBtn.disabled = false;
+                                authSubmitBtn.textContent = 'Sign In';
+                            });
+                        });
+                    } else if (currentMode === 'reset') {
+                        authSubmitBtn.disabled = true;
+                        authSubmitBtn.textContent = 'Sending reset code...';
+                        var userExists = DATA_MANAGER.findUserByEmail(email);
+                        if (!userExists) {
+                            showNotification('No account found.', 'error');
+                            authSubmitBtn.disabled = false;
+                            authSubmitBtn.textContent = 'Send Reset Code';
+                            return;
+                        }
+                        sendVerificationCode(email, 'reset').then(function(codeResult) {
+                            if (!codeResult.success) {
+                                showNotification('Error sending code.', 'error');
+                                authSubmitBtn.disabled = false;
+                                authSubmitBtn.textContent = 'Send Reset Code';
+                                return;
+                            }
+                            pendingResetUser = userExists;
+                            if (authModal) authModal.style.display = 'none';
+                            openVerificationModal(email, 'reset', function(token) {
+                                showPasswordResetModal().then(function(newPassword) {
+                                    if (newPassword === null) {
+                                        showNotification('Cancelled.', 'info');
+                                        authSubmitBtn.disabled = false;
+                                        authSubmitBtn.textContent = 'Send Reset Code';
+                                        pendingResetUser = null;
+                                        return;
+                                    }
+                                    if (DATA_MANAGER.verifyPassword(newPassword, pendingResetUser.password)) {
+                                        showNotification('Must be different from current.', 'error');
+                                        authSubmitBtn.disabled = false;
+                                        authSubmitBtn.textContent = 'Send Reset Code';
+                                        pendingResetUser = null;
+                                        return;
+                                    }
+                                    var users = DATA_MANAGER.loadUsers();
+                                    var index = -1;
+                                    for (var i = 0; i < users.length; i++) {
+                                        if (users[i].id === pendingResetUser.id) {
+                                            index = i;
+                                            break;
+                                        }
+                                    }
+                                    if (index === -1) {
+                                        showNotification('User not found.', 'error');
+                                        authSubmitBtn.disabled = false;
+                                        authSubmitBtn.textContent = 'Send Reset Code';
+                                        pendingResetUser = null;
+                                        return;
+                                    }
+                                    users[index].password = DATA_MANAGER.hashPassword(newPassword);
+                                    DATA_MANAGER.saveUsers(users);
+                                    showNotification('Password reset! Please sign in.', 'success');
+                                    authSubmitBtn.disabled = false;
+                                    authSubmitBtn.textContent = 'Send Reset Code';
+                                    pendingResetUser = null;
+                                    setTimeout(function() { openModal('login'); }, 2000);
+                                });
+                            });
+                        });
+                    } else if (currentMode === 'signup') {
+                        var confirmPassword = $('authConfirmPassword') ? $('authConfirmPassword').value : '';
+                        var username = email.split('@')[0];
+                        if (password !== confirmPassword) {
+                            showNotification('Passwords do not match!', 'error');
+                            return;
+                        }
+                        var validation = DATA_MANAGER.validatePasswordStrength(password);
+                        if (!validation.valid) {
+                            showNotification(validation.message, 'error');
+                            return;
+                        }
+                        if (!DATA_MANAGER.validateEmail(email)) {
+                            showNotification('Invalid email.', 'error');
+                            return;
+                        }
+                        authSubmitBtn.disabled = true;
+                        authSubmitBtn.textContent = 'Creating account...';
+                        var result = DATA_MANAGER.createUser(email, password, username);
+                        if (!result.success) {
+                            if (result.error === 'Email already registered. Please sign in.') {
+                                showNotification('Email already registered. Redirecting...', 'error');
+                                authSubmitBtn.disabled = false;
+                                authSubmitBtn.textContent = 'Create Account';
+                                setTimeout(function() { openModal('login'); }, 1500);
+                                return;
+                            } else {
+                                showNotification(result.error, 'error');
+                                authSubmitBtn.disabled = false;
+                                authSubmitBtn.textContent = 'Create Account';
+                                return;
+                            }
+                        }
+                        sendVerificationCode(email, 'signup').then(function(codeResult) {
+                            if (!codeResult.success) {
+                                showNotification('Error sending code.', 'error');
+                                authSubmitBtn.disabled = false;
+                                authSubmitBtn.textContent = 'Create Account';
+                                return;
+                            }
+                            if (authModal) authModal.style.display = 'none';
+                            openVerificationModal(email, 'signup', function(token) {
+                                showNotification('Account created!', 'success');
+                                checkAuthStatus();
+                                authSubmitBtn.disabled = false;
+                                authSubmitBtn.textContent = 'Create Account';
+                            });
+                        });
+                    }
+                });
+            }
+
+            // ============================================================
+            // PROFILE MENU
+            // ============================================================
+            function toggleProfileMenu() {
+                if (profileMenu) {
+                    profileMenu.remove();
+                    profileMenu = null;
+                    return;
+                }
+                if (!currentUser) return;
+                
+                profileMenu = document.createElement('div');
+                profileMenu.className = 'user-menu';
+                profileMenu.innerHTML = 
+                    '<div class="user-menu-header">' +
+                        '<i class="fas fa-user-circle"></i>' +
+                        '<div>' +
+                            '<strong>' + currentUser.username + '</strong>' +
+                            '<small>' + currentUser.email + '</small>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="user-menu-divider"></div>' +
+                    '<div class="user-menu-item" data-action="profile"><i class="fas fa-user"></i> Profile</div>' +
+                    '<div class="user-menu-item" data-action="account"><i class="fas fa-cog"></i> Account Settings</div>' +
+                    '<div class="user-menu-divider"></div>' +
+                    '<div class="user-menu-item logout" data-action="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>';
+                document.body.appendChild(profileMenu);
+                
+                var authBtn = $('authBtn');
+                var rect = authBtn ? authBtn.getBoundingClientRect() : { bottom: 0, right: 0 };
+                profileMenu.style.top = (rect.bottom + 10) + 'px';
+                profileMenu.style.right = (window.innerWidth - rect.right) + 'px';
+                
+                setTimeout(function() {
+                    document.addEventListener('click', function closeMenu(e) {
+                        if (profileMenu && !profileMenu.contains(e.target) && e.target !== authBtn) {
+                            profileMenu.remove();
+                            profileMenu = null;
+                            document.removeEventListener('click', closeMenu);
+                        }
+                    });
+                }, 10);
+                
+                var items = profileMenu.querySelectorAll('.user-menu-item');
+                for (var i = 0; i < items.length; i++) {
+                    (function(item) {
+                        on(item, 'click', function() {
+                            var action = this.dataset.action;
+                            if (profileMenu) {
+                                profileMenu.remove();
+                                profileMenu = null;
+                            }
+                            if (action === 'profile') openProfileModal();
+                            else if (action === 'account') openAccountSettings();
+                            else if (action === 'logout') logoutUser();
+                        });
+                    })(items[i]);
+                }
+            }
+
+            // ============================================================
+            // LOGOUT
+            // ============================================================
+            function logoutUser() {
+                DATA_MANAGER.logout();
+                localStorage.removeItem('authToken');
+                isLoggedIn = false;
+                currentUser = null;
+                var authBtn = $('authBtn');
+                var historyNavBtn = $('historyNavBtn');
+                if (authBtn) {
+                    authBtn.innerHTML = '<i class="fas fa-user"></i> Sign In';
+                    authBtn.classList.remove('logged-in');
+                }
+                if (historyNavBtn) historyNavBtn.style.display = 'none';
+                showNotification('Logged out.', 'info');
+                if (profileMenu) profileMenu.remove();
+            }
+
+            // ============================================================
+            // PROFILE MODAL
+            // ============================================================
+            function openProfileModal() {
+                var user = DATA_MANAGER.getCurrentUser();
+                if (!user) {
+                    showNotification('Please sign in.', 'warning');
+                    return;
+                }
+                var modal = document.createElement('div');
+                modal.className = 'modal';
+                modal.style.display = 'flex';
+                modal.innerHTML = 
+                    '<div class="modal-content settings-content">' +
+                        '<span class="close-modal close-profile">&times;</span>' +
+                        '<div class="profile-header">' +
+                            '<i class="fas fa-user-circle profile-icon"></i>' +
+                            '<h2>' + user.username + '</h2>' +
+                            '<p>' + user.email + '</p>' +
+                            '<span class="profile-badge">Verified Account</span>' +
+                        '</div>' +
+                        '<div class="profile-info">' +
+                            '<div class="info-item"><strong>Username:</strong> ' + user.username + '</div>' +
+                            '<div class="info-item"><strong>Email:</strong> ' + user.email + '</div>' +
+                            '<div class="info-item"><strong>Member Since:</strong> ' + new Date(user.createdAt).toLocaleDateString() + '</div>' +
+                            '<div class="info-item"><strong>Last Login:</strong> ' + (user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'First time') + '</div>' +
+                        '</div>' +
+                        '<button class="auth-submit-btn" id="goToSettingsBtn">Account Settings</button>' +
+                    '</div>';
+                document.body.appendChild(modal);
+                
+                on(modal.querySelector('.close-profile'), 'click', function() { modal.remove(); });
+                on(modal.querySelector('#goToSettingsBtn'), 'click', function() {
+                    modal.remove();
+                    openAccountSettings();
+                });
+            }
+
+            // ============================================================
+            // ACCOUNT SETTINGS
+            // ============================================================
+            function openAccountSettings() {
+                var user = DATA_MANAGER.getCurrentUser();
+                if (!user) {
+                    showNotification('Please sign in.', 'warning');
+                    return;
+                }
+                var modal = document.createElement('div');
+                modal.className = 'modal';
+                modal.id = 'settingsModal';
+                modal.style.display = 'flex';
+                modal.innerHTML = 
+                    '<div class="modal-content settings-content">' +
+                        '<span class="close-modal close-settings">&times;</span>' +
+                        '<h2><i class="fas fa-cog"></i> Account Settings</h2>' +
+                        '<div class="settings-body">' +
+                            '<div class="settings-field">' +
+                                '<label>Username</label>' +
+                                '<input type="text" value="' + user.username + '" disabled>' +
+                                '<small style="color: #888; font-size: 12px;">Username is auto-generated</small>' +
+                            '</div>' +
+                            '<div class="settings-field">' +
+                                '<label>Email</label>' +
+                                '<input type="email" id="settingsEmail" value="' + user.email + '">' +
+                            '</div>' +
+                            '<div class="settings-field">' +
+                                '<label>Current Password</label>' +
+                                createPasswordField('settingsCurrentPassword', 'Enter current password').outerHTML +
+                            '</div>' +
+                            '<div class="settings-field">' +
+                                '<label>New Password</label>' +
+                                createPasswordField('settingsNewPassword', 'Enter new password (8+ chars)').outerHTML +
+                            '</div>' +
+                            '<div class="settings-field">' +
+                                '<label>Confirm New Password</label>' +
+                                createPasswordField('settingsConfirmPassword', 'Confirm new password').outerHTML +
+                            '</div>' +
+                            '<button id="saveSettingsBtn" class="auth-submit-btn">Save Changes</button>' +
+                            '<button id="deleteAccountBtn" class="auth-submit-btn delete-btn">Delete Account</button>' +
+                        '</div>' +
+                    '</div>';
+                document.body.appendChild(modal);
+                
+                bindPasswordToggles(modal);
+                
+                on(modal.querySelector('.close-settings'), 'click', function() { modal.remove(); });
+                
+                on(modal.querySelector('#saveSettingsBtn'), 'click', function() {
+                    var newEmail = $('settingsEmail').value;
+                    var currentPassword = $('settingsCurrentPassword').value;
+                    var newPassword = $('settingsNewPassword').value;
+                    var confirmPassword = $('settingsConfirmPassword').value;
+                    
+                    if (!currentPassword) {
+                        showNotification('Enter current password.', 'error');
+                        return;
+                    }
+                    if (!DATA_MANAGER.verifyPassword(currentPassword, user.password)) {
+                        showNotification('Current password is incorrect.', 'error');
+                        return;
+                    }
+                    if (newEmail && newEmail !== user.email) {
+                        var existing = DATA_MANAGER.findUserByEmail(newEmail);
+                        if (existing && existing.id !== user.id) {
+                            showNotification('Email already in use.', 'error');
+                            return;
+                        }
+                        var saveBtn = $('saveSettingsBtn');
+                        var originalText = saveBtn.textContent;
+                        saveBtn.textContent = 'Sending code...';
+                        saveBtn.disabled = true;
+                        sendVerificationCode(newEmail, 'email').then(function(result) {
+                            if (!result.success) {
+                                showNotification('Error sending code.', 'error');
+                                saveBtn.textContent = originalText;
+                                saveBtn.disabled = false;
+                                return;
+                            }
+                            saveBtn.textContent = originalText;
+                            saveBtn.disabled = false;
+                            openVerificationModal(newEmail, 'email', function(token) {
+                                var updateResult = DATA_MANAGER.updateProfile(user.id, { 
+                                    email: newEmail,
+                                    username: newEmail.split('@')[0]
+                                });
+                                if (updateResult.success) {
+                                    showNotification('Email updated!', 'success');
+                                    user.email = newEmail;
+                                    user.username = newEmail.split('@')[0];
+                                    modal.remove();
+                                    checkAuthStatus();
+                                    setTimeout(function() { openProfileModal(); }, 500);
+                                } else {
+                                    showNotification('Error updating email.', 'error');
+                                }
+                            });
+                        });
+                        return;
+                    }
+                    if (newPassword || confirmPassword) {
+                        if (newPassword !== confirmPassword) {
+                            showNotification('Passwords do not match!', 'error');
+                            return;
+                        }
+                        if (newPassword === currentPassword) {
+                            showNotification('New password must be different.', 'error');
+                            return;
+                        }
+                        var validation = DATA_MANAGER.validatePasswordStrength(newPassword);
+                        if (!validation.valid) {
+                            showNotification(validation.message, 'error');
+                            return;
+                        }
+                        var saveBtn = $('saveSettingsBtn');
+                        var originalText = saveBtn.textContent;
+                        saveBtn.textContent = 'Sending code...';
+                        saveBtn.disabled = true;
+                        sendVerificationCode(user.email, 'password').then(function(result) {
+                            if (!result.success) {
+                                showNotification('Error sending code.', 'error');
+                                saveBtn.textContent = originalText;
+                                saveBtn.disabled = false;
+                                return;
+                            }
+                            saveBtn.textContent = originalText;
+                            saveBtn.disabled = false;
+                            openVerificationModal(user.email, 'password', function(token) {
+                                var updateResult = DATA_MANAGER.changePassword(user.id, currentPassword, newPassword);
+                                if (updateResult.success) {
+                                    showNotification('Password updated!', 'success');
+                                    modal.remove();
+                                } else {
+                                    showNotification('Error updating password.', 'error');
+                                }
+                            });
+                        });
+                        return;
+                    }
+                    showNotification('No changes made.', 'info');
+                    modal.remove();
+                });
+                
+                on(modal.querySelector('#deleteAccountBtn'), 'click', function() {
+                    showConfirmationModal(
+                        'Delete Account',
+                        'Are you sure? This cannot be undone.',
+                        'Delete Account',
+                        'Cancel'
+                    ).then(function(confirmed) {
+                        if (!confirmed) return;
+                        var password = prompt('Enter your password to confirm:');
+                        if (password === null) return;
+                        if (!password || password.trim() === '') {
+                            showNotification('Password is required.', 'error');
+                            return;
+                        }
+                        if (!DATA_MANAGER.verifyPassword(password, user.password)) {
+                            showNotification('Incorrect password.', 'error');
+                            return;
+                        }
+                        var deleteBtn = $('deleteAccountBtn');
+                        var originalText = deleteBtn.textContent;
+                        deleteBtn.textContent = 'Sending code...';
+                        deleteBtn.disabled = true;
+                        sendVerificationCode(user.email, 'delete').then(function(result) {
+                            if (!result.success) {
+                                showNotification('Error sending code.', 'error');
+                                deleteBtn.textContent = originalText;
+                                deleteBtn.disabled = false;
+                                return;
+                            }
+                            deleteBtn.textContent = originalText;
+                            deleteBtn.disabled = false;
+                            openVerificationModal(user.email, 'delete', function(token) {
+                                var deleteResult = DATA_MANAGER.deleteAccount(user.id, password);
+                                if (deleteResult.success) {
+                                    localStorage.removeItem('authToken');
+                                    showNotification('Account deleted.', 'info');
+                                    modal.remove();
+                                    window.location.reload();
+                                } else {
+                                    showNotification('Error deleting account.', 'error');
+                                }
+                            });
+                        });
+                    });
+                });
+            }
+
+            // ============================================================
+            // HISTORY MODAL
+            // ============================================================
+            function setupHistoryButton() {
+                var historyNavBtn = $('historyNavBtn');
+                if (historyNavBtn) {
+                    on(historyNavBtn, 'click', function() {
+                        openHistoryModal();
+                    });
+                }
+            }
+
+            function openHistoryModal() {
+                if (!isLoggedIn || !currentUser) {
+                    showNotification('Please sign in.', 'warning');
+                    return;
+                }
+                if (historyModal) {
+                    historyModal.style.display = 'flex';
+                    loadHistoryModal();
+                    return;
+                }
+                historyModal = document.createElement('div');
+                historyModal.className = 'modal';
+                historyModal.id = 'historyModal';
+                historyModal.style.display = 'flex';
+                historyModal.innerHTML = 
+                    '<div class="modal-content history-modal-content">' +
+                        '<span class="close-modal close-history">&times;</span>' +
+                        '<h2><i class="fas fa-history"></i> Translation History</h2>' +
+                        '<div class="history-header">' +
+                            '<div class="history-actions">' +
+                                '<button id="deleteAllHistory" class="delete-all-btn"><i class="fas fa-trash"></i> Delete All</button>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div id="historyListModal" class="history-list-modal">' +
+                            '<p class="empty-history">Loading history...</p>' +
+                        '</div>' +
+                    '</div>';
+                document.body.appendChild(historyModal);
+                
+                on(historyModal.querySelector('.close-history'), 'click', function() {
+                    historyModal.style.display = 'none';
+                });
+                
+                loadHistoryModal();
+                
+                on(historyModal.querySelector('#deleteAllHistory'), 'click', function() {
+                    if (!isLoggedIn || !currentUser) {
+                        showNotification('Please sign in.', 'warning');
+                        return;
+                    }
+                    showConfirmationModal(
+                        'Delete All History',
+                        'Are you sure? This cannot be undone.',
+                        'Delete All',
+                        'Cancel'
+                    ).then(function(confirmed) {
+                        if (!confirmed) return;
+                        var result = DATA_MANAGER.clearHistory(currentUser.email);
+                        if (result.success) {
+                            loadHistoryModal();
+                            showNotification('All history deleted.', 'info');
+                        } else {
+                            showNotification('Error deleting history.', 'error');
+                        }
+                    });
+                });
+            }
+
+            function loadHistoryModal() {
+                var historyList = $('historyListModal');
+                if (!historyList) return;
+                if (!isLoggedIn || !currentUser) {
+                    historyList.innerHTML = '<p class="empty-history">Sign in to see history.</p>';
+                    return;
+                }
+                try {
+                    var history = DATA_MANAGER.getHistory(currentUser.email);
+                    if (!history || history.length === 0) {
+                        historyList.innerHTML = '<p class="empty-history">No translations yet.</p>';
+                        return;
+                    }
+                    var html = '';
+                    for (var i = 0; i < history.length; i++) {
+                        var item = history[i];
+                        var time = new Date(item.createdAt).toLocaleString();
+                        html += 
+                            '<div class="history-item" data-id="' + item.id + '">' +
+                                '<button class="h-delete" data-id="' + item.id + '" title="Delete"><i class="fas fa-times"></i></button>' +
+                                '<div class="h-source">' + getLanguageName(item.sourceLang) + ' → ' + getLanguageName(item.targetLang) + '<span class="h-time">' + time + '</span></div>' +
+                                '<div class="h-original">"' + item.original.substring(0, 60) + (item.original.length > 60 ? '...' : '') + '"</div>' +
+                                '<div class="h-translation">"' + item.translated.substring(0, 60) + (item.translated.length > 60 ? '...' : '') + '"</div>' +
+                            '</div>';
+                    }
+                    historyList.innerHTML = html;
+                    var deleteBtns = historyList.querySelectorAll('.h-delete');
+                    for (var j = 0; j < deleteBtns.length; j++) {
+                        (function(btn) {
+                            on(btn, 'click', function() {
+                                var id = this.dataset.id;
+                                showConfirmationModal(
+                                    'Delete History',
+                                    'Delete this translation?',
+                                    'Delete',
+                                    'Cancel'
+                                ).then(function(confirmed) {
+                                    if (!confirmed) return;
+                                    var result = DATA_MANAGER.deleteHistoryItem(currentUser.email, id);
+                                    if (result.success) {
+                                        loadHistoryModal();
+                                        showNotification('Deleted.', 'info');
+                                    } else {
+                                        showNotification('Error deleting.', 'error');
+                                    }
+                                });
+                            });
+                        })(deleteBtns[j]);
+                    }
+                } catch (error) {
+                    historyList.innerHTML = '<p class="empty-history">Could not load history.</p>';
+                }
+            }
+
+            // ============================================================
+            // SAVE TO HISTORY
+            // ============================================================
+            function saveToHistory(original, translated, sourceLang, targetLang) {
+                if (!isLoggedIn || !currentUser) return;
+                var entry = {
+                    original: original,
+                    translated: translated,
+                    sourceLang: sourceLang,
+                    targetLang: targetLang
+                };
+                DATA_MANAGER.saveHistory(currentUser.email, entry);
+            }
+
+            // ============================================================
+            // TRANSLATION ENGINE
+            // ============================================================
+            function setupTranslation() {
+                var sourceLang = $('sourceLang');
+                var targetLang = $('targetLang');
+                var inputText = $('inputText');
+                var outputDisplay = $('outputText');
+                var translateBtn = $('translateBtn');
+                var micBtn = $('micBtn');
+                var recordingStatus = $('recordingStatus');
+                var swapBtn = $('swapLang');
+                var clearInputBtn = $('clearInput');
+                var copyOutputBtn = $('copyOutput');
+                var speakOutputBtn = $('speakOutput');
+                
+                // Create Translate From Container
+                translateFromContainer = document.createElement('div');
+                translateFromContainer.className = 'translate-from-container';
+                translateFromContainer.style.display = 'none';
+                translateFromContainer.style.marginTop = '6px';
+                translateFromContainer.style.padding = '0 4px';
+                
+                var inputBox = inputText ? inputText.closest('.input-box') : null;
+                if (inputBox) {
+                    var inputTools = inputBox.querySelector('.input-tools');
+                    if (inputTools) {
+                        inputBox.insertBefore(translateFromContainer, inputTools);
+                    } else {
+                        inputBox.appendChild(translateFromContainer);
+                    }
+                }
+
+                // Create Translate From Button
+                translateFromBtn = document.createElement('button');
+                translateFromBtn.className = 'translate-from-btn';
+                translateFromBtn.textContent = 'Translate from: ';
+                translateFromContainer.appendChild(translateFromBtn);
+
+                on(translateFromBtn, 'click', function() {
+                    var detectedLang = this.dataset.lang;
+                    if (detectedLang && detectedLang !== 'auto') {
+                        if (sourceLang) sourceLang.value = detectedLang;
+                        translateFromContainer.style.display = 'none';
+                        this.dataset.lang = '';
+                        var text = inputText ? inputText.value.trim() : '';
+                        if (text) {
+                            performTranslation();
+                        }
+                        showNotification('Switched to: ' + getLanguageName(detectedLang), 'success', 2000);
+                    }
+                });
+
+                // Add Speaker Icon to Input Field
+                var inputSpeakerBtn = document.createElement('button');
+                inputSpeakerBtn.className = 'action-btn input-speaker-btn';
+                inputSpeakerBtn.style.cssText = 'background:transparent;border:none;color:var(--text-light);padding:4px 8px;border-radius:6px;cursor:pointer;transition:var(--transition);font-size:0.85rem;';
+                inputSpeakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                inputSpeakerBtn.title = 'Read input text aloud';
+
+                var inputBoxActions = inputBox ? inputBox.querySelector('.box-actions') : null;
+                if (inputBoxActions) {
+                    inputBoxActions.appendChild(inputSpeakerBtn);
+                }
+
+                on(inputSpeakerBtn, 'click', function() {
+                    var text = inputText ? inputText.value.trim() : '';
+                    if (text) {
+                        stopSpeech();
+                        var lang = sourceLang ? sourceLang.value || 'en' : 'en';
+                        speakText(text, lang);
+                        showNotification('🔊 Reading input...', 'info', 2000);
+                    } else {
+                        showNotification('No text to read.', 'warning', 2000);
+                    }
+                });
+
+                // Update output speaker
+                if (speakOutputBtn) {
+                    var newOutputSpeaker = speakOutputBtn.cloneNode(true);
+                    speakOutputBtn.parentNode.replaceChild(newOutputSpeaker, speakOutputBtn);
+                    on(newOutputSpeaker, 'click', function() {
+                        var text = outputDisplay ? outputDisplay.textContent : '';
+                        if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
+                            stopSpeech();
+                            speakText(text, targetLang ? targetLang.value : 'en');
+                            showNotification('🔊 Reading translation...', 'info', 2000);
+                        }
+                    });
+                }
+
+                // Translation functions
+                function updateTranslateFromBtn(detectedLang, text) {
+                    if (!text || text.length < 2 || isRecording) {
+                        translateFromContainer.style.display = 'none';
+                        translateFromBtn.dataset.lang = '';
+                        return;
+                    }
+                    var selectedLang = sourceLang ? sourceLang.value : 'en';
+                    if (detectedLang && detectedLang !== 'auto' && detectedLang !== selectedLang) {
+                        var langName = getLanguageName(detectedLang);
+                        translateFromBtn.textContent = 'Translate from: ' + langName;
+                        translateFromBtn.dataset.lang = detectedLang;
+                        translateFromContainer.style.display = 'block';
+                    } else {
+                        translateFromContainer.style.display = 'none';
+                        translateFromBtn.dataset.lang = '';
+                    }
+                }
+
+                function resetTranslateFromBtn() {
+                    translateFromContainer.style.display = 'none';
+                    translateFromBtn.dataset.lang = '';
+                }
+
+                function detectLanguage(text) {
+                    return new Promise(function(resolve) {
+                        if (!text || text.length < 3) {
+                            resolve('en');
+                            return;
+                        }
+                        var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(text);
+                        fetch(url).then(function(response) {
+                            return response.json();
+                        }).then(function(data) {
+                            if (data && data[2]) {
+                                resolve(data[2]);
+                            } else {
+                                resolve('en');
+                            }
+                        }).catch(function() {
+                            resolve('en');
+                        });
+                    });
+                }
+
+                function translateText(text, sourceLangCode, targetLangCode) {
+                    return new Promise(function(resolve, reject) {
+                        if (!text || text.trim().length === 0) {
+                            resolve('');
+                            return;
+                        }
+                        var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + sourceLangCode + '&tl=' + targetLangCode + '&dt=t&q=' + encodeURIComponent(text);
+                        fetch(url).then(function(response) {
+                            return response.json();
+                        }).then(function(data) {
+                            if (data && data[0]) {
+                                var result = '';
+                                for (var i = 0; i < data[0].length; i++) {
+                                    result += data[0][i][0];
+                                }
+                                resolve(result);
+                            } else {
+                                reject(new Error('Translation failed'));
+                            }
+                        }).catch(function() {
+                            reject(new Error('Translation failed'));
+                        });
+                    });
+                }
+
+                function performTranslation() {
+                    var text = inputText ? inputText.value.trim() : '';
+                    if (!text) {
+                        if (outputDisplay) outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+                        if (translateBtn) {
+                            translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+                            translateBtn.disabled = false;
+                        }
+                        resetTranslateFromBtn();
+                        return;
+                    }
+                    if (isTranslating) {
+                        translateQueue = true;
+                        return;
+                    }
+                    translateQueue = false;
+                    isTranslating = true;
+                    if (translateBtn) {
+                        translateBtn.disabled = true;
+                        translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+                    }
+                    
+                    var sourceLangCode = sourceLang ? sourceLang.value : 'en';
+                    var targetLangCode = targetLang ? targetLang.value : 'en';
+                    
+                    detectLanguage(text).then(function(detectedLang) {
+                        if (!isRecording && detectedLang && detectedLang !== 'auto') {
+                            updateTranslateFromBtn(detectedLang, text);
+                        } else {
+                            resetTranslateFromBtn();
+                        }
+                        return translateText(text, sourceLangCode, targetLangCode);
+                    }).then(function(translated) {
+                        if (outputDisplay) outputDisplay.textContent = translated;
+                        if (isLoggedIn && currentUser) {
+                            saveToHistory(text, translated, sourceLangCode, targetLangCode);
+                        }
+                        isTranslating = false;
+                        if (translateBtn) {
+                            translateBtn.disabled = false;
+                            translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+                        }
+                        if (translateQueue) {
+                            setTimeout(function() { performTranslation(); }, 30);
+                        }
+                    }).catch(function(error) {
+                        if (outputDisplay) outputDisplay.innerHTML = '<span class="placeholder">Error: ' + error.message + '</span>';
+                        isTranslating = false;
+                        if (translateBtn) {
+                            translateBtn.disabled = false;
+                            translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+                        }
+                        if (translateQueue) {
+                            setTimeout(function() { performTranslation(); }, 30);
+                        }
+                    });
+                }
+
+                // Event listeners
+                on(translateBtn, 'click', function() {
+                    if (!isTranslating) {
+                        performTranslation();
+                    }
+                });
+
+                if (inputText) {
+                    inputText.addEventListener('input', function() {
+                        var text = inputText.value.trim();
+                        if (!text) {
+                            stopSpeech();
+                        }
+                        if (text) {
+                            if (translateBtn) {
+                                translateBtn.disabled = true;
+                                translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+                            }
+                            if (!isRecording && text.length > 3) {
+                                detectLanguage(text).then(function(detectedLang) {
+                                    if (detectedLang && detectedLang !== 'auto') {
+                                        updateTranslateFromBtn(detectedLang, text);
+                                    }
+                                    performTranslation();
+                                }).catch(function() {
+                                    performTranslation();
+                                });
+                            } else {
+                                resetTranslateFromBtn();
+                                performTranslation();
+                            }
+                        } else {
+                            if (outputDisplay) outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+                            if (translateBtn) {
+                                translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+                                translateBtn.disabled = false;
+                            }
+                            resetTranslateFromBtn();
+                        }
+                    });
+                }
+
+                if (sourceLang) {
+                    sourceLang.addEventListener('change', function() {
+                        stopRecordingIfActive();
+                        resetTranslateFromBtn();
+                        stopSpeech();
+                        var text = inputText ? inputText.value.trim() : '';
+                        if (text) {
+                            performTranslation();
+                        }
+                    });
+                }
+
+                if (targetLang) {
+                    targetLang.addEventListener('change', function() {
+                        stopRecordingIfActive();
+                        stopSpeech();
+                        var text = inputText ? inputText.value.trim() : '';
+                        if (text) {
+                            performTranslation();
+                        }
+                    });
+                }
+
+                on(swapBtn, 'click', function() {
+                    stopRecordingIfActive();
+                    stopSpeech();
+                    var temp = sourceLang ? sourceLang.value : 'rw';
+                    if (sourceLang) sourceLang.value = targetLang ? targetLang.value : 'en';
+                    if (targetLang) targetLang.value = temp;
+                    if (outputDisplay) outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+                    if (inputText) inputText.value = '';
+                    if (translateBtn) {
+                        translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+                        translateBtn.disabled = false;
+                    }
+                    resetTranslateFromBtn();
+                });
+
+                on(copyOutputBtn, 'click', function() {
+                    var text = outputDisplay ? outputDisplay.textContent : '';
+                    if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
+                        try {
+                            navigator.clipboard.writeText(text).then(function() {
+                                showNotification('Copied!', 'success');
+                            }).catch(function() {
+                                // Fallback
+                                var textarea = document.createElement('textarea');
+                                textarea.value = text;
+                                document.body.appendChild(textarea);
+                                textarea.select();
+                                document.execCommand('copy');
+                                textarea.remove();
+                                showNotification('Copied!', 'success');
+                            });
+                        } catch (e) {
+                            var textarea = document.createElement('textarea');
+                            textarea.value = text;
+                            document.body.appendChild(textarea);
+                            textarea.select();
+                            document.execCommand('copy');
+                            textarea.remove();
+                            showNotification('Copied!', 'success');
+                        }
+                    }
+                });
+
+                on(clearInputBtn, 'click', function() {
+                    stopRecordingIfActive();
+                    stopSpeech();
+                    if (inputText) inputText.value = '';
+                    if (outputDisplay) outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+                    if (translateBtn) {
+                        translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+                        translateBtn.disabled = false;
+                    }
+                    resetTranslateFromBtn();
+                });
+
+                // MIC - Recording System
+                function stopRecordingIfActive() {
+                    if (isRecording) {
+                        try {
+                            if (recognition) {
+                                recognition.stop();
+                            }
+                        } catch (e) {}
+                        isRecording = false;
+                        if (micBtn) {
+                            micBtn.classList.remove('recording');
+                            micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                            if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
+                        }
+                        resetTranslateFromBtn();
+                    }
+                }
+
+                if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+                    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    
+                    function initRecognition() {
+                        if (recognition) {
+                            try { recognition.stop(); } catch(e) {}
+                        }
+                        recognition = new SpeechRecognition();
+                        recognition.continuous = true;
+                        recognition.interimResults = true;
+                        recognition.lang = sourceLang ? sourceLang.value || 'en' : 'en';
+                        recognition.maxAlternatives = 1;
+                        
+                        recognition.onstart = function() {
+                            isRecording = true;
+                            if (micBtn) {
+                                micBtn.classList.add('recording');
+                                micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+                            }
+                            if (recordingStatus) recordingStatus.textContent = '🎤 Recording... Click to stop';
+                            resetTranslateFromBtn();
+                        };
+                        
+                        recognition.onresult = function(event) {
+                            var finalText = '';
+                            var interimText = '';
+                            for (var i = event.resultIndex; i < event.results.length; i++) {
+                                if (event.results[i].isFinal) {
+                                    finalText += event.results[i][0].transcript;
+                                } else {
+                                    interimText += event.results[i][0].transcript;
+                                }
+                            }
+                            if (interimText && inputText) {
+                                inputText.value = finalText + interimText;
+                                if (translateBtn) {
+                                    translateBtn.disabled = true;
+                                    translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+                                }
+                                performTranslation();
+                            }
+                            if (finalText && inputText) {
+                                var currentText = inputText.value;
+                                if (currentText.includes(finalText) || currentText === finalText) {
+                                    inputText.value = finalText;
+                                } else {
+                                    inputText.value = currentText + ' ' + finalText;
+                                }
+                                performTranslation();
+                            }
+                        };
+                        
+                        recognition.onerror = function(event) {
+                            if (event.error === 'no-speech') return;
+                            if (event.error === 'not-allowed') {
+                                showNotification('Microphone access denied.', 'error');
+                            }
+                            if (!isRecording) {
+                                if (micBtn) {
+                                    micBtn.classList.remove('recording');
+                                    micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                                }
+                                if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
+                                resetTranslateFromBtn();
+                            }
+                        };
+                        
+                        recognition.onend = function() {
+                            if (isRecording) {
+                                try {
+                                    recognition.lang = sourceLang ? sourceLang.value || 'en' : 'en';
+                                    recognition.start();
+                                } catch (e) {
+                                    isRecording = false;
+                                    if (micBtn) {
+                                        micBtn.classList.remove('recording');
+                                        micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                                    }
+                                    if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
+                                    resetTranslateFromBtn();
+                                }
+                            } else {
+                                if (micBtn) {
+                                    micBtn.classList.remove('recording');
+                                    micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                                }
+                                if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
+                                resetTranslateFromBtn();
+                            }
+                        };
+                    }
+                    
+                    initRecognition();
+                    
+                    on(micBtn, 'click', function() {
+                        if (isRecording) {
+                            isRecording = false;
+                            try {
+                                if (recognition) {
+                                    recognition.stop();
+                                }
+                            } catch (e) {}
+                            micBtn.classList.remove('recording');
+                            micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                            if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
+                            showNotification('⏹ Recording stopped.', 'info', 2000);
+                            var text = inputText ? inputText.value.trim() : '';
+                            if (text && text.length > 3) {
+                                detectLanguage(text).then(function(detectedLang) {
+                                    if (detectedLang && detectedLang !== 'auto') {
+                                        updateTranslateFromBtn(detectedLang, text);
+                                    }
+                                }).catch(function() {});
+                            }
+                        } else {
+                            var lang = sourceLang ? sourceLang.value || 'en' : 'en';
+                            if (recognition) {
+                                recognition.lang = lang;
+                                try {
+                                    recognition.start();
+                                } catch (e) {
+                                    initRecognition();
+                                    if (recognition) {
+                                        recognition.lang = lang;
+                                        try {
+                                            recognition.start();
+                                        } catch (e2) {
+                                            showNotification('Error starting mic.', 'error');
+                                        }
+                                    }
+                                }
+                            } else {
+                                initRecognition();
+                                if (recognition) {
+                                    recognition.lang = lang;
+                                    try {
+                                        recognition.start();
+                                    } catch (e) {
+                                        showNotification('Error starting mic.', 'error');
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    
+                    if (sourceLang) {
+                        sourceLang.addEventListener('change', function() {
+                            if (recognition && isRecording) {
+                                recognition.lang = sourceLang.value || 'en';
+                            }
+                        });
+                    }
+                    
+                } else {
+                    if (micBtn) {
+                        micBtn.disabled = true;
+                        micBtn.title = 'Speech recognition not supported';
+                    }
+                    if (recordingStatus) {
+                        recordingStatus.textContent = '⚠️ Not supported';
+                    }
+                }
+            }
+
+            // ============================================================
+            // THEME TOGGLE
+            // ============================================================
+            function setupThemeToggle() {
+                var themeToggle = $('themeToggle');
+                if (themeToggle) {
+                    on(themeToggle, 'click', function() {
+                        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                        document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+                        this.innerHTML = isDark ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+                        localStorage.setItem('theme', isDark ? 'light' : 'dark');
+                    });
+                    
+                    if (localStorage.getItem('theme') === 'dark') {
+                        document.documentElement.setAttribute('data-theme', 'dark');
+                        themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+                    }
+                }
+            }
+
+            // ============================================================
+            // ABOUT MODAL
+            // ============================================================
+            function setupAboutModal() {
+                var aboutNavBtn = $('aboutNavBtn');
+                var aboutModal = $('aboutModal');
+                var closeAboutModal = $('closeAboutModal');
+                
+                if (aboutNavBtn) {
+                    on(aboutNavBtn, 'click', function() {
+                        if (aboutModal) aboutModal.style.display = 'flex';
+                    });
+                }
+                
+                if (closeAboutModal) {
+                    on(closeAboutModal, 'click', function() {
+                        if (aboutModal) aboutModal.style.display = 'none';
+                    });
+                }
+                
+                if (aboutModal) {
+                    aboutModal.addEventListener('click', function(e) {
+                        if (e.target === aboutModal) {
+                            aboutModal.style.display = 'none';
+                        }
+                    });
+                }
+            }
+
+            // ============================================================
+            // INITIALIZATION
+            // ============================================================
+            function initApp() {
+                // Populate languages
+                populateLanguageDropdowns();
+                
+                // Setup features
+                setupAuthButton();
+                setupCloseModal();
+                setupAuthForm();
+                setupHistoryButton();
+                setupTranslation();
+                setupThemeToggle();
+                setupAboutModal();
+                
+                // Check auth
+                checkAuthStatus();
+                
+                console.log('✅ FreeTranslateLanguage initialized successfully!');
+            }
+
+            // ============================================================
+            // START APP
+            // ============================================================
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initApp);
+            } else {
+                initApp();
+            }
+
+            // Run again on load for safety
+            window.addEventListener('load', function() {
+                var sourceLang = $('sourceLang');
+                if (sourceLang && sourceLang.options.length === 0) {
+                    populateLanguageDropdowns();
+                }
             });
-            
-            sourceLang.value = 'rw';
-            targetLang.value = 'en';
-            
-            console.log('✅ Languages populated from quick fix!');
-        }
-    });
-</script>
 
-
-    <!-- ============================================ -->
-    <!-- SCRIPTS - Order is IMPORTANT!                -->
-    <!-- ============================================ -->
-    <!-- 1. Data Manager (localStorage system)       -->
-    <script src="dataManager.js"></script>
-    
-    <!-- 2. Main Application                        -->
-    <script src="script.js"></script>
-    <!-- ============================================ -->
-    
+        })();
+    </script>
 </body>
 </html>
