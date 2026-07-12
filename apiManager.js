@@ -36,7 +36,7 @@ var API_MANAGER = {
     },
     
     // ============================================================
-    // HELPER: Handle Response
+    // HELPER: Handle Response - FIXED: Better error handling
     // ============================================================
     handleResponse: function(response) {
         return response.json().then(function(data) {
@@ -44,6 +44,7 @@ var API_MANAGER = {
                 var error = new Error(data.message || 'Request failed');
                 error.status = response.status;
                 error.data = data;
+                error.success = false;
                 throw error;
             }
             return data;
@@ -102,7 +103,7 @@ var API_MANAGER = {
     },
     
     // ============================================================
-    // CHECK EMAIL EXISTS - For password reset
+    // CHECK EMAIL EXISTS - FIXED
     // ============================================================
     checkEmailExists: function(email) {
         return fetch(this.API_URL + '/auth/check-email', {
