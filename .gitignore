@@ -51,10 +51,13 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
-# Environment variables
+# Environment variables - NEVER COMMIT!
 .env
 backend/.env
 *.env
+.env.local
+.env.production
+.env.development
 
 # System files
 .DS_Store
@@ -65,10 +68,21 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+*.sublime-*
 
 # Backup files
 *.bak
 *.backup
+*.tmp
 
 # Mac metadata
 ._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.directory
+*.part
