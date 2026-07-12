@@ -338,7 +338,7 @@
     }
 
     // ============================================================
-    // CUSTOM PASSWORD PROMPT MODAL
+    // CUSTOM PASSWORD PROMPT MODAL - FIXED: Button spacing
     // ============================================================
     function showPasswordPromptModal(title, message, placeholder) {
         placeholder = placeholder || 'Enter your password';
@@ -348,16 +348,16 @@
             modal.style.display = 'flex';
             modal.style.zIndex = '10001';
             modal.innerHTML = 
-                '<div class="modal-content prompt-content" style="max-width: 420px;">' +
-                    '<h2 style="text-align: center; margin-bottom: 12px;">' + title + '</h2>' +
-                    '<p style="text-align: center; color: var(--text-secondary); margin-bottom: 16px;">' + message + '</p>' +
-                    '<div class="settings-field">' +
-                        '<label>Password</label>' +
+                '<div class="modal-content prompt-content" style="max-width: 420px; padding:28px 24px;">' +
+                    '<h2 style="text-align: center; margin-bottom: 12px; color:var(--text-primary);">' + title + '</h2>' +
+                    '<p style="text-align: center; color: var(--text-secondary); margin-bottom: 16px; font-size:0.9rem;">' + message + '</p>' +
+                    '<div class="settings-field" style="margin-bottom:16px;">' +
+                        '<label style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:4px;">Password</label>' +
                         createPasswordField('promptPasswordInput', placeholder).outerHTML +
                     '</div>' +
-                    '<div class="confirmation-buttons" style="margin-top: 16px;">' +
-                        '<button class="auth-submit-btn cancel-btn" id="promptCancel" style="flex:1;">Cancel</button>' +
-                        '<button class="auth-submit-btn delete-btn" id="promptConfirm" style="flex:1;">Confirm</button>' +
+                    '<div class="confirmation-buttons" style="display:flex; gap:16px; justify-content:center; margin-top:8px; width:100%; flex-wrap:wrap;">' +
+                        '<button class="auth-submit-btn cancel-btn" id="promptCancel" style="flex:1; min-width:120px; max-width:180px; min-height:44px; padding:10px 20px; border-radius:var(--radius-sm); font-size:0.9rem; font-weight:600; cursor:pointer; transition:var(--transition); font-family:var(--font); border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-secondary); margin:4px;">Cancel</button>' +
+                        '<button class="auth-submit-btn delete-btn" id="promptConfirm" style="flex:1; min-width:120px; max-width:180px; min-height:44px; padding:10px 20px; border-radius:var(--radius-sm); font-size:0.9rem; font-weight:600; cursor:pointer; transition:var(--transition); font-family:var(--font); border:none; background:var(--danger); color:white; margin:4px;">Confirm</button>' +
                     '</div>' +
                 '</div>';
             document.body.appendChild(modal);
@@ -405,7 +405,7 @@
     }
 
     // ============================================================
-    // CONFIRMATION MODAL
+    // CONFIRMATION MODAL - FIXED: Better button spacing
     // ============================================================
     function showConfirmationModal(title, message, confirmText, cancelText) {
         confirmText = confirmText || 'Confirm';
@@ -415,12 +415,12 @@
             modal.className = 'modal';
             modal.style.display = 'flex';
             modal.innerHTML = 
-                '<div class="modal-content confirmation-content">' +
-                    '<h2>' + title + '</h2>' +
-                    '<p>' + message + '</p>' +
+                '<div class="modal-content confirmation-content" style="padding:28px 24px;">' +
+                    '<h2 style="margin-bottom:12px; color:var(--text-primary);">' + title + '</h2>' +
+                    '<p style="margin-bottom:16px; color:var(--text-secondary); font-size:0.9rem; line-height:1.6;">' + message + '</p>' +
                     '<div class="confirmation-buttons" style="display:flex; gap:16px; justify-content:center; margin-top:16px; width:100%; flex-wrap:wrap;">' +
-                        '<button class="auth-submit-btn cancel-btn" id="cancelConfirm" style="flex:1; min-width:120px; max-width:180px; min-height:44px; margin:4px;">' + cancelText + '</button>' +
-                        '<button class="auth-submit-btn delete-btn" id="confirmAction" style="flex:1; min-width:120px; max-width:180px; min-height:44px; margin:4px;">' + confirmText + '</button>' +
+                        '<button class="auth-submit-btn cancel-btn" id="cancelConfirm" style="flex:1; min-width:120px; max-width:180px; min-height:44px; margin:4px; padding:10px 20px; border-radius:var(--radius-sm); font-size:0.9rem; font-weight:600; cursor:pointer; transition:var(--transition); font-family:var(--font); border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-secondary);">' + cancelText + '</button>' +
+                        '<button class="auth-submit-btn delete-btn" id="confirmAction" style="flex:1; min-width:120px; max-width:180px; min-height:44px; margin:4px; padding:10px 20px; border-radius:var(--radius-sm); font-size:0.9rem; font-weight:600; cursor:pointer; transition:var(--transition); font-family:var(--font); border:none; background:var(--danger); color:white;">' + confirmText + '</button>' +
                     '</div>' +
                 '</div>';
             document.body.appendChild(modal);
@@ -446,20 +446,20 @@
             modal.className = 'modal';
             modal.style.display = 'flex';
             modal.innerHTML = 
-                '<div class="modal-content prompt-content" style="max-width: 440px;">' +
-                    '<h2 style="text-align: center; margin-bottom: 12px;">Reset Password</h2>' +
-                    '<p style="text-align: center; color: var(--text-secondary); margin-bottom: 16px;">Enter your new password below.</p>' +
-                    '<div class="settings-field">' +
-                        '<label>New Password (min 8 chars)</label>' +
+                '<div class="modal-content prompt-content" style="max-width: 440px; padding:28px 24px;">' +
+                    '<h2 style="text-align: center; margin-bottom: 12px; color:var(--text-primary);">Reset Password</h2>' +
+                    '<p style="text-align: center; color: var(--text-secondary); margin-bottom: 16px; font-size:0.9rem;">Enter your new password below.</p>' +
+                    '<div class="settings-field" style="margin-bottom:12px;">' +
+                        '<label style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:4px;">New Password (min 8 chars)</label>' +
                         createPasswordField('resetNewPassword', 'Enter new password').outerHTML +
                     '</div>' +
-                    '<div class="settings-field">' +
-                        '<label>Confirm New Password</label>' +
+                    '<div class="settings-field" style="margin-bottom:16px;">' +
+                        '<label style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:4px;">Confirm New Password</label>' +
                         createPasswordField('resetConfirmPassword', 'Confirm new password').outerHTML +
                     '</div>' +
-                    '<div class="confirmation-buttons" style="display:flex; gap:16px; justify-content:center; margin-top:16px; width:100%; flex-wrap:wrap;">' +
-                        '<button class="auth-submit-btn cancel-btn" id="resetCancel" style="flex:1; min-width:120px; max-width:180px; min-height:44px; margin:4px;">Cancel</button>' +
-                        '<button class="auth-submit-btn" id="resetConfirm" style="flex:1; min-width:120px; max-width:180px; min-height:44px; margin:4px; background: var(--accent);">Reset Password</button>' +
+                    '<div class="confirmation-buttons" style="display:flex; gap:16px; justify-content:center; margin-top:8px; width:100%; flex-wrap:wrap;">' +
+                        '<button class="auth-submit-btn cancel-btn" id="resetCancel" style="flex:1; min-width:120px; max-width:180px; min-height:44px; padding:10px 20px; border-radius:var(--radius-sm); font-size:0.9rem; font-weight:600; cursor:pointer; transition:var(--transition); font-family:var(--font); border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-secondary); margin:4px;">Cancel</button>' +
+                        '<button class="auth-submit-btn" id="resetConfirm" style="flex:1; min-width:120px; max-width:180px; min-height:44px; padding:10px 20px; border-radius:var(--radius-sm); font-size:0.9rem; font-weight:600; cursor:pointer; transition:var(--transition); font-family:var(--font); border:none; background:var(--accent); color:white; margin:4px;">Reset Password</button>' +
                     '</div>' +
                 '</div>';
             document.body.appendChild(modal);
@@ -526,15 +526,15 @@
         };
         var title = titleMap[action] || 'Verification Required';
         modal.innerHTML = 
-            '<div class="modal-content verification-content">' +
-                '<span class="close-modal close-verification">&times;</span>' +
-                '<h2>' + title + '</h2>' +
-                '<p class="verification-desc">Enter the 6-digit verification code sent to your email. Also check SPAM/JUNK folder.</p>' +
-                '<form id="verificationForm">' +
-                    '<input type="text" id="verificationCode" placeholder="Enter 6-digit code" maxlength="6" autocomplete="off" required>' +
-                    '<button type="submit" class="auth-submit-btn" id="verifySubmitBtn" style="width:100%; min-height:44px; margin-top:10px;">Verify</button>' +
+            '<div class="modal-content verification-content" style="padding:28px 24px;">' +
+                '<span class="close-modal close-verification" style="position:absolute; top:12px; right:16px; font-size:1.4rem; cursor:pointer; color:var(--text-light); transition:var(--transition); line-height:1; background:none; border:none; padding:4px 8px; border-radius:4px;">&times;</span>' +
+                '<h2 style="margin-bottom:12px; color:var(--text-primary);">' + title + '</h2>' +
+                '<p class="verification-desc" style="text-align:center; color:var(--text-secondary); margin-bottom:14px; font-size:0.85rem; line-height:1.5;">Enter the 6-digit verification code sent to your email. Also check SPAM/JUNK folder.</p>' +
+                '<form id="verificationForm" style="display:flex; flex-direction:column; gap:10px;">' +
+                    '<input type="text" id="verificationCode" placeholder="Enter 6-digit code" maxlength="6" autocomplete="off" required style="width:100%; text-align:center; font-size:1.3rem; letter-spacing:6px; padding:12px 14px; font-weight:600; background:var(--bg-input); border:2px solid var(--border-color); border-radius:var(--radius-sm); color:var(--text-primary); font-family:var(--font); transition:var(--transition); min-height:48px;">' +
+                    '<button type="submit" class="auth-submit-btn" id="verifySubmitBtn" style="width:100%; min-height:44px; margin-top:10px; padding:10px; background:var(--accent); color:white; border:none; border-radius:var(--radius-sm); font-size:0.9rem; font-weight:600; cursor:pointer; transition:var(--transition); font-family:var(--font);">Verify</button>' +
                 '</form>' +
-                '<p class="auth-switch">Didn\'t receive code? <a href="#" id="resendCodeBtn">Resend Code</a></p>' +
+                '<p class="auth-switch" style="text-align:center; margin-top:12px; font-size:0.8rem; color:var(--text-secondary);">Didn\'t receive code? <a href="#" id="resendCodeBtn" style="color:var(--accent); text-decoration:none; font-weight:600; cursor:pointer;">Resend Code</a></p>' +
             '</div>';
         document.body.appendChild(modal);
         
@@ -1365,7 +1365,7 @@
     }
 
     // ============================================================
-    // HISTORY MODAL - FIXED: Individual delete working with click AND touch
+    // HISTORY MODAL - Individual delete working
     // ============================================================
     function setupHistoryButton() {
         var historyNavBtn = $('historyNavBtn');
@@ -1411,7 +1411,6 @@
         
         loadHistoryModal();
         
-        // Delete All button
         bindClick(historyModal.querySelector('#deleteAllHistory'), function() {
             if (!isLoggedIn || !currentUser) {
                 showNotification('Please sign in.', 'warning');
@@ -1462,20 +1461,15 @@
             }
             historyList.innerHTML = html;
             
-            // ============================================================
-            // FIXED: Individual delete buttons - DIRECT event binding with both click AND touch
-            // ============================================================
             var deleteBtns = historyList.querySelectorAll('.h-delete');
             for (var j = 0; j < deleteBtns.length; j++) {
                 (function(btn) {
-                    // DIRECT CLICK BINDING
                     btn.addEventListener('click', function(e) {
                         e.preventDefault();
                         e.stopPropagation();
                         handleDeleteClick(this);
                     });
                     
-                    // DIRECT TOUCH BINDING
                     btn.addEventListener('touchstart', function(e) {
                         e.preventDefault();
                         e.stopPropagation();
@@ -1484,23 +1478,18 @@
                 })(deleteBtns[j]);
             }
             
-            // Helper function to handle delete
             function handleDeleteClick(btnElement) {
                 var id = btnElement.getAttribute('data-id');
-                
-                // If not found, try to get from parent history-item
                 if (!id) {
                     var parent = btnElement.closest('.history-item');
                     if (parent) {
                         id = parent.getAttribute('data-id');
                     }
                 }
-                
                 if (!id) {
                     showNotification('Error: Could not identify history item.', 'error');
                     return;
                 }
-                
                 showConfirmationModal(
                     'Delete History',
                     'Delete this translation from history?',
