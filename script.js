@@ -32,6 +32,8 @@
     var finalTranscript = '';
     var interimTranscript = '';
     var recordingTimeout = null;
+    var silenceTimeout = null;
+    var lastSpeechTime = null;
     var currentRecordingLang = 'en';
     var detectedLanguageCache = '';
     var lastTranslationText = '';
@@ -403,7 +405,7 @@
     }
 
     // ============================================================
-    // CONFIRMATION MODAL
+    // CONFIRMATION MODAL - FIXED: Better button spacing
     // ============================================================
     function showConfirmationModal(title, message, confirmText, cancelText) {
         confirmText = confirmText || 'Confirm';
@@ -416,9 +418,9 @@
                 '<div class="modal-content confirmation-content">' +
                     '<h2>' + title + '</h2>' +
                     '<p>' + message + '</p>' +
-                    '<div class="confirmation-buttons" style="display:flex; gap:16px; justify-content:center; margin-top:16px; width:100%;">' +
-                        '<button class="auth-submit-btn cancel-btn" id="cancelConfirm" style="flex:1; max-width:160px; min-height:44px;">' + cancelText + '</button>' +
-                        '<button class="auth-submit-btn delete-btn" id="confirmAction" style="flex:1; max-width:160px; min-height:44px;">' + confirmText + '</button>' +
+                    '<div class="confirmation-buttons" style="display:flex; gap:16px; justify-content:center; margin-top:16px; width:100%; flex-wrap:wrap;">' +
+                        '<button class="auth-submit-btn cancel-btn" id="cancelConfirm" style="flex:1; min-width:120px; max-width:180px; min-height:44px; margin:4px;">' + cancelText + '</button>' +
+                        '<button class="auth-submit-btn delete-btn" id="confirmAction" style="flex:1; min-width:120px; max-width:180px; min-height:44px; margin:4px;">' + confirmText + '</button>' +
                     '</div>' +
                 '</div>';
             document.body.appendChild(modal);
@@ -455,9 +457,9 @@
                         '<label>Confirm New Password</label>' +
                         createPasswordField('resetConfirmPassword', 'Confirm new password').outerHTML +
                     '</div>' +
-                    '<div class="confirmation-buttons" style="display:flex; gap:16px; justify-content:center; margin-top:16px; width:100%;">' +
-                        '<button class="auth-submit-btn cancel-btn" id="resetCancel" style="flex:1; max-width:160px; min-height:44px;">Cancel</button>' +
-                        '<button class="auth-submit-btn" id="resetConfirm" style="flex:1; max-width:160px; min-height:44px; background: var(--accent);">Reset Password</button>' +
+                    '<div class="confirmation-buttons" style="display:flex; gap:16px; justify-content:center; margin-top:16px; width:100%; flex-wrap:wrap;">' +
+                        '<button class="auth-submit-btn cancel-btn" id="resetCancel" style="flex:1; min-width:120px; max-width:180px; min-height:44px; margin:4px;">Cancel</button>' +
+                        '<button class="auth-submit-btn" id="resetConfirm" style="flex:1; min-width:120px; max-width:180px; min-height:44px; margin:4px; background: var(--accent);">Reset Password</button>' +
                     '</div>' +
                 '</div>';
             document.body.appendChild(modal);
@@ -1363,7 +1365,7 @@
     }
 
     // ============================================================
-    // HISTORY MODAL
+    // HISTORY MODAL - FIXED: Individual delete working
     // ============================================================
     function setupHistoryButton() {
         var historyNavBtn = $('historyNavBtn');
@@ -1409,6 +1411,7 @@
         
         loadHistoryModal();
         
+        // Delete All button
         bindClick(historyModal.querySelector('#deleteAllHistory'), function() {
             if (!isLoggedIn || !currentUser) {
                 showNotification('Please sign in.', 'warning');
@@ -1459,14 +1462,28 @@
             }
             historyList.innerHTML = html;
             
+            // ============================================================
+            // FIXED: Individual delete buttons - properly bound for click AND touch
+            // ============================================================
             var deleteBtns = historyList.querySelectorAll('.h-delete');
             for (var j = 0; j < deleteBtns.length; j++) {
                 (function(btn) {
+                    // Use bindClick for both click and touch support
                     bindClick(btn, function(e) {
                         e.preventDefault();
                         e.stopPropagation();
                         var id = this.getAttribute('data-id');
-                        if (!id) return;
+                        if (!id) {
+                            // Try to get from parent
+                            var parent = this.closest('.history-item');
+                            if (parent) {
+                                id = parent.getAttribute('data-id');
+                            }
+                        }
+                        if (!id) {
+                            showNotification('Error: Could not identify history item.', 'error');
+                            return;
+                        }
                         
                         showConfirmationModal(
                             'Delete History',
@@ -1586,7 +1603,7 @@
     }
 
     // ============================================================
-    // TRANSLATION ENGINE - COMPLETELY FIXED
+    // TRANSLATION ENGINE
     // ============================================================
     function setupTranslation() {
         var sourceLang = $('sourceLang');
@@ -1611,6 +1628,7 @@
         lastDetectedLangResult = '';
         isDetectionRunning = false;
         isProcessingRecording = false;
+        lastSpeechTime = null;
         
         // Create Translate From Container
         translateFromContainer = document.createElement('div');
@@ -1635,11 +1653,6 @@
         translateFromBtn.textContent = 'Translate from: ';
         translateFromContainer.appendChild(translateFromBtn);
 
-        // ============================================================
-        // FIXED: Click handler for Translate From button
-        // When clicked: Change source language AND ensure target is different
-        // Then translate immediately
-        // ============================================================
         function handleTranslateFromClick(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -1653,25 +1666,17 @@
                     }
                 }
                 if (langExists && sourceLang) {
-                    // Change source to detected language
                     sourceLang.value = detectedLang;
-                    
-                    // IMPORTANT: Ensure target is different from source
                     ensureDifferentLanguages();
-                    
-                    // Hide the button
                     translateFromContainer.style.display = 'none';
                     translateFromBtn.setAttribute('data-lang', '');
                     translateFromBtn.textContent = 'Translate from: ';
-                    
                     var text = inputText ? inputText.value.trim() : '';
                     if (text) {
-                        // Force translation with the detected language
                         forceTranslationWithDetectedLang = true;
                         pendingDetectedLang = detectedLang;
                         performTranslation();
                     }
-                    
                     var langName = getLanguageName(detectedLang);
                     showNotification('Switched to: ' + langName, 'success', 2000);
                 }
@@ -1835,16 +1840,12 @@
             });
         }
 
-        // ============================================================
-        // FIXED: Ensure source and target are NEVER the same
-        // ============================================================
         function ensureDifferentLanguages() {
             if (!sourceLang || !targetLang) return;
             
             if (sourceLang.value === targetLang.value) {
                 var allLangs = LANGUAGES.map(function(l) { return l.code; });
                 var newLang = 'en';
-                // Find a language different from source
                 for (var i = 0; i < allLangs.length; i++) {
                     if (allLangs[i] !== sourceLang.value) {
                         newLang = allLangs[i];
@@ -1855,9 +1856,6 @@
             }
         }
 
-        // ============================================================
-        // FIXED: Translation with proper language handling
-        // ============================================================
         function performTranslation() {
             var text = inputText ? inputText.value.trim() : '';
             if (!text) {
@@ -1872,13 +1870,11 @@
                 return;
             }
             
-            // Ensure languages are different before translating
             ensureDifferentLanguages();
             
             var sourceLangCode = sourceLang ? sourceLang.value : 'en';
             var targetLangCode = targetLang ? targetLang.value : 'en';
             
-            // If still same, force change
             if (sourceLangCode === targetLangCode) {
                 var allLangs = LANGUAGES.map(function(l) { return l.code; });
                 for (var i = 0; i < allLangs.length; i++) {
@@ -1913,7 +1909,6 @@
                 translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
             }
             
-            // If we're forcing translation with a detected language
             if (forceTranslationWithDetectedLang && pendingDetectedLang) {
                 var detectedLang = pendingDetectedLang;
                 forceTranslationWithDetectedLang = false;
@@ -1925,7 +1920,6 @@
                     resetTranslateFromBtn();
                 }
                 
-                // Translate using the source language (which was changed to detected)
                 translateText(text, sourceLangCode, targetLangCode).then(function(translated) {
                     if (outputDisplay) outputDisplay.textContent = translated;
                     if (isLoggedIn && currentUser) {
@@ -1953,7 +1947,6 @@
                 return;
             }
             
-            // Normal flow - detect language first
             detectLanguage(text).then(function(detectedLang) {
                 if (!isRecording && detectedLang && detectedLang !== 'auto') {
                     updateTranslateFromBtn(detectedLang, text);
@@ -1994,9 +1987,6 @@
             }
         });
 
-        // ============================================================
-        // FIXED: Input detection with proper text handling
-        // ============================================================
         if (inputText) {
             inputText.addEventListener('input', function() {
                 var text = inputText.value.trim();
@@ -2041,7 +2031,6 @@
             });
         }
 
-        // Language change events - ensure different languages
         if (sourceLang) {
             sourceLang.addEventListener('change', function() {
                 stopRecordingIfActive();
@@ -2132,13 +2121,12 @@
             pendingDetectedLang = '';
             lastDetectedText = '';
             lastDetectedLangResult = '';
-            // Reset recording transcript
             finalTranscript = '';
             interimTranscript = '';
         });
 
         // ============================================================
-        // MIC - RECORDING SYSTEM - FIXED DOUBLING ISSUE
+        // MIC - RECORDING SYSTEM - FIXED: No time limit, stops after 1 minute silence
         // ============================================================
         function stopRecordingIfActive() {
             if (isRecording) {
@@ -2152,18 +2140,20 @@
                     clearTimeout(recordingTimeout);
                     recordingTimeout = null;
                 }
+                if (silenceTimeout) {
+                    clearTimeout(silenceTimeout);
+                    silenceTimeout = null;
+                }
                 if (micBtn) {
                     removeClass(micBtn, 'recording');
                     micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
                     if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
                 }
                 resetTranslateFromBtn();
-                // Only process if we have final transcript
                 if (finalTranscript.trim() && !isProcessingRecording) {
                     isProcessingRecording = true;
                     var text = finalTranscript.trim();
                     inputText.value = text;
-                    // Clear transcripts to prevent duplication
                     finalTranscript = '';
                     interimTranscript = '';
                     performTranslation();
@@ -2173,6 +2163,7 @@
                 }
                 finalTranscript = '';
                 interimTranscript = '';
+                lastSpeechTime = null;
             }
         }
 
@@ -2184,7 +2175,7 @@
                     try { recognition.stop(); } catch(e) {}
                 }
                 recognition = new SpeechRecognition();
-                recognition.continuous = false; // Changed to false to prevent doubling
+                recognition.continuous = true;
                 recognition.interimResults = true;
                 var selectedLang = sourceLang ? sourceLang.value || 'en' : 'en';
                 currentRecordingLang = selectedLang;
@@ -2196,6 +2187,14 @@
                     finalTranscript = '';
                     interimTranscript = '';
                     isProcessingRecording = false;
+                    lastSpeechTime = Date.now();
+                    
+                    // Reset silence timer
+                    if (silenceTimeout) {
+                        clearTimeout(silenceTimeout);
+                        silenceTimeout = null;
+                    }
+                    
                     if (micBtn) {
                         addClass(micBtn, 'recording');
                         micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
@@ -2206,41 +2205,23 @@
                     }
                     resetTranslateFromBtn();
                     
+                    // Remove the old 30-second timeout - NO MORE TIME LIMIT
                     if (recordingTimeout) {
                         clearTimeout(recordingTimeout);
-                    }
-                    recordingTimeout = setTimeout(function() {
-                        if (isRecording) {
-                            try {
-                                if (recognition) {
-                                    recognition.stop();
-                                }
-                            } catch(e) {}
-                            isRecording = false;
-                            if (micBtn) {
-                                removeClass(micBtn, 'recording');
-                                micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-                            }
-                            if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
-                            if (finalTranscript.trim() && !isProcessingRecording) {
-                                isProcessingRecording = true;
-                                var text = finalTranscript.trim();
-                                inputText.value = text;
-                                finalTranscript = '';
-                                interimTranscript = '';
-                                performTranslation();
-                                setTimeout(function() {
-                                    isProcessingRecording = false;
-                                }, 500);
-                            }
-                            finalTranscript = '';
-                            interimTranscript = '';
-                        }
                         recordingTimeout = null;
-                    }, 30000);
+                    }
                 };
                 
                 recognition.onresult = function(event) {
+                    // Update last speech time on any result
+                    lastSpeechTime = Date.now();
+                    
+                    // Reset silence timer
+                    if (silenceTimeout) {
+                        clearTimeout(silenceTimeout);
+                        silenceTimeout = null;
+                    }
+                    
                     var currentFinal = '';
                     var currentInterim = '';
                     
@@ -2252,9 +2233,12 @@
                         }
                     }
                     
-                    // Only update if we have new text
                     if (currentFinal) {
-                        finalTranscript = currentFinal;
+                        if (finalTranscript) {
+                            finalTranscript += ' ' + currentFinal;
+                        } else {
+                            finalTranscript = currentFinal;
+                        }
                     }
                     
                     if (currentInterim || finalTranscript) {
@@ -2266,11 +2250,51 @@
                             translateBtn.disabled = true;
                             translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
                         }
-                        // Translate the interim text
                         if (!isProcessingRecording) {
                             performTranslation();
                         }
                     }
+                    
+                    // Start silence timer - 60 seconds of silence will stop recording
+                    if (silenceTimeout) {
+                        clearTimeout(silenceTimeout);
+                    }
+                    silenceTimeout = setTimeout(function() {
+                        if (isRecording && lastSpeechTime) {
+                            var timeSinceLastSpeech = Date.now() - lastSpeechTime;
+                            if (timeSinceLastSpeech >= 60000) { // 60 seconds silence
+                                if (isRecording) {
+                                    try {
+                                        if (recognition) {
+                                            recognition.stop();
+                                        }
+                                    } catch(e) {}
+                                    isRecording = false;
+                                    if (micBtn) {
+                                        removeClass(micBtn, 'recording');
+                                        micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                                    }
+                                    if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
+                                    if (finalTranscript.trim() && !isProcessingRecording) {
+                                        isProcessingRecording = true;
+                                        var text = finalTranscript.trim();
+                                        inputText.value = text;
+                                        finalTranscript = '';
+                                        interimTranscript = '';
+                                        performTranslation();
+                                        setTimeout(function() {
+                                            isProcessingRecording = false;
+                                        }, 500);
+                                    }
+                                    finalTranscript = '';
+                                    interimTranscript = '';
+                                    lastSpeechTime = null;
+                                    showNotification('⏹ Recording stopped due to 60 seconds of silence.', 'info', 3000);
+                                }
+                            }
+                        }
+                        silenceTimeout = null;
+                    }, 61000); // Check after 61 seconds
                 };
                 
                 recognition.onerror = function(event) {
@@ -2298,13 +2322,17 @@
                 };
                 
                 recognition.onend = function() {
+                    if (silenceTimeout) {
+                        clearTimeout(silenceTimeout);
+                        silenceTimeout = null;
+                    }
                     if (recordingTimeout) {
                         clearTimeout(recordingTimeout);
                         recordingTimeout = null;
                     }
                     
                     if (isRecording) {
-                        // Don't auto-restart - this was causing doubling
+                        // Don't auto-restart - user controls start/stop
                         isRecording = false;
                         if (micBtn) {
                             removeClass(micBtn, 'recording');
@@ -2325,6 +2353,7 @@
                         }
                         finalTranscript = '';
                         interimTranscript = '';
+                        lastSpeechTime = null;
                     } else {
                         if (micBtn) {
                             removeClass(micBtn, 'recording');
@@ -2345,6 +2374,7 @@
                         }
                         finalTranscript = '';
                         interimTranscript = '';
+                        lastSpeechTime = null;
                     }
                 };
             }
@@ -2356,6 +2386,10 @@
                     // Stop recording
                     isRecording = false;
                     isProcessingRecording = false;
+                    if (silenceTimeout) {
+                        clearTimeout(silenceTimeout);
+                        silenceTimeout = null;
+                    }
                     try {
                         if (recognition) {
                             recognition.stop();
@@ -2383,6 +2417,7 @@
                     }
                     finalTranscript = '';
                     interimTranscript = '';
+                    lastSpeechTime = null;
                 } else {
                     // Start recording
                     var lang = sourceLang ? sourceLang.value || 'en' : 'en';
@@ -2391,10 +2426,16 @@
                     isProcessingRecording = false;
                     finalTranscript = '';
                     interimTranscript = '';
+                    lastSpeechTime = Date.now();
+                    
+                    if (silenceTimeout) {
+                        clearTimeout(silenceTimeout);
+                        silenceTimeout = null;
+                    }
                     
                     if (recognition) {
                         recognition.lang = lang;
-                        recognition.continuous = false;
+                        recognition.continuous = true;
                         try {
                             recognition.start();
                             showNotification('🎤 Listening in ' + langName + '...', 'info', 2000);
@@ -2402,7 +2443,7 @@
                             initRecognition();
                             if (recognition) {
                                 recognition.lang = lang;
-                                recognition.continuous = false;
+                                recognition.continuous = true;
                                 try {
                                     recognition.start();
                                     showNotification('🎤 Listening in ' + langName + '...', 'info', 2000);
@@ -2415,7 +2456,7 @@
                         initRecognition();
                         if (recognition) {
                             recognition.lang = lang;
-                            recognition.continuous = false;
+                            recognition.continuous = true;
                             try {
                                 recognition.start();
                                 showNotification('🎤 Listening in ' + langName + '...', 'info', 2000);
