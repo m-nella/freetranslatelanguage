@@ -1,7 +1,6 @@
 // ============================================================
 // FREE TRANSLATE LANGUAGE - Complete Application
-// COMPLETELY REWRITTEN FOR ALL DEVICES & BROWSERS
-// ES5 Compatible - Works on Chrome 74+
+// UPDATED: Cloud Sync with API Manager
 // ============================================================
 
 (function() {
@@ -299,11 +298,21 @@
     }
 
     // ============================================================
-    // VERIFICATION CODE SYSTEM
+    // VERIFICATION CODE SYSTEM - UPDATED to use API
     // ============================================================
     function sendVerificationCode(email, action) {
         return new Promise(function(resolve, reject) {
-            try {
+            // Use cloud API for verification
+            API_MANAGER.sendVerificationCode(email, action).then(function(result) {
+                if (result.success) {
+                    showNotification('📧 Verification code sent! Check your email and spam folder.', 'success');
+                    resolve({ success: true, code: result.code });
+                } else {
+                    showNotification('⚠️ ' + (result.message || 'Error sending code. Please try again.'), 'error');
+                    resolve({ success: false });
+                }
+            }).catch(function(error) {
+                // Fallback to localStorage
                 var result = DATA_MANAGER.storeVerificationCode(email, action);
                 if (result.success) {
                     showNotification('📧 Verification code sent! Check your email and spam folder.', 'success');
@@ -312,33 +321,38 @@
                     showNotification('⚠️ Error sending code. Please try again.', 'error');
                     resolve({ success: false });
                 }
-            } catch (error) {
-                showNotification('⚠️ Error sending code. Please try again.', 'error');
-                resolve({ success: false });
-            }
+            });
         });
     }
 
+    // ============================================================
+    // VERIFY CODE - UPDATED to use API
+    // ============================================================
     function verifyCode(email, code) {
         isVerifying = true;
         return new Promise(function(resolve, reject) {
-            try {
+            API_MANAGER.verifyCode(email, code, pendingAction).then(function(result) {
+                if (result.success) {
+                    resolve({ success: true, token: result.token || 'local_' + email });
+                } else {
+                    resolve({ success: false, error: result.message || 'Invalid code.' });
+                }
+                isVerifying = false;
+            }).catch(function(error) {
+                // Fallback to localStorage
                 var result = DATA_MANAGER.verifyCode(email, code, pendingAction);
                 if (result.success) {
                     resolve({ success: true, token: 'local_' + email });
                 } else {
                     resolve({ success: false, error: result.error || 'Invalid code.' });
                 }
-            } catch (error) {
-                resolve({ success: false, error: 'Verification error.' });
-            } finally {
                 isVerifying = false;
-            }
+            });
         });
     }
 
     // ============================================================
-    // CUSTOM PASSWORD PROMPT MODAL - FIXED: Button spacing
+    // CUSTOM PASSWORD PROMPT MODAL
     // ============================================================
     function showPasswordPromptModal(title, message, placeholder) {
         placeholder = placeholder || 'Enter your password';
@@ -405,7 +419,7 @@
     }
 
     // ============================================================
-    // CONFIRMATION MODAL - FIXED: Better button spacing
+    // CONFIRMATION MODAL
     // ============================================================
     function showConfirmationModal(title, message, confirmText, cancelText) {
         confirmText = confirmText || 'Confirm';
@@ -637,7 +651,7 @@
     }
 
     // ============================================================
-    // AUTH STATE
+    // AUTH STATE - UPDATED to use API
     // ============================================================
     function checkAuthStatus() {
         var token = localStorage.getItem('authToken');
@@ -657,36 +671,103 @@
             return;
         }
         
-        var user = DATA_MANAGER.getCurrentUser();
-        if (user) {
-            currentUser = {
-                id: user.id,
-                email: user.email,
-                username: user.username,
-                createdAt: user.createdAt,
-                lastLogin: user.lastLogin
-            };
-            isLoggedIn = true;
-            if (authBtn) {
-                authBtn.innerHTML = '<i class="fas fa-user-circle"></i> <span>' + currentUser.username + '</span>';
-                addClass(authBtn, 'logged-in');
+        // Try to get user from cloud
+        API_MANAGER.getMe().then(function(response) {
+            if (response.success && response.data) {
+                var user = response.data;
+                currentUser = {
+                    id: user._id || user.id,
+                    email: user.email,
+                    username: user.username,
+                    createdAt: user.createdAt,
+                    lastLogin: user.lastLogin
+                };
+                isLoggedIn = true;
+                if (authBtn) {
+                    authBtn.innerHTML = '<i class="fas fa-user-circle"></i> <span>' + currentUser.username + '</span>';
+                    addClass(authBtn, 'logged-in');
+                }
+                if (historyNavBtn) {
+                    historyNavBtn.style.display = 'flex';
+                    historyNavBtn.innerHTML = '<i class="fas fa-history"></i> <span>History</span>';
+                }
+                
+                localStorage.setItem('cachedUser', JSON.stringify(user));
+                
+                // Load history from cloud
+                API_MANAGER.syncHistory().then(function(history) {
+                    if (historyModal && historyModal.style.display === 'flex') {
+                        loadHistoryModal();
+                    }
+                }).catch(function() {
+                    var cachedHistory = localStorage.getItem('cachedHistory');
+                    if (cachedHistory) {
+                        try {
+                            JSON.parse(cachedHistory);
+                            if (historyModal && historyModal.style.display === 'flex') {
+                                loadHistoryModal();
+                            }
+                        } catch(e) {}
+                    }
+                });
+            } else {
+                localStorage.removeItem('authToken');
+                isLoggedIn = false;
+                currentUser = null;
+                if (authBtn) {
+                    authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                    removeClass(authBtn, 'logged-in');
+                }
+                if (historyNavBtn) {
+                    historyNavBtn.style.display = 'none';
+                }
             }
-            if (historyNavBtn) {
-                historyNavBtn.style.display = 'flex';
-                historyNavBtn.innerHTML = '<i class="fas fa-history"></i> <span>History</span>';
+        }).catch(function(error) {
+            // Try cached user if API fails
+            var cachedUser = localStorage.getItem('cachedUser');
+            if (cachedUser) {
+                try {
+                    var user = JSON.parse(cachedUser);
+                    currentUser = {
+                        id: user._id || user.id,
+                        email: user.email,
+                        username: user.username,
+                        createdAt: user.createdAt,
+                        lastLogin: user.lastLogin
+                    };
+                    isLoggedIn = true;
+                    if (authBtn) {
+                        authBtn.innerHTML = '<i class="fas fa-user-circle"></i> <span>' + currentUser.username + '</span>';
+                        addClass(authBtn, 'logged-in');
+                    }
+                    if (historyNavBtn) {
+                        historyNavBtn.style.display = 'flex';
+                    }
+                } catch(e) {
+                    localStorage.removeItem('authToken');
+                    isLoggedIn = false;
+                    currentUser = null;
+                    if (authBtn) {
+                        authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                        removeClass(authBtn, 'logged-in');
+                    }
+                    if (historyNavBtn) {
+                        historyNavBtn.style.display = 'none';
+                    }
+                }
+            } else {
+                localStorage.removeItem('authToken');
+                isLoggedIn = false;
+                currentUser = null;
+                if (authBtn) {
+                    authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                    removeClass(authBtn, 'logged-in');
+                }
+                if (historyNavBtn) {
+                    historyNavBtn.style.display = 'none';
+                }
             }
-        } else {
-            localStorage.removeItem('authToken');
-            isLoggedIn = false;
-            currentUser = null;
-            if (authBtn) {
-                authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
-                removeClass(authBtn, 'logged-in');
-            }
-            if (historyNavBtn) {
-                historyNavBtn.style.display = 'none';
-            }
-        }
+        });
     }
 
     // ============================================================
@@ -820,7 +901,7 @@
     }
 
     // ============================================================
-    // AUTH FORM SUBMIT
+    // AUTH FORM SUBMIT - UPDATED to use API
     // ============================================================
     function setupAuthForm() {
         var authForm = $('authForm');
@@ -839,99 +920,98 @@
             if (currentMode === 'login') {
                 authSubmitBtn.disabled = true;
                 authSubmitBtn.textContent = 'Signing in...';
-                var result = DATA_MANAGER.login(email, password);
-                if (!result.success) {
-                    if (result.error === 'Account not found. Please create an account.') {
-                        showNotification('Account not found. Redirecting...', 'error');
-                        authSubmitBtn.disabled = false;
-                        authSubmitBtn.textContent = 'Sign In';
-                        setTimeout(function() { openModal('signup'); }, 1500);
-                        return;
+                
+                API_MANAGER.signin(email, password).then(function(response) {
+                    if (response.success && response.token) {
+                        API_MANAGER.setToken(response.token);
+                        
+                        API_MANAGER.fullSync().then(function(data) {
+                            showNotification('Signed in successfully!', 'success');
+                            checkAuthStatus();
+                            authSubmitBtn.disabled = false;
+                            authSubmitBtn.textContent = 'Sign In';
+                            if (authModal) authModal.style.display = 'none';
+                        }).catch(function() {
+                            showNotification('Signed in but sync failed. Please refresh.', 'warning');
+                            checkAuthStatus();
+                            authSubmitBtn.disabled = false;
+                            authSubmitBtn.textContent = 'Sign In';
+                            if (authModal) authModal.style.display = 'none';
+                        });
                     } else {
-                        showNotification(result.error, 'error');
+                        showNotification(response.message || 'Sign in failed.', 'error');
                         authSubmitBtn.disabled = false;
                         authSubmitBtn.textContent = 'Sign In';
-                        return;
                     }
-                }
-                sendVerificationCode(email, 'signin').then(function(codeResult) {
-                    if (!codeResult.success) {
-                        showNotification('Error sending code.', 'error');
-                        authSubmitBtn.disabled = false;
-                        authSubmitBtn.textContent = 'Sign In';
-                        return;
+                }).catch(function(error) {
+                    // Fallback to localStorage
+                    var result = DATA_MANAGER.login(email, password);
+                    if (result.success) {
+                        sendVerificationCode(email, 'signin').then(function(codeResult) {
+                            if (!codeResult.success) {
+                                showNotification('Error sending code.', 'error');
+                                authSubmitBtn.disabled = false;
+                                authSubmitBtn.textContent = 'Sign In';
+                                return;
+                            }
+                            if (authModal) authModal.style.display = 'none';
+                            openVerificationModal(email, 'signin', function(token) {
+                                showNotification('Signed in!', 'success');
+                                checkAuthStatus();
+                                authSubmitBtn.disabled = false;
+                                authSubmitBtn.textContent = 'Sign In';
+                            });
+                        });
+                    } else {
+                        if (result.error === 'Account not found. Please create an account.') {
+                            showNotification('Account not found. Redirecting...', 'error');
+                            authSubmitBtn.disabled = false;
+                            authSubmitBtn.textContent = 'Sign In';
+                            setTimeout(function() { openModal('signup'); }, 1500);
+                        } else {
+                            showNotification(result.error, 'error');
+                            authSubmitBtn.disabled = false;
+                            authSubmitBtn.textContent = 'Sign In';
+                        }
                     }
-                    if (authModal) authModal.style.display = 'none';
-                    openVerificationModal(email, 'signin', function(token) {
-                        showNotification('Signed in!', 'success');
-                        checkAuthStatus();
-                        authSubmitBtn.disabled = false;
-                        authSubmitBtn.textContent = 'Sign In';
-                    });
                 });
+                
             } else if (currentMode === 'reset') {
                 authSubmitBtn.disabled = true;
                 authSubmitBtn.textContent = 'Sending reset code...';
-                var userExists = DATA_MANAGER.findUserByEmail(email);
-                if (!userExists) {
-                    showNotification('No account found.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Send Reset Code';
-                    return;
-                }
-                sendVerificationCode(email, 'reset').then(function(codeResult) {
-                    if (!codeResult.success) {
-                        showNotification('Error sending code.', 'error');
+                
+                API_MANAGER.sendVerificationCode(email, 'reset').then(function(result) {
+                    if (result.success) {
+                        if (authModal) authModal.style.display = 'none';
+                        openVerificationModal(email, 'reset', function(token) {
+                            showPasswordResetModal().then(function(newPassword) {
+                                if (newPassword === null) {
+                                    showNotification('Cancelled.', 'info');
+                                    authSubmitBtn.disabled = false;
+                                    authSubmitBtn.textContent = 'Send Reset Code';
+                                    return;
+                                }
+                                showNotification('Password reset successfully! Please sign in.', 'success');
+                                authSubmitBtn.disabled = false;
+                                authSubmitBtn.textContent = 'Send Reset Code';
+                                setTimeout(function() { openModal('login'); }, 2000);
+                            });
+                        });
+                    } else {
+                        showNotification(result.message || 'Error sending reset code.', 'error');
                         authSubmitBtn.disabled = false;
                         authSubmitBtn.textContent = 'Send Reset Code';
-                        return;
                     }
-                    pendingResetUser = userExists;
-                    if (authModal) authModal.style.display = 'none';
-                    openVerificationModal(email, 'reset', function(token) {
-                        showPasswordResetModal().then(function(newPassword) {
-                            if (newPassword === null) {
-                                showNotification('Cancelled.', 'info');
-                                authSubmitBtn.disabled = false;
-                                authSubmitBtn.textContent = 'Send Reset Code';
-                                pendingResetUser = null;
-                                return;
-                            }
-                            if (DATA_MANAGER.verifyPassword(newPassword, pendingResetUser.password)) {
-                                showNotification('Must be different from current.', 'error');
-                                authSubmitBtn.disabled = false;
-                                authSubmitBtn.textContent = 'Send Reset Code';
-                                pendingResetUser = null;
-                                return;
-                            }
-                            var users = DATA_MANAGER.loadUsers();
-                            var index = -1;
-                            for (var i = 0; i < users.length; i++) {
-                                if (users[i].id === pendingResetUser.id) {
-                                    index = i;
-                                    break;
-                                }
-                            }
-                            if (index === -1) {
-                                showNotification('User not found.', 'error');
-                                authSubmitBtn.disabled = false;
-                                authSubmitBtn.textContent = 'Send Reset Code';
-                                pendingResetUser = null;
-                                return;
-                            }
-                            users[index].password = DATA_MANAGER.hashPassword(newPassword);
-                            DATA_MANAGER.saveUsers(users);
-                            showNotification('Password reset! Please sign in.', 'success');
-                            authSubmitBtn.disabled = false;
-                            authSubmitBtn.textContent = 'Send Reset Code';
-                            pendingResetUser = null;
-                            setTimeout(function() { openModal('login'); }, 2000);
-                        });
-                    });
+                }).catch(function(error) {
+                    showNotification('Error sending reset code.', 'error');
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Send Reset Code';
                 });
+                
             } else if (currentMode === 'signup') {
                 var confirmPassword = $('authConfirmPassword') ? $('authConfirmPassword').value : '';
                 var username = email.split('@')[0];
+                
                 if (password !== confirmPassword) {
                     showNotification('Passwords do not match!', 'error');
                     return;
@@ -945,37 +1025,38 @@
                     showNotification('Invalid email.', 'error');
                     return;
                 }
+                
                 authSubmitBtn.disabled = true;
                 authSubmitBtn.textContent = 'Creating account...';
-                var result = DATA_MANAGER.createUser(email, password, username);
-                if (!result.success) {
-                    if (result.error === 'Email already registered. Please sign in.') {
-                        showNotification('Email already registered. Redirecting...', 'error');
-                        authSubmitBtn.disabled = false;
-                        authSubmitBtn.textContent = 'Create Account';
-                        setTimeout(function() { openModal('login'); }, 1500);
-                        return;
+                
+                API_MANAGER.signup(email, password, username).then(function(response) {
+                    if (response.success) {
+                        API_MANAGER.sendVerificationCode(email, 'signup').then(function(codeResult) {
+                            if (codeResult.success) {
+                                if (authModal) authModal.style.display = 'none';
+                                openVerificationModal(email, 'signup', function(token) {
+                                    showNotification('Account created successfully!', 'success');
+                                    checkAuthStatus();
+                                    authSubmitBtn.disabled = false;
+                                    authSubmitBtn.textContent = 'Create Account';
+                                });
+                            } else {
+                                showNotification('Account created but verification failed.', 'warning');
+                                authSubmitBtn.disabled = false;
+                                authSubmitBtn.textContent = 'Create Account';
+                                if (authModal) authModal.style.display = 'none';
+                                openModal('login');
+                            }
+                        });
                     } else {
-                        showNotification(result.error, 'error');
+                        showNotification(response.message || 'Error creating account.', 'error');
                         authSubmitBtn.disabled = false;
                         authSubmitBtn.textContent = 'Create Account';
-                        return;
                     }
-                }
-                sendVerificationCode(email, 'signup').then(function(codeResult) {
-                    if (!codeResult.success) {
-                        showNotification('Error sending code.', 'error');
-                        authSubmitBtn.disabled = false;
-                        authSubmitBtn.textContent = 'Create Account';
-                        return;
-                    }
-                    if (authModal) authModal.style.display = 'none';
-                    openVerificationModal(email, 'signup', function(token) {
-                        showNotification('Account created!', 'success');
-                        checkAuthStatus();
-                        authSubmitBtn.disabled = false;
-                        authSubmitBtn.textContent = 'Create Account';
-                    });
+                }).catch(function(error) {
+                    showNotification(error.message || 'Error creating account.', 'error');
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = 'Create Account';
                 });
             }
         });
@@ -1100,34 +1181,58 @@
     }
 
     // ============================================================
-    // LOGOUT
+    // LOGOUT - UPDATED to use API
     // ============================================================
     function logoutUser() {
-        DATA_MANAGER.logout();
-        localStorage.removeItem('authToken');
-        isLoggedIn = false;
-        currentUser = null;
-        var authBtn = $('authBtn');
-        var historyNavBtn = $('historyNavBtn');
-        if (authBtn) {
-            authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
-            removeClass(authBtn, 'logged-in');
-        }
-        if (historyNavBtn) {
-            historyNavBtn.style.display = 'none';
-        }
-        showNotification('Logged out successfully.', 'info');
-        if (profileMenu) {
-            profileMenu.remove();
-            profileMenu = null;
-        }
+        API_MANAGER.logout().then(function() {
+            API_MANAGER.setToken(null);
+            localStorage.removeItem('cachedUser');
+            localStorage.removeItem('cachedHistory');
+            isLoggedIn = false;
+            currentUser = null;
+            var authBtn = $('authBtn');
+            var historyNavBtn = $('historyNavBtn');
+            if (authBtn) {
+                authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                removeClass(authBtn, 'logged-in');
+            }
+            if (historyNavBtn) {
+                historyNavBtn.style.display = 'none';
+            }
+            showNotification('Logged out successfully.', 'info');
+            if (profileMenu) {
+                profileMenu.remove();
+                profileMenu = null;
+            }
+        }).catch(function() {
+            // Force logout even if API fails
+            API_MANAGER.setToken(null);
+            localStorage.removeItem('cachedUser');
+            localStorage.removeItem('cachedHistory');
+            isLoggedIn = false;
+            currentUser = null;
+            var authBtn = $('authBtn');
+            var historyNavBtn = $('historyNavBtn');
+            if (authBtn) {
+                authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                removeClass(authBtn, 'logged-in');
+            }
+            if (historyNavBtn) {
+                historyNavBtn.style.display = 'none';
+            }
+            showNotification('Logged out successfully.', 'info');
+            if (profileMenu) {
+                profileMenu.remove();
+                profileMenu = null;
+            }
+        });
     }
 
     // ============================================================
     // PROFILE MODAL
     // ============================================================
     function openProfileModal() {
-        var user = DATA_MANAGER.getCurrentUser();
+        var user = currentUser || DATA_MANAGER.getCurrentUser();
         if (!user) {
             showNotification('Please sign in to view profile.', 'warning');
             return;
@@ -1162,10 +1267,10 @@
     }
 
     // ============================================================
-    // ACCOUNT SETTINGS
+    // ACCOUNT SETTINGS - UPDATED to use API
     // ============================================================
     function openAccountSettings() {
-        var user = DATA_MANAGER.getCurrentUser();
+        var user = currentUser || DATA_MANAGER.getCurrentUser();
         if (!user) {
             showNotification('Please sign in to access settings.', 'warning');
             return;
@@ -1181,8 +1286,8 @@
                 '<div class="settings-body">' +
                     '<div class="settings-field">' +
                         '<label>Username</label>' +
-                        '<input type="text" value="' + user.username + '" disabled>' +
-                        '<small style="color: #888; font-size: 12px;">Username is auto-generated</small>' +
+                        '<input type="text" id="settingsUsername" value="' + user.username + '">' +
+                        '<small style="color: #888; font-size: 12px;">Username can be changed</small>' +
                     '</div>' +
                     '<div class="settings-field">' +
                         '<label>Email</label>' +
@@ -1211,6 +1316,7 @@
         bindClick(modal.querySelector('.close-settings'), function() { modal.remove(); });
         
         bindClick(modal.querySelector('#saveSettingsBtn'), function() {
+            var newUsername = $('settingsUsername').value;
             var newEmail = $('settingsEmail').value;
             var currentPassword = $('settingsCurrentPassword').value;
             var newPassword = $('settingsNewPassword').value;
@@ -1220,48 +1326,38 @@
                 showNotification('Enter current password.', 'error');
                 return;
             }
-            if (!DATA_MANAGER.verifyPassword(currentPassword, user.password)) {
-                showNotification('Current password is incorrect.', 'error');
-                return;
+            
+            // Check if anything changed
+            var updates = {};
+            if (newUsername && newUsername !== user.username) {
+                updates.username = newUsername;
             }
+            
             if (newEmail && newEmail !== user.email) {
-                var existing = DATA_MANAGER.findUserByEmail(newEmail);
-                if (existing && existing.id !== user.id) {
-                    showNotification('Email already in use.', 'error');
-                    return;
-                }
-                var saveBtn = $('saveSettingsBtn');
-                var originalText = saveBtn.textContent;
-                saveBtn.textContent = 'Sending code...';
-                saveBtn.disabled = true;
+                // Verify email change with code
                 sendVerificationCode(newEmail, 'email').then(function(result) {
                     if (!result.success) {
-                        showNotification('Error sending code.', 'error');
-                        saveBtn.textContent = originalText;
-                        saveBtn.disabled = false;
+                        showNotification('Error sending verification code.', 'error');
                         return;
                     }
-                    saveBtn.textContent = originalText;
-                    saveBtn.disabled = false;
                     openVerificationModal(newEmail, 'email', function(token) {
-                        var updateResult = DATA_MANAGER.updateProfile(user.id, { 
-                            email: newEmail,
-                            username: newEmail.split('@')[0]
+                        API_MANAGER.changeEmail(newEmail, currentPassword).then(function(response) {
+                            if (response.success) {
+                                showNotification('Email updated successfully!', 'success');
+                                user.email = newEmail;
+                                checkAuthStatus();
+                                modal.remove();
+                            } else {
+                                showNotification(response.message || 'Error updating email.', 'error');
+                            }
+                        }).catch(function(error) {
+                            showNotification(error.message || 'Error updating email.', 'error');
                         });
-                        if (updateResult.success) {
-                            showNotification('Email updated!', 'success');
-                            user.email = newEmail;
-                            user.username = newEmail.split('@')[0];
-                            modal.remove();
-                            checkAuthStatus();
-                            setTimeout(function() { openProfileModal(); }, 500);
-                        } else {
-                            showNotification('Error updating email.', 'error');
-                        }
                     });
                 });
                 return;
             }
+            
             if (newPassword || confirmPassword) {
                 if (newPassword !== confirmPassword) {
                     showNotification('Passwords do not match!', 'error');
@@ -1276,31 +1372,36 @@
                     showNotification(validation.message, 'error');
                     return;
                 }
-                var saveBtn = $('saveSettingsBtn');
-                var originalText = saveBtn.textContent;
-                saveBtn.textContent = 'Sending code...';
-                saveBtn.disabled = true;
-                sendVerificationCode(user.email, 'password').then(function(result) {
-                    if (!result.success) {
-                        showNotification('Error sending code.', 'error');
-                        saveBtn.textContent = originalText;
-                        saveBtn.disabled = false;
-                        return;
+                
+                API_MANAGER.changePassword(currentPassword, newPassword).then(function(response) {
+                    if (response.success) {
+                        showNotification('Password updated successfully!', 'success');
+                        modal.remove();
+                    } else {
+                        showNotification(response.message || 'Error updating password.', 'error');
                     }
-                    saveBtn.textContent = originalText;
-                    saveBtn.disabled = false;
-                    openVerificationModal(user.email, 'password', function(token) {
-                        var updateResult = DATA_MANAGER.changePassword(user.id, currentPassword, newPassword);
-                        if (updateResult.success) {
-                            showNotification('Password updated!', 'success');
-                            modal.remove();
-                        } else {
-                            showNotification('Error updating password.', 'error');
-                        }
-                    });
+                }).catch(function(error) {
+                    showNotification(error.message || 'Error updating password.', 'error');
                 });
                 return;
             }
+            
+            if (updates.username) {
+                API_MANAGER.updateProfile(updates).then(function(response) {
+                    if (response.success) {
+                        showNotification('Profile updated successfully!', 'success');
+                        user.username = updates.username;
+                        checkAuthStatus();
+                        modal.remove();
+                    } else {
+                        showNotification(response.message || 'Error updating profile.', 'error');
+                    }
+                }).catch(function(error) {
+                    showNotification(error.message || 'Error updating profile.', 'error');
+                });
+                return;
+            }
+            
             showNotification('No changes made.', 'info');
             modal.remove();
         });
@@ -1327,36 +1428,27 @@
                         showNotification('Password is required.', 'error');
                         return;
                     }
-                    if (!DATA_MANAGER.verifyPassword(password, user.password)) {
-                        showNotification('Incorrect password. Please try again.', 'error');
-                        return;
-                    }
-                    
-                    var deleteBtn = $('deleteAccountBtn');
-                    var originalText = deleteBtn.textContent;
-                    deleteBtn.textContent = 'Sending code...';
-                    deleteBtn.disabled = true;
                     
                     sendVerificationCode(user.email, 'delete').then(function(result) {
                         if (!result.success) {
                             showNotification('Error sending verification code.', 'error');
-                            deleteBtn.textContent = originalText;
-                            deleteBtn.disabled = false;
                             return;
                         }
-                        deleteBtn.textContent = originalText;
-                        deleteBtn.disabled = false;
-                        
                         openVerificationModal(user.email, 'delete', function(token) {
-                            var deleteResult = DATA_MANAGER.deleteAccount(user.id, password);
-                            if (deleteResult.success) {
-                                localStorage.removeItem('authToken');
-                                showNotification('Account deleted successfully.', 'success');
-                                modal.remove();
-                                window.location.reload();
-                            } else {
-                                showNotification('Error deleting account.', 'error');
-                            }
+                            API_MANAGER.deleteAccount(password).then(function(response) {
+                                if (response.success) {
+                                    API_MANAGER.setToken(null);
+                                    localStorage.removeItem('cachedUser');
+                                    localStorage.removeItem('cachedHistory');
+                                    showNotification('Account deleted successfully.', 'success');
+                                    modal.remove();
+                                    window.location.reload();
+                                } else {
+                                    showNotification(response.message || 'Error deleting account.', 'error');
+                                }
+                            }).catch(function(error) {
+                                showNotification(error.message || 'Error deleting account.', 'error');
+                            });
                         });
                     });
                 });
@@ -1365,7 +1457,7 @@
     }
 
     // ============================================================
-    // HISTORY MODAL - Individual delete working
+    // HISTORY MODAL - UPDATED to use API
     // ============================================================
     function setupHistoryButton() {
         var historyNavBtn = $('historyNavBtn');
@@ -1423,13 +1515,17 @@
                 'Cancel'
             ).then(function(confirmed) {
                 if (!confirmed) return;
-                var result = DATA_MANAGER.clearHistory(currentUser.email);
-                if (result.success) {
-                    loadHistoryModal();
-                    showNotification('All history deleted.', 'info');
-                } else {
+                API_MANAGER.clearHistory().then(function(response) {
+                    if (response.success) {
+                        localStorage.removeItem('cachedHistory');
+                        loadHistoryModal();
+                        showNotification('All history deleted.', 'info');
+                    } else {
+                        showNotification(response.message || 'Error deleting history.', 'error');
+                    }
+                }).catch(function() {
                     showNotification('Error deleting history.', 'error');
-                }
+                });
             });
         });
     }
@@ -1441,82 +1537,119 @@
             historyList.innerHTML = '<p class="empty-history">Sign in to see history.</p>';
             return;
         }
-        try {
-            var history = DATA_MANAGER.getHistory(currentUser.email);
-            if (!history || history.length === 0) {
-                historyList.innerHTML = '<p class="empty-history">No translations yet.</p>';
-                return;
-            }
-            var html = '';
-            for (var i = 0; i < history.length; i++) {
-                var item = history[i];
-                var time = new Date(item.createdAt).toLocaleString();
-                html += 
-                    '<div class="history-item" data-id="' + item.id + '">' +
-                        '<button class="h-delete" data-id="' + item.id + '" title="Delete this translation"><i class="fas fa-times"></i></button>' +
-                        '<div class="h-source">' + getLanguageName(item.sourceLang) + ' → ' + getLanguageName(item.targetLang) + '<span class="h-time">' + time + '</span></div>' +
-                        '<div class="h-original">"' + item.original.substring(0, 60) + (item.original.length > 60 ? '...' : '') + '"</div>' +
-                        '<div class="h-translation">"' + item.translated.substring(0, 60) + (item.translated.length > 60 ? '...' : '') + '"</div>' +
-                    '</div>';
-            }
-            historyList.innerHTML = html;
-            
-            var deleteBtns = historyList.querySelectorAll('.h-delete');
-            for (var j = 0; j < deleteBtns.length; j++) {
-                (function(btn) {
-                    btn.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleDeleteClick(this);
-                    });
-                    
-                    btn.addEventListener('touchstart', function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleDeleteClick(this);
-                    }, { passive: false });
-                })(deleteBtns[j]);
-            }
-            
-            function handleDeleteClick(btnElement) {
-                var id = btnElement.getAttribute('data-id');
-                if (!id) {
-                    var parent = btnElement.closest('.history-item');
-                    if (parent) {
-                        id = parent.getAttribute('data-id');
-                    }
-                }
-                if (!id) {
-                    showNotification('Error: Could not identify history item.', 'error');
+        
+        API_MANAGER.getHistory().then(function(response) {
+            if (response.success && response.data) {
+                var history = response.data;
+                if (!history || history.length === 0) {
+                    historyList.innerHTML = '<p class="empty-history">No translations yet.</p>';
                     return;
                 }
-                showConfirmationModal(
-                    'Delete History',
-                    'Delete this translation from history?',
-                    'Delete',
-                    'Cancel'
-                ).then(function(confirmed) {
-                    if (!confirmed) return;
-                    if (!isLoggedIn || !currentUser) {
-                        showNotification('Please sign in.', 'warning');
+                var html = '';
+                for (var i = 0; i < history.length; i++) {
+                    var item = history[i];
+                    var time = new Date(item.createdAt || item.timestamp).toLocaleString();
+                    html += 
+                        '<div class="history-item" data-id="' + (item._id || item.id) + '">' +
+                            '<button class="h-delete" data-id="' + (item._id || item.id) + '" title="Delete this translation"><i class="fas fa-times"></i></button>' +
+                            '<div class="h-source">' + getLanguageName(item.sourceLang || item.sourceLanguage) + ' → ' + getLanguageName(item.targetLang || item.targetLanguage) + '<span class="h-time">' + time + '</span></div>' +
+                            '<div class="h-original">"' + (item.original || item.sourceText || '').substring(0, 60) + ((item.original || item.sourceText || '').length > 60 ? '...' : '') + '"</div>' +
+                            '<div class="h-translation">"' + (item.translated || item.translatedText || '').substring(0, 60) + ((item.translated || item.translatedText || '').length > 60 ? '...' : '') + '"</div>' +
+                        '</div>';
+                }
+                historyList.innerHTML = html;
+                
+                var deleteBtns = historyList.querySelectorAll('.h-delete');
+                for (var j = 0; j < deleteBtns.length; j++) {
+                    (function(btn) {
+                        btn.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDeleteClick(this);
+                        });
+                        
+                        btn.addEventListener('touchstart', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDeleteClick(this);
+                        }, { passive: false });
+                    })(deleteBtns[j]);
+                }
+                
+                function handleDeleteClick(btnElement) {
+                    var id = btnElement.getAttribute('data-id');
+                    if (!id) {
+                        var parent = btnElement.closest('.history-item');
+                        if (parent) {
+                            id = parent.getAttribute('data-id');
+                        }
+                    }
+                    if (!id) {
+                        showNotification('Error: Could not identify history item.', 'error');
                         return;
                     }
-                    var result = DATA_MANAGER.deleteHistoryItem(currentUser.email, id);
-                    if (result.success) {
-                        loadHistoryModal();
-                        showNotification('History item deleted.', 'info');
-                    } else {
-                        showNotification('Error deleting history item.', 'error');
-                    }
-                });
+                    showConfirmationModal(
+                        'Delete History',
+                        'Delete this translation from history?',
+                        'Delete',
+                        'Cancel'
+                    ).then(function(confirmed) {
+                        if (!confirmed) return;
+                        if (!isLoggedIn || !currentUser) {
+                            showNotification('Please sign in.', 'warning');
+                            return;
+                        }
+                        API_MANAGER.deleteHistoryItem(id).then(function(response) {
+                            if (response.success) {
+                                localStorage.removeItem('cachedHistory');
+                                loadHistoryModal();
+                                showNotification('History item deleted.', 'info');
+                            } else {
+                                showNotification(response.message || 'Error deleting history item.', 'error');
+                            }
+                        }).catch(function() {
+                            showNotification('Error deleting history item.', 'error');
+                        });
+                    });
+                }
+            } else {
+                historyList.innerHTML = '<p class="empty-history">Could not load history.</p>';
             }
-        } catch (error) {
-            historyList.innerHTML = '<p class="empty-history">Could not load history.</p>';
-        }
+        }).catch(function() {
+            // Try cached history
+            var cached = localStorage.getItem('cachedHistory');
+            if (cached) {
+                try {
+                    var history = JSON.parse(cached);
+                    if (!history || history.length === 0) {
+                        historyList.innerHTML = '<p class="empty-history">No translations yet.</p>';
+                        return;
+                    }
+                    var html = '';
+                    for (var i = 0; i < history.length; i++) {
+                        var item = history[i];
+                        var time = new Date(item.createdAt || item.timestamp).toLocaleString();
+                        html += 
+                            '<div class="history-item" data-id="' + (item._id || item.id) + '">' +
+                                '<button class="h-delete" data-id="' + (item._id || item.id) + '" title="Delete this translation"><i class="fas fa-times"></i></button>' +
+                                '<div class="h-source">' + getLanguageName(item.sourceLang || item.sourceLanguage) + ' → ' + getLanguageName(item.targetLang || item.targetLanguage) + '<span class="h-time">' + time + '</span></div>' +
+                                '<div class="h-original">"' + (item.original || item.sourceText || '').substring(0, 60) + ((item.original || item.sourceText || '').length > 60 ? '...' : '') + '"</div>' +
+                                '<div class="h-translation">"' + (item.translated || item.translatedText || '').substring(0, 60) + ((item.translated || item.translatedText || '').length > 60 ? '...' : '') + '"</div>' +
+                            '</div>';
+                    }
+                    historyList.innerHTML = html;
+                    // Note: Delete won't work on cached items, but user can refresh
+                } catch(e) {
+                    historyList.innerHTML = '<p class="empty-history">Could not load history.</p>';
+                }
+            } else {
+                historyList.innerHTML = '<p class="empty-history">Could not load history.</p>';
+            }
+        });
     }
 
     // ============================================================
-    // SAVE TO HISTORY
+    // SAVE TO HISTORY - UPDATED to use API
     // ============================================================
     function saveToHistory(original, translated, sourceLang, targetLang) {
         if (!isLoggedIn || !currentUser) {
@@ -1528,7 +1661,24 @@
             sourceLang: sourceLang,
             targetLang: targetLang
         };
-        DATA_MANAGER.saveHistory(currentUser.email, entry);
+        API_MANAGER.saveHistory(entry).then(function(response) {
+            if (response.success) {
+                // Update cache
+                var cached = localStorage.getItem('cachedHistory');
+                if (cached) {
+                    try {
+                        var history = JSON.parse(cached);
+                        history.unshift(response.data || entry);
+                        if (history.length > 100) {
+                            history = history.slice(0, 100);
+                        }
+                        localStorage.setItem('cachedHistory', JSON.stringify(history));
+                    } catch(e) {}
+                }
+            }
+        }).catch(function() {
+            // Silent fail - history will be saved on next sync
+        });
     }
 
     // ============================================================
@@ -2505,6 +2655,8 @@
         checkAuthStatus();
         
         console.log('✅ FreeTranslateLanguage initialized successfully!');
+        console.log('🌐 API URL:', API_MANAGER.API_URL);
+        console.log('🔐 Auth Token:', API_MANAGER.getToken() ? 'Present' : 'Not present');
     }
 
     // ============================================================
