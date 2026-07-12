@@ -102,6 +102,19 @@ var API_MANAGER = {
     },
     
     // ============================================================
+    // CHECK EMAIL EXISTS - For password reset
+    // ============================================================
+    checkEmailExists: function(email) {
+        return fetch(this.API_URL + '/auth/check-email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email: email })
+        }).then(this.handleResponse);
+    },
+    
+    // ============================================================
     // USER APIs
     // ============================================================
     
