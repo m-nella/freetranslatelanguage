@@ -690,7 +690,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     }
 });
 
-// DELETE /api/user/delete
+// DELETE /api/user/delete - FIXED
 app.delete('/api/user/delete', authMiddleware, async (req, res) => {
     try {
         const { password } = req.body;
@@ -705,9 +705,14 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
         }
 
         // Verify password
-        const isMatch = await comparePassword(password, user.passwordHash);
-        if (!isMatch) {
-            return res.status(401).json({ success: false, message: 'Password is incorrect.' });
+        try {
+            const isMatch = await comparePassword(password, user.passwordHash);
+            if (!isMatch) {
+                return res.status(401).json({ success: false, message: 'Password is incorrect.' });
+            }
+        } catch (compareError) {
+            console.error('❌ Password comparison error during deletion:', compareError);
+            return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
         // Delete history
@@ -720,7 +725,7 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
 
     } catch (error) {
         console.error('Delete account error:', error);
-        res.status(500).json({ success: false, message: 'Error deleting account.' });
+        res.status(500).json({ success: false, message: 'Error deleting account. Please try again.' });
     }
 });
 
