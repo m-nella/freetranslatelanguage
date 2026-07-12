@@ -37,7 +37,6 @@ const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
     message: { success: false, message: 'Too many requests, please try again later.' },
-    // FIX: Handle X-Forwarded-For header properly
     keyGenerator: function(req) {
         return req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
     }
@@ -468,7 +467,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin - FIXED
+// POST /api/auth/signin - FIXED with better error handling
 app.post('/api/auth/signin', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -535,7 +534,7 @@ app.post('/api/auth/logout', authMiddleware, async (req, res) => {
     }
 });
 
-// GET /api/auth/me
+// GET /api/auth/me - FIXED with better error handling
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
     try {
         const user = await User.findById(req.userId).select('-passwordHash');
@@ -918,7 +917,20 @@ app.post('/api/verify/check-code', async (req, res) => {
         verification.isUsed = true;
         await verification.save();
 
-        res.json({ success: true, message: 'Code verified successfully.' });
+        // Generate a token for the user if the action is signup or signin
+        let token = null;
+        if (action === 'signup' || action === 'signin') {
+            const user = await User.findOne({ email: email.toLowerCase() });
+            if (user) {
+                token = generateToken(user._id);
+            }
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'Code verified successfully.',
+            token: token // Return token if available
+        });
 
     } catch (error) {
         console.error('Verify code error:', error);
