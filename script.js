@@ -41,6 +41,7 @@
     var lastDetectedText = '';
     var lastDetectedLangResult = '';
     var isDetectionRunning = false;
+    var isProcessingRecording = false;
 
     // ============================================================
     // LANGUAGE LIST
@@ -402,7 +403,7 @@
     }
 
     // ============================================================
-    // CONFIRMATION MODAL - FIXED: Better button spacing
+    // CONFIRMATION MODAL
     // ============================================================
     function showConfirmationModal(title, message, confirmText, cancelText) {
         confirmText = confirmText || 'Confirm';
@@ -1362,7 +1363,7 @@
     }
 
     // ============================================================
-    // HISTORY MODAL - FIXED: Individual delete working
+    // HISTORY MODAL
     // ============================================================
     function setupHistoryButton() {
         var historyNavBtn = $('historyNavBtn');
@@ -1458,11 +1459,9 @@
             }
             historyList.innerHTML = html;
             
-            // FIXED: Individual delete buttons - properly bound
             var deleteBtns = historyList.querySelectorAll('.h-delete');
             for (var j = 0; j < deleteBtns.length; j++) {
                 (function(btn) {
-                    // Use bindClick for both click and touch support
                     bindClick(btn, function(e) {
                         e.preventDefault();
                         e.stopPropagation();
@@ -1513,12 +1512,11 @@
     }
 
     // ============================================================
-    // THEME TOGGLE - FIXED: Works on ALL devices
+    // THEME TOGGLE
     // ============================================================
     function setupThemeToggle() {
         var themeToggle = $('themeToggle');
         if (themeToggle) {
-            // Set initial icon based on theme
             var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
             var icon = themeToggle.querySelector('i');
             if (icon) {
@@ -1588,7 +1586,7 @@
     }
 
     // ============================================================
-    // TRANSLATION ENGINE
+    // TRANSLATION ENGINE - COMPLETELY FIXED
     // ============================================================
     function setupTranslation() {
         var sourceLang = $('sourceLang');
@@ -1612,6 +1610,7 @@
         lastDetectedText = '';
         lastDetectedLangResult = '';
         isDetectionRunning = false;
+        isProcessingRecording = false;
         
         // Create Translate From Container
         translateFromContainer = document.createElement('div');
@@ -1636,7 +1635,11 @@
         translateFromBtn.textContent = 'Translate from: ';
         translateFromContainer.appendChild(translateFromBtn);
 
-        // Click handler for Translate From button
+        // ============================================================
+        // FIXED: Click handler for Translate From button
+        // When clicked: Change source language AND ensure target is different
+        // Then translate immediately
+        // ============================================================
         function handleTranslateFromClick(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -1650,16 +1653,25 @@
                     }
                 }
                 if (langExists && sourceLang) {
+                    // Change source to detected language
                     sourceLang.value = detectedLang;
+                    
+                    // IMPORTANT: Ensure target is different from source
+                    ensureDifferentLanguages();
+                    
+                    // Hide the button
                     translateFromContainer.style.display = 'none';
                     translateFromBtn.setAttribute('data-lang', '');
                     translateFromBtn.textContent = 'Translate from: ';
+                    
                     var text = inputText ? inputText.value.trim() : '';
                     if (text) {
+                        // Force translation with the detected language
                         forceTranslationWithDetectedLang = true;
                         pendingDetectedLang = detectedLang;
                         performTranslation();
                     }
+                    
                     var langName = getLanguageName(detectedLang);
                     showNotification('Switched to: ' + langName, 'success', 2000);
                 }
@@ -1823,6 +1835,29 @@
             });
         }
 
+        // ============================================================
+        // FIXED: Ensure source and target are NEVER the same
+        // ============================================================
+        function ensureDifferentLanguages() {
+            if (!sourceLang || !targetLang) return;
+            
+            if (sourceLang.value === targetLang.value) {
+                var allLangs = LANGUAGES.map(function(l) { return l.code; });
+                var newLang = 'en';
+                // Find a language different from source
+                for (var i = 0; i < allLangs.length; i++) {
+                    if (allLangs[i] !== sourceLang.value) {
+                        newLang = allLangs[i];
+                        break;
+                    }
+                }
+                targetLang.value = newLang;
+            }
+        }
+
+        // ============================================================
+        // FIXED: Translation with proper language handling
+        // ============================================================
         function performTranslation() {
             var text = inputText ? inputText.value.trim() : '';
             if (!text) {
@@ -1837,8 +1872,23 @@
                 return;
             }
             
+            // Ensure languages are different before translating
+            ensureDifferentLanguages();
+            
             var sourceLangCode = sourceLang ? sourceLang.value : 'en';
             var targetLangCode = targetLang ? targetLang.value : 'en';
+            
+            // If still same, force change
+            if (sourceLangCode === targetLangCode) {
+                var allLangs = LANGUAGES.map(function(l) { return l.code; });
+                for (var i = 0; i < allLangs.length; i++) {
+                    if (allLangs[i] !== sourceLangCode) {
+                        targetLangCode = allLangs[i];
+                        targetLang.value = targetLangCode;
+                        break;
+                    }
+                }
+            }
             
             if (sourceLangCode === targetLangCode) {
                 if (outputDisplay) outputDisplay.textContent = text;
@@ -1863,6 +1913,7 @@
                 translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
             }
             
+            // If we're forcing translation with a detected language
             if (forceTranslationWithDetectedLang && pendingDetectedLang) {
                 var detectedLang = pendingDetectedLang;
                 forceTranslationWithDetectedLang = false;
@@ -1874,6 +1925,7 @@
                     resetTranslateFromBtn();
                 }
                 
+                // Translate using the source language (which was changed to detected)
                 translateText(text, sourceLangCode, targetLangCode).then(function(translated) {
                     if (outputDisplay) outputDisplay.textContent = translated;
                     if (isLoggedIn && currentUser) {
@@ -1901,6 +1953,7 @@
                 return;
             }
             
+            // Normal flow - detect language first
             detectLanguage(text).then(function(detectedLang) {
                 if (!isRecording && detectedLang && detectedLang !== 'auto') {
                     updateTranslateFromBtn(detectedLang, text);
@@ -1941,6 +1994,9 @@
             }
         });
 
+        // ============================================================
+        // FIXED: Input detection with proper text handling
+        // ============================================================
         if (inputText) {
             inputText.addEventListener('input', function() {
                 var text = inputText.value.trim();
@@ -1985,25 +2041,7 @@
             });
         }
 
-        // ============================================================
-        // FIXED: Prevent source and target from being the same
-        // ============================================================
-        function ensureDifferentLanguages() {
-            if (!sourceLang || !targetLang) return;
-            
-            if (sourceLang.value === targetLang.value) {
-                var allLangs = LANGUAGES.map(function(l) { return l.code; });
-                var newLang = 'en';
-                for (var i = 0; i < allLangs.length; i++) {
-                    if (allLangs[i] !== sourceLang.value) {
-                        newLang = allLangs[i];
-                        break;
-                    }
-                }
-                targetLang.value = newLang;
-            }
-        }
-
+        // Language change events - ensure different languages
         if (sourceLang) {
             sourceLang.addEventListener('change', function() {
                 stopRecordingIfActive();
@@ -2094,10 +2132,13 @@
             pendingDetectedLang = '';
             lastDetectedText = '';
             lastDetectedLangResult = '';
+            // Reset recording transcript
+            finalTranscript = '';
+            interimTranscript = '';
         });
 
         // ============================================================
-        // MIC - RECORDING SYSTEM
+        // MIC - RECORDING SYSTEM - FIXED DOUBLING ISSUE
         // ============================================================
         function stopRecordingIfActive() {
             if (isRecording) {
@@ -2117,9 +2158,18 @@
                     if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
                 }
                 resetTranslateFromBtn();
-                if (finalTranscript.trim()) {
-                    inputText.value = finalTranscript.trim();
+                // Only process if we have final transcript
+                if (finalTranscript.trim() && !isProcessingRecording) {
+                    isProcessingRecording = true;
+                    var text = finalTranscript.trim();
+                    inputText.value = text;
+                    // Clear transcripts to prevent duplication
+                    finalTranscript = '';
+                    interimTranscript = '';
                     performTranslation();
+                    setTimeout(function() {
+                        isProcessingRecording = false;
+                    }, 500);
                 }
                 finalTranscript = '';
                 interimTranscript = '';
@@ -2134,18 +2184,18 @@
                     try { recognition.stop(); } catch(e) {}
                 }
                 recognition = new SpeechRecognition();
-                recognition.continuous = true;
+                recognition.continuous = false; // Changed to false to prevent doubling
                 recognition.interimResults = true;
                 var selectedLang = sourceLang ? sourceLang.value || 'en' : 'en';
                 currentRecordingLang = selectedLang;
                 recognition.lang = selectedLang;
-                recognition.maxAlternatives = 5;
-                recognition.continuous = true;
+                recognition.maxAlternatives = 3;
                 
                 recognition.onstart = function() {
                     isRecording = true;
                     finalTranscript = '';
                     interimTranscript = '';
+                    isProcessingRecording = false;
                     if (micBtn) {
                         addClass(micBtn, 'recording');
                         micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
@@ -2172,9 +2222,16 @@
                                 micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
                             }
                             if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
-                            if (finalTranscript.trim()) {
-                                inputText.value = finalTranscript.trim();
+                            if (finalTranscript.trim() && !isProcessingRecording) {
+                                isProcessingRecording = true;
+                                var text = finalTranscript.trim();
+                                inputText.value = text;
+                                finalTranscript = '';
+                                interimTranscript = '';
                                 performTranslation();
+                                setTimeout(function() {
+                                    isProcessingRecording = false;
+                                }, 500);
                             }
                             finalTranscript = '';
                             interimTranscript = '';
@@ -2195,20 +2252,24 @@
                         }
                     }
                     
+                    // Only update if we have new text
                     if (currentFinal) {
-                        finalTranscript += ' ' + currentFinal;
+                        finalTranscript = currentFinal;
                     }
                     
                     if (currentInterim || finalTranscript) {
                         var displayText = (finalTranscript + ' ' + currentInterim).trim();
-                        if (inputText) {
+                        if (inputText && !isProcessingRecording) {
                             inputText.value = displayText;
                         }
-                        if (translateBtn) {
+                        if (translateBtn && !isProcessingRecording) {
                             translateBtn.disabled = true;
                             translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
                         }
-                        performTranslation();
+                        // Translate the interim text
+                        if (!isProcessingRecording) {
+                            performTranslation();
+                        }
                     }
                 };
                 
@@ -2243,26 +2304,27 @@
                     }
                     
                     if (isRecording) {
-                        try {
-                            var selectedLang = sourceLang ? sourceLang.value || 'en' : 'en';
-                            currentRecordingLang = selectedLang;
-                            recognition.lang = selectedLang;
-                            recognition.start();
-                        } catch (e) {
-                            isRecording = false;
-                            if (micBtn) {
-                                removeClass(micBtn, 'recording');
-                                micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-                            }
-                            if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
-                            resetTranslateFromBtn();
-                            if (finalTranscript.trim()) {
-                                inputText.value = finalTranscript.trim();
-                                performTranslation();
-                            }
+                        // Don't auto-restart - this was causing doubling
+                        isRecording = false;
+                        if (micBtn) {
+                            removeClass(micBtn, 'recording');
+                            micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                        }
+                        if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
+                        resetTranslateFromBtn();
+                        if (finalTranscript.trim() && !isProcessingRecording) {
+                            isProcessingRecording = true;
+                            var text = finalTranscript.trim();
+                            inputText.value = text;
                             finalTranscript = '';
                             interimTranscript = '';
+                            performTranslation();
+                            setTimeout(function() {
+                                isProcessingRecording = false;
+                            }, 500);
                         }
+                        finalTranscript = '';
+                        interimTranscript = '';
                     } else {
                         if (micBtn) {
                             removeClass(micBtn, 'recording');
@@ -2270,9 +2332,16 @@
                         }
                         if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
                         resetTranslateFromBtn();
-                        if (finalTranscript.trim()) {
-                            inputText.value = finalTranscript.trim();
+                        if (finalTranscript.trim() && !isProcessingRecording) {
+                            isProcessingRecording = true;
+                            var text = finalTranscript.trim();
+                            inputText.value = text;
+                            finalTranscript = '';
+                            interimTranscript = '';
                             performTranslation();
+                            setTimeout(function() {
+                                isProcessingRecording = false;
+                            }, 500);
                         }
                         finalTranscript = '';
                         interimTranscript = '';
@@ -2284,7 +2353,9 @@
             
             bindClick(micBtn, function() {
                 if (isRecording) {
+                    // Stop recording
                     isRecording = false;
+                    isProcessingRecording = false;
                     try {
                         if (recognition) {
                             recognition.stop();
@@ -2299,19 +2370,31 @@
                     if (recordingStatus) recordingStatus.textContent = 'Click mic to start';
                     showNotification('⏹ Recording stopped.', 'info', 2000);
                     
-                    if (finalTranscript.trim()) {
-                        inputText.value = finalTranscript.trim();
+                    if (finalTranscript.trim() && !isProcessingRecording) {
+                        isProcessingRecording = true;
+                        var text = finalTranscript.trim();
+                        inputText.value = text;
+                        finalTranscript = '';
+                        interimTranscript = '';
                         performTranslation();
+                        setTimeout(function() {
+                            isProcessingRecording = false;
+                        }, 500);
                     }
                     finalTranscript = '';
                     interimTranscript = '';
                 } else {
+                    // Start recording
                     var lang = sourceLang ? sourceLang.value || 'en' : 'en';
                     var langName = getLanguageName(lang);
                     currentRecordingLang = lang;
+                    isProcessingRecording = false;
+                    finalTranscript = '';
+                    interimTranscript = '';
                     
                     if (recognition) {
                         recognition.lang = lang;
+                        recognition.continuous = false;
                         try {
                             recognition.start();
                             showNotification('🎤 Listening in ' + langName + '...', 'info', 2000);
@@ -2319,6 +2402,7 @@
                             initRecognition();
                             if (recognition) {
                                 recognition.lang = lang;
+                                recognition.continuous = false;
                                 try {
                                     recognition.start();
                                     showNotification('🎤 Listening in ' + langName + '...', 'info', 2000);
@@ -2331,6 +2415,7 @@
                         initRecognition();
                         if (recognition) {
                             recognition.lang = lang;
+                            recognition.continuous = false;
                             try {
                                 recognition.start();
                                 showNotification('🎤 Listening in ' + langName + '...', 'info', 2000);
