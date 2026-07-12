@@ -128,6 +128,29 @@
     }
 
     // ============================================================
+    // USERNAME GENERATION - FIXED
+    // ============================================================
+    function generateUsernameFromEmail(email) {
+        if (!email) return 'user';
+        // Get part before @
+        var localPart = email.split('@')[0];
+        // Remove dots and special characters
+        var clean = localPart.replace(/[^a-zA-Z0-9]/g, '');
+        // If empty after cleaning, use default
+        if (!clean) return 'user';
+        // If too long, truncate to 12 chars
+        if (clean.length > 12) {
+            clean = clean.substring(0, 12);
+        }
+        // If too short, pad with random chars
+        if (clean.length < 3) {
+            var random = Math.random().toString(36).substring(2, 5);
+            clean = clean + random;
+        }
+        return clean.toLowerCase();
+    }
+
+    // ============================================================
     // LANGUAGE NAMES
     // ============================================================
     function getLanguageName(code) {
@@ -324,7 +347,7 @@
     }
 
     // ============================================================
-    // VERIFY CODE - UPDATED to use API - FIXED SYNTAX
+    // VERIFY CODE - UPDATED to use API - FIXED
     // ============================================================
     function verifyCode(email, code) {
         isVerifying = true;
@@ -1035,7 +1058,8 @@
                 
             } else if (currentMode === 'signup') {
                 var confirmPassword = $('authConfirmPassword') ? $('authConfirmPassword').value : '';
-                var username = email.split('@')[0];
+                // FIX: Generate username from email
+                var username = generateUsernameFromEmail(email);
                 
                 if (password !== confirmPassword) {
                     showNotification('Passwords do not match!', 'error');
@@ -1151,7 +1175,7 @@
             '<div class="user-menu-header" style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-input);">' +
                 '<i class="fas fa-user-circle" style="font-size:1.8rem;color:var(--accent);"></i>' +
                 '<div style="display:flex;flex-direction:column;">' +
-                    '<strong style="color:var(--text-primary);font-size:0.9rem;">' + currentUser.username + '</strong>' +
+                    '<strong style="color:var(--text-primary);font-size:0.9rem;">' + (currentUser.username || currentUser.email.split('@')[0]) + '</strong>' +
                     '<small style="color:var(--text-light);font-size:0.7rem;word-break:break-all;">' + currentUser.email + '</small>' +
                 '</div>' +
             '</div>' +
@@ -1300,12 +1324,12 @@
                 '<span class="close-modal close-profile">&times;</span>' +
                 '<div class="profile-header">' +
                     '<i class="fas fa-user-circle profile-icon"></i>' +
-                    '<h2>' + user.username + '</h2>' +
+                    '<h2>' + (user.username || user.email.split('@')[0]) + '</h2>' +
                     '<p>' + user.email + '</p>' +
                     '<span class="profile-badge">Verified Account</span>' +
                 '</div>' +
                 '<div class="profile-info">' +
-                    '<div class="info-item"><strong>Username:</strong> ' + user.username + '</div>' +
+                    '<div class="info-item"><strong>Username:</strong> ' + (user.username || user.email.split('@')[0]) + '</div>' +
                     '<div class="info-item"><strong>Email:</strong> ' + user.email + '</div>' +
                     '<div class="info-item"><strong>Member Since:</strong> ' + new Date(user.createdAt).toLocaleDateString() + '</div>' +
                     '<div class="info-item"><strong>Last Login:</strong> ' + (user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'First time') + '</div>' +
@@ -1322,7 +1346,7 @@
     }
 
     // ============================================================
-    // ACCOUNT SETTINGS - UPDATED to use API
+    // ACCOUNT SETTINGS - UPDATED to use API - FIXED
     // ============================================================
     function openAccountSettings() {
         var user = currentUser || DATA_MANAGER.getCurrentUser();
@@ -1341,7 +1365,7 @@
                 '<div class="settings-body">' +
                     '<div class="settings-field">' +
                         '<label>Username</label>' +
-                        '<input type="text" id="settingsUsername" value="' + user.username + '">' +
+                        '<input type="text" id="settingsUsername" value="' + (user.username || user.email.split('@')[0]) + '">' +
                         '<small style="color: #888; font-size: 12px;">Username can be changed</small>' +
                     '</div>' +
                     '<div class="settings-field">' +
@@ -1482,27 +1506,35 @@
                         return;
                     }
                     
-                    sendVerificationCode(user.email, 'delete').then(function(result) {
-                        if (!result.success) {
-                            showNotification('Error sending verification code.', 'error');
-                            return;
+                    // FIX: Directly call delete without verification code
+                    // Since we already have the password, we don't need email verification for deletion
+                    showNotification('Deleting account...', 'info');
+                    
+                    API_MANAGER.deleteAccount(password).then(function(response) {
+                        if (response.success) {
+                            API_MANAGER.setToken(null);
+                            localStorage.removeItem('cachedUser');
+                            localStorage.removeItem('cachedHistory');
+                            showNotification('Account deleted successfully.', 'success');
+                            modal.remove();
+                            // Reset UI
+                            isLoggedIn = false;
+                            currentUser = null;
+                            var authBtn = $('authBtn');
+                            if (authBtn) {
+                                authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                                removeClass(authBtn, 'logged-in');
+                            }
+                            var historyNavBtn = $('historyNavBtn');
+                            if (historyNavBtn) {
+                                historyNavBtn.style.display = 'none';
+                            }
+                            window.location.reload();
+                        } else {
+                            showNotification(response.message || 'Error deleting account. Please try again.', 'error');
                         }
-                        openVerificationModal(user.email, 'delete', function(token) {
-                            API_MANAGER.deleteAccount(password).then(function(response) {
-                                if (response.success) {
-                                    API_MANAGER.setToken(null);
-                                    localStorage.removeItem('cachedUser');
-                                    localStorage.removeItem('cachedHistory');
-                                    showNotification('Account deleted successfully.', 'success');
-                                    modal.remove();
-                                    window.location.reload();
-                                } else {
-                                    showNotification(response.message || 'Error deleting account.', 'error');
-                                }
-                            }).catch(function(error) {
-                                showNotification(error.message || 'Error deleting account.', 'error');
-                            });
-                        });
+                    }).catch(function(error) {
+                        showNotification(error.message || 'Error deleting account. Please try again.', 'error');
                     });
                 });
             });
