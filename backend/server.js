@@ -487,7 +487,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin
+// POST /api/auth/signin - FIXED: Better error handling
 app.post('/api/auth/signin', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -498,7 +498,7 @@ app.post('/api/auth/signin', async (req, res) => {
 
         const user = await User.findOne({ email: email.toLowerCase() });
         if (!user) {
-            return res.status(401).json({ success: false, message: 'Account not found. Please create an account.' });
+            return res.status(404).json({ success: false, message: 'Account not found. Please create an account.' });
         }
 
         if (!user.isVerified) {
@@ -592,7 +592,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 // ============================================================
-// 8. CHECK EMAIL EXISTS - For password reset
+// 8. CHECK EMAIL EXISTS - FIXED
 // ============================================================
 app.post('/api/auth/check-email', async (req, res) => {
     try {
@@ -607,11 +607,11 @@ app.post('/api/auth/check-email', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Email not registered. Please create an account.' });
         }
 
-        res.json({ success: true, message: 'Email found.' });
+        res.json({ success: true, message: 'Email found.', exists: true });
 
     } catch (error) {
         console.error('Check email error:', error);
-        res.status(500).json({ success: false, message: 'Error checking email.' });
+        res.status(500).json({ success: false, message: 'Error checking email. Please try again.' });
     }
 });
 
@@ -743,7 +743,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     }
 });
 
-// DELETE /api/user/delete
+// DELETE /api/user/delete - FIXED: Hard delete with verification
 app.delete('/api/user/delete', authMiddleware, async (req, res) => {
     try {
         const { password } = req.body;
@@ -767,10 +767,20 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
+        // Delete all user history
         await History.deleteMany({ userId: req.userId });
+        
+        // Delete all verification codes for this user
+        await VerificationCode.deleteMany({ email: user.email });
+        
+        // Hard delete the user
         await User.findByIdAndDelete(req.userId);
 
-        res.json({ success: true, message: 'Account deleted successfully.' });
+        res.json({ 
+            success: true, 
+            message: 'Account deleted successfully.',
+            deleted: true
+        });
 
     } catch (error) {
         console.error('Delete account error:', error);
@@ -880,7 +890,7 @@ app.delete('/api/history/clear', authMiddleware, async (req, res) => {
 // 11. VERIFICATION APIs
 // ============================================================
 
-// POST /api/verify/send-code - FIXED: Check if email exists for reset action
+// POST /api/verify/send-code - FIXED: Better error handling
 app.post('/api/verify/send-code', async (req, res) => {
     try {
         const { email, action } = req.body;
@@ -936,7 +946,7 @@ app.post('/api/verify/send-code', async (req, res) => {
 
     } catch (error) {
         console.error('Send code error:', error);
-        res.status(500).json({ success: false, message: 'Error sending verification code.' });
+        res.status(500).json({ success: false, message: 'Error sending verification code. Please try again.' });
     }
 });
 
@@ -1000,7 +1010,7 @@ app.post('/api/verify/check-code', async (req, res) => {
 
     } catch (error) {
         console.error('Verify code error:', error);
-        res.status(500).json({ success: false, message: 'Error verifying code.' });
+        res.status(500).json({ success: false, message: 'Error verifying code. Please try again.' });
     }
 });
 
