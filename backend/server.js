@@ -32,7 +32,7 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// Rate Limiting - FIXED for Render.com
+// Rate Limiting
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
@@ -44,7 +44,7 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // ============================================================
-// 3. DATABASE CONNECTION
+// 3. DATABASE CONNECTION - FIXED
 // ============================================================
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
@@ -52,7 +52,12 @@ if (!MONGODB_URI) {
     process.exit(1);
 }
 
-mongoose.connect(MONGODB_URI).then(() => {
+mongoose.connect(MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+}).then(() => {
     console.log('✅ MongoDB Atlas connected successfully!');
 }).catch((err) => {
     console.error('❌ MongoDB connection error:', err);
@@ -69,7 +74,8 @@ const UserSchema = new mongoose.Schema({
         type: String,
         required: true,
         trim: true,
-        minlength: 3
+        minlength: 2,
+        maxlength: 20
     },
     email: {
         type: String,
@@ -257,6 +263,22 @@ function comparePassword(password, hash) {
     });
 }
 
+// Generate username from email
+function generateUsernameFromEmail(email) {
+    if (!email) return 'user';
+    var localPart = email.split('@')[0];
+    var clean = localPart.replace(/[^a-zA-Z0-9]/g, '');
+    if (!clean) return 'user';
+    if (clean.length > 12) {
+        clean = clean.substring(0, 12);
+    }
+    if (clean.length < 3) {
+        var random = Math.random().toString(36).substring(2, 5);
+        clean = clean + random;
+    }
+    return clean.toLowerCase();
+}
+
 // Send Email via Brevo API
 function sendEmailViaBrevo(email, code, action) {
     return new Promise((resolve, reject) => {
@@ -419,13 +441,13 @@ function authMiddleware(req, res, next) {
 // 7. AUTH APIs
 // ============================================================
 
-// POST /api/auth/signup
+// POST /api/auth/signup - FIXED with username generation
 app.post('/api/auth/signup', async (req, res) => {
     try {
         const { email, password, username } = req.body;
 
-        if (!email || !password || !username) {
-            return res.status(400).json({ success: false, message: 'All fields are required.' });
+        if (!email || !password) {
+            return res.status(400).json({ success: false, message: 'Email and password are required.' });
         }
 
         // Check if user exists
@@ -434,12 +456,18 @@ app.post('/api/auth/signup', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email already registered. Please sign in.' });
         }
 
+        // Generate username if not provided or invalid
+        let finalUsername = username;
+        if (!finalUsername || finalUsername.length < 2) {
+            finalUsername = generateUsernameFromEmail(email);
+        }
+
         // Hash password
         const passwordHash = await hashPassword(password);
 
         // Create user
         const user = new User({
-            username: username,
+            username: finalUsername,
             email: email.toLowerCase(),
             passwordHash: passwordHash
         });
@@ -467,7 +495,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin - FIXED with better error handling
+// POST /api/auth/signin
 app.post('/api/auth/signin', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -476,19 +504,16 @@ app.post('/api/auth/signin', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email and password are required.' });
         }
 
-        // Find user
         const user = await User.findOne({ email: email.toLowerCase() });
         if (!user) {
             return res.status(401).json({ success: false, message: 'Account not found. Please create an account.' });
         }
 
-        // Check if user has passwordHash
         if (!user.passwordHash) {
             console.error('❌ User has no passwordHash:', user.email);
             return res.status(500).json({ success: false, message: 'Account data corrupted. Please contact support.' });
         }
 
-        // Verify password
         try {
             const isMatch = await comparePassword(password, user.passwordHash);
             if (!isMatch) {
@@ -499,11 +524,9 @@ app.post('/api/auth/signin', async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        // Update last login
         user.lastLogin = new Date();
         await user.save();
 
-        // Generate token
         const token = generateToken(user._id);
 
         res.json({
@@ -534,7 +557,7 @@ app.post('/api/auth/logout', authMiddleware, async (req, res) => {
     }
 });
 
-// GET /api/auth/me - FIXED with better error handling
+// GET /api/auth/me
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
     try {
         const user = await User.findById(req.userId).select('-passwordHash');
@@ -632,13 +655,11 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // Verify current password
         const isMatch = await comparePassword(currentPassword, user.passwordHash);
         if (!isMatch) {
             return res.status(401).json({ success: false, message: 'Current password is incorrect.' });
         }
 
-        // Hash new password
         const passwordHash = await hashPassword(newPassword);
         user.passwordHash = passwordHash;
         user.updatedAt = new Date();
@@ -666,13 +687,11 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // Verify password
         const isMatch = await comparePassword(password, user.passwordHash);
         if (!isMatch) {
             return res.status(401).json({ success: false, message: 'Password is incorrect.' });
         }
 
-        // Check if email is taken
         const existingUser = await User.findOne({ email: newEmail.toLowerCase() });
         if (existingUser && existingUser._id.toString() !== req.userId) {
             return res.status(400).json({ success: false, message: 'Email already in use.' });
@@ -704,7 +723,6 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // Verify password
         try {
             const isMatch = await comparePassword(password, user.passwordHash);
             if (!isMatch) {
@@ -715,10 +733,8 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        // Delete history
         await History.deleteMany({ userId: req.userId });
 
-        // Delete user
         await User.findByIdAndDelete(req.userId);
 
         res.json({ success: true, message: 'Account deleted successfully.' });
@@ -771,7 +787,6 @@ app.post('/api/history', authMiddleware, async (req, res) => {
 
         await historyEntry.save();
 
-        // Keep only last 100 entries
         const count = await History.countDocuments({ userId: req.userId });
         if (count > 100) {
             const toDelete = await History.find({ userId: req.userId })
@@ -841,17 +856,14 @@ app.post('/api/verify/send-code', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email and action are required.' });
         }
 
-        // Generate 6-digit code
         const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-        // Delete existing unused codes for this email and action
         await VerificationCode.deleteMany({
             email: email.toLowerCase(),
             action: action,
             isUsed: false
         });
 
-        // Create new verification code
         const verification = new VerificationCode({
             email: email.toLowerCase(),
             code: code,
@@ -861,7 +873,6 @@ app.post('/api/verify/send-code', async (req, res) => {
 
         await verification.save();
 
-        // Send email
         const emailResult = await sendEmailViaBrevo(email, code, action);
 
         if (emailResult.success) {
@@ -894,7 +905,6 @@ app.post('/api/verify/check-code', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email, code and action are required.' });
         }
 
-        // Find verification record
         const verification = await VerificationCode.findOne({
             email: email.toLowerCase(),
             code: code,
@@ -906,23 +916,19 @@ app.post('/api/verify/check-code', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid or expired verification code.' });
         }
 
-        // Check if expired
         if (new Date() > verification.expiresAt) {
             await VerificationCode.deleteOne({ _id: verification._id });
             return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
         }
 
-        // Check attempts
         if (verification.attempts >= 5) {
             await VerificationCode.deleteOne({ _id: verification._id });
             return res.status(400).json({ success: false, message: 'Too many failed attempts. Please request a new code.' });
         }
 
-        // Mark as used
         verification.isUsed = true;
         await verification.save();
 
-        // Generate a token for the user if the action is signup or signin
         let token = null;
         if (action === 'signup' || action === 'signin') {
             const user = await User.findOne({ email: email.toLowerCase() });
@@ -934,7 +940,7 @@ app.post('/api/verify/check-code', async (req, res) => {
         res.json({ 
             success: true, 
             message: 'Code verified successfully.',
-            token: token // Return token if available
+            token: token
         });
 
     } catch (error) {
