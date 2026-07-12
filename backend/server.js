@@ -856,13 +856,24 @@ app.delete('/api/history/clear', authMiddleware, async (req, res) => {
 // 10. VERIFICATION APIs
 // ============================================================
 
-// POST /api/verify/send-code
+// POST /api/verify/send-code - FIXED: Check if email exists for reset action
 app.post('/api/verify/send-code', async (req, res) => {
     try {
         const { email, action } = req.body;
 
         if (!email || !action) {
             return res.status(400).json({ success: false, message: 'Email and action are required.' });
+        }
+
+        // For 'reset' action, check if email exists in database
+        if (action === 'reset') {
+            const user = await User.findOne({ email: email.toLowerCase() });
+            if (!user) {
+                return res.status(404).json({ 
+                    success: false, 
+                    message: 'Email not registered. Please create an account.' 
+                });
+            }
         }
 
         const code = Math.floor(100000 + Math.random() * 900000).toString();
