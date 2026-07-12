@@ -592,7 +592,31 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 // ============================================================
-// 8. USER APIs
+// 8. CHECK EMAIL EXISTS - For password reset
+// ============================================================
+app.post('/api/auth/check-email', async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ success: false, message: 'Email is required.' });
+        }
+
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'Email not registered. Please create an account.' });
+        }
+
+        res.json({ success: true, message: 'Email found.' });
+
+    } catch (error) {
+        console.error('Check email error:', error);
+        res.status(500).json({ success: false, message: 'Error checking email.' });
+    }
+});
+
+// ============================================================
+// 9. USER APIs
 // ============================================================
 
 // PUT /api/user/profile - ONLY FOR PHOTO AND SETTINGS, NOT USERNAME/EMAIL
@@ -755,7 +779,7 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
 });
 
 // ============================================================
-// 9. HISTORY APIs
+// 10. HISTORY APIs
 // ============================================================
 
 // GET /api/history
@@ -853,7 +877,7 @@ app.delete('/api/history/clear', authMiddleware, async (req, res) => {
 });
 
 // ============================================================
-// 10. VERIFICATION APIs
+// 11. VERIFICATION APIs
 // ============================================================
 
 // POST /api/verify/send-code - FIXED: Check if email exists for reset action
@@ -981,7 +1005,7 @@ app.post('/api/verify/check-code', async (req, res) => {
 });
 
 // ============================================================
-// 11. SETTINGS APIs
+// 12. SETTINGS APIs
 // ============================================================
 
 // GET /api/settings
@@ -1053,7 +1077,7 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
 });
 
 // ============================================================
-// 12. EMAIL SEND (For backward compatibility)
+// 13. EMAIL SEND (For backward compatibility)
 // ============================================================
 app.post('/api/email/send', async (req, res) => {
     try {
@@ -1078,7 +1102,7 @@ app.post('/api/email/send', async (req, res) => {
 });
 
 // ============================================================
-// 13. HEALTH CHECK
+// 14. HEALTH CHECK
 // ============================================================
 app.get('/health', (req, res) => {
     res.json({
@@ -1107,7 +1131,7 @@ app.get('/', (req, res) => {
 });
 
 // ============================================================
-// 14. START SERVER
+// 15. START SERVER
 // ============================================================
 const PORT = process.env.PORT || 5000;
 
