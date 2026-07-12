@@ -32,11 +32,15 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// Rate Limiting
+// Rate Limiting - FIXED for Render.com
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // 100 requests per window
-    message: { success: false, message: 'Too many requests, please try again later.' }
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: { success: false, message: 'Too many requests, please try again later.' },
+    // FIX: Handle X-Forwarded-For header properly
+    keyGenerator: function(req) {
+        return req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+    }
 });
 app.use('/api/', limiter);
 
@@ -49,10 +53,7 @@ if (!MONGODB_URI) {
     process.exit(1);
 }
 
-mongoose.connect(MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(() => {
+mongoose.connect(MONGODB_URI).then(() => {
     console.log('✅ MongoDB Atlas connected successfully!');
 }).catch((err) => {
     console.error('❌ MongoDB connection error:', err);
@@ -181,7 +182,7 @@ const VerificationCodeSchema = new mongoose.Schema({
         type: Date,
         required: true,
         default: function() {
-            return new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+            return new Date(Date.now() + 15 * 60 * 1000);
         }
     },
     isUsed: {
@@ -198,6 +199,7 @@ const VerificationCodeSchema = new mongoose.Schema({
     }
 });
 
+// Create models
 const User = mongoose.model('User', UserSchema);
 const History = mongoose.model('History', HistorySchema);
 const VerificationCode = mongoose.model('VerificationCode', VerificationCodeSchema);
@@ -218,6 +220,42 @@ function verifyToken(token) {
     } catch (error) {
         return null;
     }
+}
+
+// Hash password
+function hashPassword(password) {
+    return new Promise(function(resolve, reject) {
+        bcrypt.genSalt(10, function(err, salt) {
+            if (err) {
+                reject(err);
+                return;
+            }
+            bcrypt.hash(password, salt, function(err, hash) {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                resolve(hash);
+            });
+        });
+    });
+}
+
+// Compare password
+function comparePassword(password, hash) {
+    return new Promise(function(resolve, reject) {
+        if (!password || !hash) {
+            reject(new Error('Password and hash are required'));
+            return;
+        }
+        bcrypt.compare(password, hash, function(err, result) {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve(result);
+        });
+    });
 }
 
 // Send Email via Brevo API
@@ -398,8 +436,7 @@ app.post('/api/auth/signup', async (req, res) => {
         }
 
         // Hash password
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(password, salt);
+        const passwordHash = await hashPassword(password);
 
         // Create user
         const user = new User({
@@ -431,7 +468,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin
+// POST /api/auth/signin - FIXED
 app.post('/api/auth/signin', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -446,10 +483,21 @@ app.post('/api/auth/signin', async (req, res) => {
             return res.status(401).json({ success: false, message: 'Account not found. Please create an account.' });
         }
 
+        // Check if user has passwordHash
+        if (!user.passwordHash) {
+            console.error('❌ User has no passwordHash:', user.email);
+            return res.status(500).json({ success: false, message: 'Account data corrupted. Please contact support.' });
+        }
+
         // Verify password
-        const isMatch = await bcrypt.compare(password, user.passwordHash);
-        if (!isMatch) {
-            return res.status(401).json({ success: false, message: 'Incorrect password. Please try again.' });
+        try {
+            const isMatch = await comparePassword(password, user.passwordHash);
+            if (!isMatch) {
+                return res.status(401).json({ success: false, message: 'Incorrect password. Please try again.' });
+            }
+        } catch (compareError) {
+            console.error('❌ Password comparison error:', compareError);
+            return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
         // Update last login
@@ -586,15 +634,13 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
         }
 
         // Verify current password
-        const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+        const isMatch = await comparePassword(currentPassword, user.passwordHash);
         if (!isMatch) {
             return res.status(401).json({ success: false, message: 'Current password is incorrect.' });
         }
 
         // Hash new password
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(newPassword, salt);
-
+        const passwordHash = await hashPassword(newPassword);
         user.passwordHash = passwordHash;
         user.updatedAt = new Date();
         await user.save();
@@ -622,7 +668,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
         }
 
         // Verify password
-        const isMatch = await bcrypt.compare(password, user.passwordHash);
+        const isMatch = await comparePassword(password, user.passwordHash);
         if (!isMatch) {
             return res.status(401).json({ success: false, message: 'Password is incorrect.' });
         }
@@ -660,7 +706,7 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
         }
 
         // Verify password
-        const isMatch = await bcrypt.compare(password, user.passwordHash);
+        const isMatch = await comparePassword(password, user.passwordHash);
         if (!isMatch) {
             return res.status(401).json({ success: false, message: 'Password is incorrect.' });
         }
@@ -818,10 +864,9 @@ app.post('/api/verify/send-code', async (req, res) => {
             res.json({
                 success: true,
                 message: 'Verification code sent successfully.',
-                code: code // For development only - remove in production
+                code: code
             });
         } else {
-            // Code stored locally even if email fails
             res.json({
                 success: true,
                 message: 'Verification code created. Please check your email.',
