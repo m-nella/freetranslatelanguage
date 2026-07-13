@@ -93,6 +93,21 @@ var API_MANAGER = {
         }).then(this.handleResponse);
     },
     
+    // NEW: Reset password endpoint
+    resetPassword: function(email, newPassword, verificationCode) {
+        return fetch(this.API_URL + '/auth/reset-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: email,
+                newPassword: newPassword,
+                verificationCode: verificationCode
+            })
+        }).then(this.handleResponse);
+    },
+    
     logout: function() {
         var token = this.getToken();
         if (!token) {
