@@ -487,7 +487,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin - FIXED: Verify credentials first
+// POST /api/auth/signin
 app.post('/api/auth/signin', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -516,7 +516,6 @@ app.post('/api/auth/signin', async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        // Password is correct, now require verification
         user.lastLogin = new Date();
         await user.save();
         
@@ -538,7 +537,7 @@ app.post('/api/auth/signin', async (req, res) => {
     }
 });
 
-// POST /api/auth/verify-password - NEW: Dedicated endpoint for password verification
+// POST /api/auth/verify-password
 app.post('/api/auth/verify-password', authMiddleware, async (req, res) => {
     try {
         const { password } = req.body;
@@ -642,7 +641,7 @@ app.post('/api/auth/check-email', async (req, res) => {
 });
 
 // ============================================================
-// 9. USER APIs - ALL REQUIRE VERIFICATION CODE
+// 9. USER APIs
 // ============================================================
 
 // PUT /api/user/profile
@@ -691,7 +690,7 @@ app.put('/api/user/profile', authMiddleware, async (req, res) => {
     }
 });
 
-// PUT /api/user/change-password - FIXED: Verify current password
+// PUT /api/user/change-password
 app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     try {
         const { currentPassword, newPassword, verificationCode } = req.body;
@@ -709,7 +708,6 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // STEP 1: Verify current password
         try {
             const isMatch = await comparePassword(currentPassword, user.passwordHash);
             if (!isMatch) {
@@ -720,12 +718,10 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        // STEP 2: Verify new password is different
         if (currentPassword === newPassword) {
             return res.status(400).json({ success: false, message: 'New password must be different from current password.' });
         }
 
-        // STEP 3: Check verification code
         const verification = await VerificationCode.findOne({
             email: user.email,
             code: verificationCode,
@@ -742,7 +738,6 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
         }
 
-        // STEP 4: Mark code as used and update password
         verification.isUsed = true;
         await verification.save();
 
@@ -759,7 +754,7 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     }
 });
 
-// PUT /api/user/change-email - FIXED: Verify password
+// PUT /api/user/change-email
 app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     try {
         const { newEmail, password, verificationCode } = req.body;
@@ -777,12 +772,10 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // STEP 1: Verify new email is different
         if (newEmail.toLowerCase() === user.email) {
             return res.status(400).json({ success: false, message: 'New email must be different from current email.' });
         }
 
-        // STEP 2: Verify password
         try {
             const isMatch = await comparePassword(password, user.passwordHash);
             if (!isMatch) {
@@ -793,13 +786,11 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        // STEP 3: Check if new email already exists
         const existingUser = await User.findOne({ email: newEmail.toLowerCase() });
         if (existingUser && existingUser._id.toString() !== req.userId) {
             return res.status(400).json({ success: false, message: 'Email already in use.' });
         }
 
-        // STEP 4: Check verification code
         const verification = await VerificationCode.findOne({
             email: newEmail.toLowerCase(),
             code: verificationCode,
@@ -816,7 +807,6 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
         }
 
-        // STEP 5: Mark code as used and update
         verification.isUsed = true;
         await verification.save();
 
@@ -841,7 +831,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     }
 });
 
-// DELETE /api/user/delete - FIXED: Verify password
+// DELETE /api/user/delete
 app.delete('/api/user/delete', authMiddleware, async (req, res) => {
     try {
         const { password, verificationCode } = req.body;
@@ -859,7 +849,6 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // STEP 1: Verify password
         try {
             const isMatch = await comparePassword(password, user.passwordHash);
             if (!isMatch) {
@@ -870,7 +859,6 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        // STEP 2: Check verification code
         const verification = await VerificationCode.findOne({
             email: user.email,
             code: verificationCode,
@@ -887,7 +875,6 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
         }
 
-        // STEP 3: Mark code as used and delete
         verification.isUsed = true;
         await verification.save();
 
@@ -1233,7 +1220,74 @@ app.post('/api/email/send', async (req, res) => {
 });
 
 // ============================================================
-// 14. HEALTH CHECK
+// 14. RESET PASSWORD - FIXED: Verify new password different from current
+// ============================================================
+app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+        const { email, newPassword, verificationCode } = req.body;
+
+        if (!email || !newPassword || !verificationCode) {
+            return res.status(400).json({ success: false, message: 'Email, new password and verification code are required.' });
+        }
+
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
+
+        // STEP 1: Verify the verification code
+        const verification = await VerificationCode.findOne({
+            email: email.toLowerCase(),
+            code: verificationCode,
+            action: 'reset',
+            isUsed: false
+        });
+
+        if (!verification) {
+            return res.status(400).json({ success: false, message: 'Invalid or expired verification code.' });
+        }
+
+        if (new Date() > verification.expiresAt) {
+            await VerificationCode.deleteOne({ _id: verification._id });
+            return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
+        }
+
+        // STEP 2: Verify new password is different from current password
+        try {
+            const isMatch = await comparePassword(newPassword, user.passwordHash);
+            if (isMatch) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'New password must be different from current password.' 
+                });
+            }
+        } catch (compareError) {
+            console.error('❌ Password comparison error:', compareError);
+            return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
+        }
+
+        // STEP 3: Mark code as used and update password
+        verification.isUsed = true;
+        await verification.save();
+
+        const passwordHash = await hashPassword(newPassword);
+        user.passwordHash = passwordHash;
+        user.updatedAt = new Date();
+        await user.save();
+
+        res.json({ 
+            success: true, 
+            message: 'Password reset successfully. Please sign in with your new password.' 
+        });
+
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ success: false, message: 'Error resetting password. Please try again.' });
+    }
+});
+
+// ============================================================
+// 15. HEALTH CHECK
 // ============================================================
 app.get('/health', (req, res) => {
     res.json({
@@ -1262,7 +1316,7 @@ app.get('/', (req, res) => {
 });
 
 // ============================================================
-// 15. START SERVER
+// 16. START SERVER
 // ============================================================
 const PORT = process.env.PORT || 5000;
 
