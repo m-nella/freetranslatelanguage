@@ -487,7 +487,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin - FIXED: Better error handling
+// POST /api/auth/signin - FIXED: Allow unverified users to sign in with verification requirement
 app.post('/api/auth/signin', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -499,14 +499,6 @@ app.post('/api/auth/signin', async (req, res) => {
         const user = await User.findOne({ email: email.toLowerCase() });
         if (!user) {
             return res.status(404).json({ success: false, message: 'Account not found. Please create an account.' });
-        }
-
-        if (!user.isVerified) {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'Please verify your email first. Check your email for verification code.',
-                requiresVerification: true
-            });
         }
 
         if (!user.passwordHash) {
@@ -522,6 +514,23 @@ app.post('/api/auth/signin', async (req, res) => {
         } catch (compareError) {
             console.error('❌ Password comparison error:', compareError);
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
+        }
+
+        // If user is not verified, return requiresVerification flag
+        if (!user.isVerified) {
+            user.lastLogin = new Date();
+            await user.save();
+            return res.json({
+                success: false,
+                message: 'Please verify your email before signing in.',
+                requiresVerification: true,
+                email: user.email,
+                data: {
+                    id: user._id,
+                    username: user.username,
+                    email: user.email
+                }
+            });
         }
 
         user.lastLogin = new Date();
@@ -743,7 +752,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     }
 });
 
-// DELETE /api/user/delete - FIXED: Hard delete with verification
+// DELETE /api/user/delete
 app.delete('/api/user/delete', authMiddleware, async (req, res) => {
     try {
         const { password } = req.body;
@@ -767,13 +776,8 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        // Delete all user history
         await History.deleteMany({ userId: req.userId });
-        
-        // Delete all verification codes for this user
         await VerificationCode.deleteMany({ email: user.email });
-        
-        // Hard delete the user
         await User.findByIdAndDelete(req.userId);
 
         res.json({ 
@@ -890,7 +894,7 @@ app.delete('/api/history/clear', authMiddleware, async (req, res) => {
 // 11. VERIFICATION APIs
 // ============================================================
 
-// POST /api/verify/send-code - FIXED: Better error handling
+// POST /api/verify/send-code
 app.post('/api/verify/send-code', async (req, res) => {
     try {
         const { email, action } = req.body;
@@ -983,12 +987,14 @@ app.post('/api/verify/check-code', async (req, res) => {
         verification.isUsed = true;
         await verification.save();
 
-        // Mark user as verified for signup action
-        if (action === 'signup') {
+        // Mark user as verified for signup or signin action
+        if (action === 'signup' || action === 'signin') {
             const user = await User.findOne({ email: email.toLowerCase() });
             if (user) {
                 user.isVerified = true;
                 await user.save();
+                // Generate token after verification
+                token = generateToken(user._id);
             }
         }
 
