@@ -4,14 +4,8 @@
 // ============================================================
 
 var API_MANAGER = {
-    // ============================================================
-    // API CONFIGURATION
-    // ============================================================
     API_URL: 'https://freetranslatelanguage.onrender.com/api',
     
-    // ============================================================
-    // TOKEN MANAGEMENT
-    // ============================================================
     getToken: function() {
         return localStorage.getItem('authToken');
     },
@@ -36,9 +30,6 @@ var API_MANAGER = {
         return headers;
     },
     
-    // ============================================================
-    // HELPER: Handle Response
-    // ============================================================
     handleResponse: function(response) {
         return response.json().then(function(data) {
             if (!response.ok) {
@@ -52,62 +43,35 @@ var API_MANAGER = {
         });
     },
     
-    // ============================================================
-    // AUTH APIs
-    // ============================================================
-    
     signup: function(email, password, username) {
         return fetch(this.API_URL + '/auth/signup', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                email: email,
-                password: password,
-                username: username
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, password: password, username: username })
         }).then(this.handleResponse);
     },
     
     signin: function(email, password) {
         return fetch(this.API_URL + '/auth/signin', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                email: email,
-                password: password
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, password: password })
         }).then(this.handleResponse);
     },
     
     verifyPassword: function(password) {
-        var token = this.getToken();
-        if (!token) {
-            return Promise.reject({ status: 401, message: 'No token' });
-        }
         return fetch(this.API_URL + '/auth/verify-password', {
             method: 'POST',
             headers: this.getHeaders(),
-            body: JSON.stringify({
-                password: password
-            })
+            body: JSON.stringify({ password: password })
         }).then(this.handleResponse);
     },
     
     resetPassword: function(email, newPassword, verificationCode) {
         return fetch(this.API_URL + '/auth/reset-password', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                email: email,
-                newPassword: newPassword,
-                verificationCode: verificationCode
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, newPassword: newPassword, verificationCode: verificationCode })
         }).then(this.handleResponse);
     },
     
@@ -135,22 +99,13 @@ var API_MANAGER = {
         }).then(this.handleResponse);
     },
     
-    // ============================================================
-    // CHECK EMAIL EXISTS
-    // ============================================================
     checkEmailExists: function(email) {
         return fetch(this.API_URL + '/auth/check-email', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: email })
         }).then(this.handleResponse);
     },
-    
-    // ============================================================
-    // USER APIs
-    // ============================================================
     
     updateProfile: function(updates) {
         return fetch(this.API_URL + '/user/profile', {
@@ -161,13 +116,8 @@ var API_MANAGER = {
     },
     
     changePassword: function(currentPassword, newPassword, verificationCode) {
-        var body = {
-            currentPassword: currentPassword,
-            newPassword: newPassword
-        };
-        if (verificationCode) {
-            body.verificationCode = verificationCode;
-        }
+        var body = { currentPassword: currentPassword, newPassword: newPassword };
+        if (verificationCode) { body.verificationCode = verificationCode; }
         return fetch(this.API_URL + '/user/change-password', {
             method: 'PUT',
             headers: this.getHeaders(),
@@ -176,13 +126,8 @@ var API_MANAGER = {
     },
     
     changeEmail: function(newEmail, password, verificationCode) {
-        var body = {
-            newEmail: newEmail,
-            password: password
-        };
-        if (verificationCode) {
-            body.verificationCode = verificationCode;
-        }
+        var body = { newEmail: newEmail, password: password };
+        if (verificationCode) { body.verificationCode = verificationCode; }
         return fetch(this.API_URL + '/user/change-email', {
             method: 'PUT',
             headers: this.getHeaders(),
@@ -191,22 +136,14 @@ var API_MANAGER = {
     },
     
     deleteAccount: function(password, verificationCode) {
-        var body = {
-            password: password
-        };
-        if (verificationCode) {
-            body.verificationCode = verificationCode;
-        }
+        var body = { password: password };
+        if (verificationCode) { body.verificationCode = verificationCode; }
         return fetch(this.API_URL + '/user/delete', {
             method: 'DELETE',
             headers: this.getHeaders(),
             body: JSON.stringify(body)
         }).then(this.handleResponse);
     },
-    
-    // ============================================================
-    // HISTORY APIs
-    // ============================================================
     
     getHistory: function() {
         return fetch(this.API_URL + '/history', {
@@ -237,10 +174,6 @@ var API_MANAGER = {
         }).then(this.handleResponse);
     },
     
-    // ============================================================
-    // SETTINGS APIs
-    // ============================================================
-    
     getSettings: function() {
         return fetch(this.API_URL + '/settings', {
             method: 'GET',
@@ -256,40 +189,21 @@ var API_MANAGER = {
         }).then(this.handleResponse);
     },
     
-    // ============================================================
-    // VERIFICATION APIs
-    // ============================================================
-    
     sendVerificationCode: function(email, action) {
         return fetch(this.API_URL + '/verify/send-code', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                email: email,
-                action: action
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, action: action })
         }).then(this.handleResponse);
     },
     
     verifyCode: function(email, code, action) {
         return fetch(this.API_URL + '/verify/check-code', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                email: email,
-                code: code,
-                action: action
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, code: code, action: action })
         }).then(this.handleResponse);
     },
-    
-    // ============================================================
-    // SYNC HELPERS
-    // ============================================================
     
     syncUserData: function() {
         var self = this;
@@ -316,16 +230,10 @@ var API_MANAGER = {
             }
             throw new Error('Failed to sync history');
         }).catch(function(error) {
-            if (error.status === 401) {
-                throw error;
-            }
+            if (error.status === 401) { throw error; }
             var cached = localStorage.getItem('cachedHistory');
             if (cached) {
-                try {
-                    return JSON.parse(cached);
-                } catch(e) {
-                    return [];
-                }
+                try { return JSON.parse(cached); } catch(e) { return []; }
             }
             throw error;
         });
@@ -335,10 +243,7 @@ var API_MANAGER = {
         var self = this;
         return this.syncUserData().then(function(user) {
             return self.syncHistory().then(function(history) {
-                return {
-                    user: user,
-                    history: history
-                };
+                return { user: user, history: history };
             });
         });
     }
