@@ -547,203 +547,254 @@
     }
 
     // ============================================================
-    // VERIFICATION MODAL - FIXED with refresh on cancel for signup
-    // ============================================================
-    function openVerificationModal(email, action, callback) {
-        pendingEmail = email;
-        pendingAction = action;
-        pendingCallback = callback;
-        pendingVerificationCode = null;
+// VERIFICATION MODAL - COMPLETE FIXED
+// ============================================================
+function openVerificationModal(email, action, callback) {
+    pendingEmail = email;
+    pendingAction = action;
+    pendingCallback = callback;
+    pendingVerificationCode = null;
+    isVerifying = false;
+    verificationDone = false;
+    
+    var existing = $('verificationModal');
+    if (existing) existing.remove();
+    
+    var modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'verificationModal';
+    modal.style.display = 'flex';
+    var titleMap = {
+        'signup': 'Verify Your Email',
+        'signin': 'Verify Sign In',
+        'delete': 'Confirm Delete Account',
+        'email': 'Verify Email Change',
+        'password': 'Verify Password Change',
+        'reset': 'Reset Password'
+    };
+    var title = titleMap[action] || 'Verification Required';
+    modal.innerHTML = 
+        '<div class="modal-content verification-content" style="padding:28px 24px;">' +
+            '<span class="close-modal close-verification" style="position:absolute; top:12px; right:16px; font-size:1.4rem; cursor:pointer; color:var(--text-light); transition:var(--transition); line-height:1; background:none; border:none; padding:4px 8px; border-radius:4px;">&times;</span>' +
+            '<h2 style="margin-bottom:12px; color:var(--text-primary);">' + title + '</h2>' +
+            '<p class="verification-desc" style="text-align:center; color:var(--text-secondary); margin-bottom:14px; font-size:0.85rem; line-height:1.5;">Enter the 6-digit verification code sent to your email. Also check SPAM/JUNK folder.</p>' +
+            '<form id="verificationForm" style="display:flex; flex-direction:column; gap:10px;">' +
+                '<input type="text" id="verificationCode" placeholder="Enter 6-digit code" maxlength="6" autocomplete="off" required style="width:100%; text-align:center; font-size:1.3rem; letter-spacing:6px; padding:12px 14px; font-weight:600; background:var(--bg-input); border:2px solid var(--border-color); border-radius:var(--radius-sm); color:var(--text-primary); font-family:var(--font); transition:var(--transition); min-height:48px;">' +
+                '<button type="submit" class="auth-submit-btn" id="verifySubmitBtn" style="width:100%; min-height:44px; margin-top:10px; padding:10px; background:var(--accent); color:white; border:none; border-radius:var(--radius-sm); font-size:0.9rem; font-weight:600; cursor:pointer; transition:var(--transition); font-family:var(--font);">Verify</button>' +
+            '</form>' +
+            '<p class="auth-switch" style="text-align:center; margin-top:12px; font-size:0.8rem; color:var(--text-secondary);">Didn\'t receive code? <a href="#" id="resendCodeBtn" style="color:var(--accent); text-decoration:none; font-weight:600; cursor:pointer;">Resend Code</a></p>' +
+        '</div>';
+    document.body.appendChild(modal);
+    
+    var codeInput = $('verificationCode');
+    if (codeInput) {
+        codeInput.style.width = '100%';
+        codeInput.style.textAlign = 'center';
+        codeInput.style.fontSize = '1.3rem';
+        codeInput.style.letterSpacing = '6px';
+        codeInput.style.padding = '12px 14px';
+        codeInput.style.fontWeight = '600';
+        codeInput.style.background = 'var(--bg-input)';
+        codeInput.style.border = '2px solid var(--border-color)';
+        codeInput.style.borderRadius = 'var(--radius-sm)';
+        codeInput.style.color = 'var(--text-primary)';
+        codeInput.style.fontFamily = 'var(--font)';
+        codeInput.style.transition = 'var(--transition)';
+        codeInput.style.minHeight = '48px';
+    }
+    
+    var closeBtn = modal.querySelector('.close-verification');
+    bindClick(closeBtn, function() {
+        modal.remove();
         isVerifying = false;
         verificationDone = false;
+        if (action === 'signup' || action === 'signin') {
+            window.location.reload();
+        }
+    });
+    
+    var form = $('verificationForm');
+    var submitBtn = $('verifySubmitBtn');
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (verificationDone || isVerifying) return;
         
-        var existing = $('verificationModal');
-        if (existing) existing.remove();
-        
-        var modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.id = 'verificationModal';
-        modal.style.display = 'flex';
-        var titleMap = {
-            'signup': 'Verify Your Email',
-            'signin': 'Verify Sign In',
-            'delete': 'Confirm Delete Account',
-            'email': 'Verify Email Change',
-            'password': 'Verify Password Change',
-            'reset': 'Reset Password'
-        };
-        var title = titleMap[action] || 'Verification Required';
-        modal.innerHTML = 
-            '<div class="modal-content verification-content" style="padding:28px 24px;">' +
-                '<span class="close-modal close-verification" style="position:absolute; top:12px; right:16px; font-size:1.4rem; cursor:pointer; color:var(--text-light); transition:var(--transition); line-height:1; background:none; border:none; padding:4px 8px; border-radius:4px;">&times;</span>' +
-                '<h2 style="margin-bottom:12px; color:var(--text-primary);">' + title + '</h2>' +
-                '<p class="verification-desc" style="text-align:center; color:var(--text-secondary); margin-bottom:14px; font-size:0.85rem; line-height:1.5;">Enter the 6-digit verification code sent to your email. Also check SPAM/JUNK folder.</p>' +
-                '<form id="verificationForm" style="display:flex; flex-direction:column; gap:10px;">' +
-                    '<input type="text" id="verificationCode" placeholder="Enter 6-digit code" maxlength="6" autocomplete="off" required style="width:100%; text-align:center; font-size:1.3rem; letter-spacing:6px; padding:12px 14px; font-weight:600; background:var(--bg-input); border:2px solid var(--border-color); border-radius:var(--radius-sm); color:var(--text-primary); font-family:var(--font); transition:var(--transition); min-height:48px;">' +
-                    '<button type="submit" class="auth-submit-btn" id="verifySubmitBtn" style="width:100%; min-height:44px; margin-top:10px; padding:10px; background:var(--accent); color:white; border:none; border-radius:var(--radius-sm); font-size:0.9rem; font-weight:600; cursor:pointer; transition:var(--transition); font-family:var(--font);">Verify</button>' +
-                '</form>' +
-                '<p class="auth-switch" style="text-align:center; margin-top:12px; font-size:0.8rem; color:var(--text-secondary);">Didn\'t receive code? <a href="#" id="resendCodeBtn" style="color:var(--accent); text-decoration:none; font-weight:600; cursor:pointer;">Resend Code</a></p>' +
-            '</div>';
-        document.body.appendChild(modal);
-        
-        var codeInput = $('verificationCode');
-        if (codeInput) {
-            codeInput.style.width = '100%';
-            codeInput.style.textAlign = 'center';
-            codeInput.style.fontSize = '1.3rem';
-            codeInput.style.letterSpacing = '6px';
-            codeInput.style.padding = '12px 14px';
-            codeInput.style.fontWeight = '600';
-            codeInput.style.background = 'var(--bg-input)';
-            codeInput.style.border = '2px solid var(--border-color)';
-            codeInput.style.borderRadius = 'var(--radius-sm)';
-            codeInput.style.color = 'var(--text-primary)';
-            codeInput.style.fontFamily = 'var(--font)';
-            codeInput.style.transition = 'var(--transition)';
-            codeInput.style.minHeight = '48px';
+        var code = codeInput.value.trim();
+        if (!code || code.length !== 6) {
+            showNotification('Please enter a valid 6-digit code.', 'error');
+            return;
         }
         
-        var closeBtn = modal.querySelector('.close-verification');
-        bindClick(closeBtn, function() {
-            modal.remove();
-            isVerifying = false;
-            verificationDone = false;
-            if (action === 'signup') {
-                window.location.reload();
-            }
-        });
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Verifying...';
+        isVerifying = true;
         
-        var form = $('verificationForm');
-        var submitBtn = $('verifySubmitBtn');
-        
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (verificationDone || isVerifying) return;
-            
-            var code = codeInput.value.trim();
-            if (!code || code.length !== 6) {
-                showNotification('Please enter a valid 6-digit code.', 'error');
-                return;
-            }
-            
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Verifying...';
-            isVerifying = true;
-            
-            verifyCode(email, code).then(function(result) {
-                if (result.success) {
-                    verificationDone = true;
-                    submitBtn.textContent = '✓ Verified';
-                    submitBtn.style.backgroundColor = '#4CAF50';
-                    codeInput.disabled = true;
-                    showNotification('Verification successful!', 'success');
-                    
-                    pendingVerificationCode = code;
-                    
-                    if (result.token && action !== 'signup') {
-                        API_MANAGER.setToken(result.token);
-                    }
-                    
+        API_MANAGER.verifyCode(email, code, action).then(function(result) {
+            if (result.success) {
+                verificationDone = true;
+                submitBtn.textContent = '✓ Verified';
+                submitBtn.style.backgroundColor = '#4CAF50';
+                codeInput.disabled = true;
+                showNotification('Verification successful!', 'success');
+                
+                pendingVerificationCode = code;
+                
+                // SIGNUP: Mark verified and redirect to sign in
+                if (action === 'signup') {
                     setTimeout(function() {
                         modal.remove();
                         if (typeof pendingCallback === 'function') {
                             pendingCallback(result, code);
                         }
-                        if (action === 'signup') {
-                            showNotification('Email verified! Please sign in.', 'success');
-                            setTimeout(function() {
-                                window.location.reload();
-                            }, 500);
-                        } else if (action === 'signin') {
-                            // Token is already set, check auth status
-                            checkAuthStatus();
-                            // If checkAuthStatus doesn't show logged in, force update
-                            setTimeout(function() {
-                                if (!isLoggedIn && API_MANAGER.getToken()) {
-                                    // Force reload user data
-                                    API_MANAGER.getMe().then(function(response) {
-                                        if (response.success && response.data) {
-                                            var user = response.data;
-                                            currentUser = {
-                                                id: user._id || user.id,
-                                                email: user.email,
-                                                username: user.username || generateUsernameFromEmail(user.email),
-                                                createdAt: user.createdAt,
-                                                lastLogin: user.lastLogin,
-                                                isVerified: user.isVerified
-                                            };
-                                            isLoggedIn = true;
-                                            updateUIForLoggedInUser();
-                                        }
-                                    }).catch(function() {});
-                                }
-                            }, 300);
-                        } else if (action === 'email') {
-                            showNotification('Email updated successfully!', 'success');
-                            setTimeout(function() {
-                                window.location.reload();
-                            }, 500);
-                        } else if (action === 'password') {
-                            showNotification('Password updated successfully!', 'success');
-                            setTimeout(function() {
-                                window.location.reload();
-                            }, 500);
-                        } else if (action === 'reset') {
-                            // Reset is handled in the callback
-                        } else {
-                            checkAuthStatus();
-                        }
+                        showNotification('Email verified! Please sign in.', 'success');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 500);
                         isVerifying = false;
                         verificationDone = false;
                     }, 800);
-                } else {
-                    showNotification(result.error || 'Invalid code.', 'error');
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Verify';
-                    submitBtn.style.backgroundColor = '';
-                    isVerifying = false;
-                    codeInput.value = '';
-                    codeInput.focus();
+                    return;
                 }
-            }).catch(function() {
-                showNotification('Verification error.', 'error');
+                
+                // SIGNIN: Set token and log in
+                if (action === 'signin') {
+                    if (result.token) {
+                        API_MANAGER.setToken(result.token);
+                        showNotification('Signed in successfully!', 'success');
+                        setTimeout(function() {
+                            modal.remove();
+                            if (typeof pendingCallback === 'function') {
+                                pendingCallback(result, code);
+                            }
+                            checkAuthStatus();
+                            isVerifying = false;
+                            verificationDone = false;
+                        }, 500);
+                    } else {
+                        showNotification('Verification failed: No token received.', 'error');
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Verify';
+                        submitBtn.style.backgroundColor = '';
+                        isVerifying = false;
+                    }
+                    return;
+                }
+                
+                // RESET: Proceed to password reset
+                if (action === 'reset') {
+                    setTimeout(function() {
+                        modal.remove();
+                        if (typeof pendingCallback === 'function') {
+                            pendingCallback(result, code);
+                        }
+                        isVerifying = false;
+                        verificationDone = false;
+                    }, 500);
+                    return;
+                }
+                
+                // EMAIL: Update email
+                if (action === 'email') {
+                    setTimeout(function() {
+                        modal.remove();
+                        if (typeof pendingCallback === 'function') {
+                            pendingCallback(result, code);
+                        }
+                        isVerifying = false;
+                        verificationDone = false;
+                    }, 500);
+                    return;
+                }
+                
+                // PASSWORD: Update password
+                if (action === 'password') {
+                    setTimeout(function() {
+                        modal.remove();
+                        if (typeof pendingCallback === 'function') {
+                            pendingCallback(result, code);
+                        }
+                        isVerifying = false;
+                        verificationDone = false;
+                    }, 500);
+                    return;
+                }
+                
+                // DELETE: Delete account
+                if (action === 'delete') {
+                    setTimeout(function() {
+                        modal.remove();
+                        if (typeof pendingCallback === 'function') {
+                            pendingCallback(result, code);
+                        }
+                        isVerifying = false;
+                        verificationDone = false;
+                    }, 500);
+                    return;
+                }
+                
+                // Default: Just callback
+                setTimeout(function() {
+                    modal.remove();
+                    if (typeof pendingCallback === 'function') {
+                        pendingCallback(result, code);
+                    }
+                    checkAuthStatus();
+                    isVerifying = false;
+                    verificationDone = false;
+                }, 800);
+            } else {
+                showNotification(result.message || 'Invalid code.', 'error');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Verify';
                 submitBtn.style.backgroundColor = '';
                 isVerifying = false;
-            });
-        });
-        
-        var resendBtn = $('resendCodeBtn');
-        bindClick(resendBtn, function(e) {
-            e.preventDefault();
-            verificationDone = false;
-            isVerifying = false;
+                codeInput.value = '';
+                codeInput.focus();
+            }
+        }).catch(function(error) {
+            showNotification(error.message || 'Verification error. Please try again.', 'error');
             submitBtn.disabled = false;
             submitBtn.textContent = 'Verify';
             submitBtn.style.backgroundColor = '';
-            codeInput.disabled = false;
-            codeInput.value = '';
-            codeInput.focus();
-            sendVerificationCode(email, pendingAction).then(function(result) {
-                if (result.success) {
-                    showNotification('New code sent! Check your email.', 'success');
-                }
-            });
+            isVerifying = false;
         });
-        
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                modal.remove();
-                isVerifying = false;
-                verificationDone = false;
-                if (action === 'signup') {
-                    window.location.reload();
-                }
+    });
+    
+    var resendBtn = $('resendCodeBtn');
+    bindClick(resendBtn, function(e) {
+        e.preventDefault();
+        verificationDone = false;
+        isVerifying = false;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Verify';
+        submitBtn.style.backgroundColor = '';
+        codeInput.disabled = false;
+        codeInput.value = '';
+        codeInput.focus();
+        API_MANAGER.sendVerificationCode(email, action).then(function(result) {
+            if (result.success) {
+                showNotification('New code sent! Check your email.', 'success');
+            } else {
+                showNotification(result.message || 'Error sending code.', 'error');
             }
+        }).catch(function() {
+            showNotification('Error sending code.', 'error');
         });
-    }
+    });
+    
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.remove();
+            isVerifying = false;
+            verificationDone = false;
+            if (action === 'signup' || action === 'signin') {
+                window.location.reload();
+            }
+        }
+    });
+}
 
     // ============================================================
     // UPDATE UI FOR LOGGED IN USER
@@ -763,17 +814,52 @@
     }
 
     // ============================================================
-    // AUTH STATE - FIXED: Better cross-device support
-    // ============================================================
-    function checkAuthStatus() {
-        if (authCheckInProgress) return;
-        authCheckInProgress = true;
-        
-        var token = API_MANAGER.getToken();
-        var authBtn = $('authBtn');
-        var historyNavBtn = $('historyNavBtn');
-        
-        if (!token) {
+// AUTH STATE - FIXED: Better cross-device support
+// ============================================================
+function checkAuthStatus() {
+    var token = API_MANAGER.getToken();
+    var authBtn = $('authBtn');
+    var historyNavBtn = $('historyNavBtn');
+    
+    if (!token) {
+        isLoggedIn = false;
+        currentUser = null;
+        if (authBtn) {
+            authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+            removeClass(authBtn, 'logged-in');
+        }
+        if (historyNavBtn) {
+            historyNavBtn.style.display = 'none';
+        }
+        return;
+    }
+    
+    API_MANAGER.getMe().then(function(response) {
+        if (response.success && response.data) {
+            var user = response.data;
+            currentUser = {
+                id: user._id || user.id,
+                email: user.email,
+                username: user.username || generateUsernameFromEmail(user.email),
+                createdAt: user.createdAt,
+                lastLogin: user.lastLogin,
+                isVerified: user.isVerified
+            };
+            isLoggedIn = true;
+            if (authBtn) {
+                authBtn.innerHTML = '<i class="fas fa-user-circle"></i> <span>' + currentUser.username + '</span>';
+                addClass(authBtn, 'logged-in');
+            }
+            if (historyNavBtn) {
+                historyNavBtn.style.display = 'flex';
+                historyNavBtn.innerHTML = '<i class="fas fa-history"></i> <span>History</span>';
+            }
+            localStorage.setItem('cachedUser', JSON.stringify(user));
+            
+            API_MANAGER.syncHistory().catch(function() {});
+        } else {
+            API_MANAGER.setToken(null);
+            localStorage.removeItem('cachedUser');
             isLoggedIn = false;
             currentUser = null;
             if (authBtn) {
@@ -783,14 +869,27 @@
             if (historyNavBtn) {
                 historyNavBtn.style.display = 'none';
             }
-            authCheckInProgress = false;
+        }
+    }).catch(function(error) {
+        if (error.status === 401) {
+            API_MANAGER.setToken(null);
+            localStorage.removeItem('cachedUser');
+            isLoggedIn = false;
+            currentUser = null;
+            if (authBtn) {
+                authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                removeClass(authBtn, 'logged-in');
+            }
+            if (historyNavBtn) {
+                historyNavBtn.style.display = 'none';
+            }
             return;
         }
         
-        API_MANAGER.getMe().then(function(response) {
-            authCheckInProgress = false;
-            if (response.success && response.data) {
-                var user = response.data;
+        var cachedUser = localStorage.getItem('cachedUser');
+        if (cachedUser) {
+            try {
+                var user = JSON.parse(cachedUser);
                 currentUser = {
                     id: user._id || user.id,
                     email: user.email,
@@ -800,15 +899,14 @@
                     isVerified: user.isVerified
                 };
                 isLoggedIn = true;
-                updateUIForLoggedInUser();
-                localStorage.setItem('cachedUser', JSON.stringify(user));
-                
-                API_MANAGER.syncHistory().then(function(history) {
-                    if (historyModal && historyModal.style.display === 'flex') {
-                        loadHistoryModal();
-                    }
-                }).catch(function() {});
-            } else {
+                if (authBtn) {
+                    authBtn.innerHTML = '<i class="fas fa-user-circle"></i> <span>' + currentUser.username + '</span>';
+                    addClass(authBtn, 'logged-in');
+                }
+                if (historyNavBtn) {
+                    historyNavBtn.style.display = 'flex';
+                }
+            } catch(e) {
                 API_MANAGER.setToken(null);
                 localStorage.removeItem('cachedUser');
                 isLoggedIn = false;
@@ -821,66 +919,21 @@
                     historyNavBtn.style.display = 'none';
                 }
             }
-        }).catch(function(error) {
-            authCheckInProgress = false;
-            if (error.status === 401) {
-                API_MANAGER.setToken(null);
-                localStorage.removeItem('cachedUser');
-                isLoggedIn = false;
-                currentUser = null;
-                if (authBtn) {
-                    authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
-                    removeClass(authBtn, 'logged-in');
-                }
-                if (historyNavBtn) {
-                    historyNavBtn.style.display = 'none';
-                }
-                return;
+        } else {
+            API_MANAGER.setToken(null);
+            localStorage.removeItem('cachedUser');
+            isLoggedIn = false;
+            currentUser = null;
+            if (authBtn) {
+                authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                removeClass(authBtn, 'logged-in');
             }
-            
-            // Try cached user
-            var cachedUser = localStorage.getItem('cachedUser');
-            if (cachedUser) {
-                try {
-                    var user = JSON.parse(cachedUser);
-                    currentUser = {
-                        id: user._id || user.id,
-                        email: user.email,
-                        username: user.username || generateUsernameFromEmail(user.email),
-                        createdAt: user.createdAt,
-                        lastLogin: user.lastLogin,
-                        isVerified: user.isVerified
-                    };
-                    isLoggedIn = true;
-                    updateUIForLoggedInUser();
-                } catch(e) {
-                    API_MANAGER.setToken(null);
-                    localStorage.removeItem('cachedUser');
-                    isLoggedIn = false;
-                    currentUser = null;
-                    if (authBtn) {
-                        authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
-                        removeClass(authBtn, 'logged-in');
-                    }
-                    if (historyNavBtn) {
-                        historyNavBtn.style.display = 'none';
-                    }
-                }
-            } else {
-                API_MANAGER.setToken(null);
-                localStorage.removeItem('cachedUser');
-                isLoggedIn = false;
-                currentUser = null;
-                if (authBtn) {
-                    authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
-                    removeClass(authBtn, 'logged-in');
-                }
-                if (historyNavBtn) {
-                    historyNavBtn.style.display = 'none';
-                }
+            if (historyNavBtn) {
+                historyNavBtn.style.display = 'none';
             }
-        });
-    }
+        }
+    });
+}
 
     // ============================================================
     // OPEN AUTH MODAL - No auto-fill
