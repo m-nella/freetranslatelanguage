@@ -814,17 +814,51 @@
     }
 
     // ============================================================
-    // AUTH STATE - FIXED: Better cross-device support
-    // ============================================================
-    function checkAuthStatus() {
-        if (authCheckInProgress) return;
-        authCheckInProgress = true;
-        
-        var token = API_MANAGER.getToken();
-        var authBtn = $('authBtn');
-        var historyNavBtn = $('historyNavBtn');
-        
-        if (!token) {
+// AUTH STATE - FIXED: Uses cookies for cross-device authentication
+// ============================================================
+function checkAuthStatus() {
+    if (authCheckInProgress) return;
+    authCheckInProgress = true;
+    
+    var token = API_MANAGER.getToken();
+    var authBtn = $('authBtn');
+    var historyNavBtn = $('historyNavBtn');
+    
+    // No token = not logged in
+    if (!token) {
+        isLoggedIn = false;
+        currentUser = null;
+        if (authBtn) {
+            authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+            removeClass(authBtn, 'logged-in');
+        }
+        if (historyNavBtn) {
+            historyNavBtn.style.display = 'none';
+        }
+        authCheckInProgress = false;
+        return;
+    }
+    
+    // Token exists - verify it with server
+    API_MANAGER.getMe().then(function(response) {
+        authCheckInProgress = false;
+        if (response.success && response.data) {
+            var user = response.data;
+            currentUser = {
+                id: user._id || user.id,
+                email: user.email,
+                username: user.username || generateUsernameFromEmail(user.email),
+                createdAt: user.createdAt,
+                lastLogin: user.lastLogin,
+                isVerified: user.isVerified
+            };
+            isLoggedIn = true;
+            updateUIForLoggedInUser();
+            localStorage.setItem('cachedUser', JSON.stringify(user));
+        } else {
+            // Token invalid - clear it
+            API_MANAGER.setToken(null);
+            localStorage.removeItem('cachedUser');
             isLoggedIn = false;
             currentUser = null;
             if (authBtn) {
@@ -834,14 +868,30 @@
             if (historyNavBtn) {
                 historyNavBtn.style.display = 'none';
             }
-            authCheckInProgress = false;
+        }
+    }).catch(function(error) {
+        authCheckInProgress = false;
+        // Only clear token on 401 (unauthorized)
+        if (error.status === 401) {
+            API_MANAGER.setToken(null);
+            localStorage.removeItem('cachedUser');
+            isLoggedIn = false;
+            currentUser = null;
+            if (authBtn) {
+                authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                removeClass(authBtn, 'logged-in');
+            }
+            if (historyNavBtn) {
+                historyNavBtn.style.display = 'none';
+            }
             return;
         }
         
-        API_MANAGER.getMe().then(function(response) {
-            authCheckInProgress = false;
-            if (response.success && response.data) {
-                var user = response.data;
+        // For other errors, try cached user data
+        var cachedUser = localStorage.getItem('cachedUser');
+        if (cachedUser) {
+            try {
+                var user = JSON.parse(cachedUser);
                 currentUser = {
                     id: user._id || user.id,
                     email: user.email,
@@ -852,10 +902,7 @@
                 };
                 isLoggedIn = true;
                 updateUIForLoggedInUser();
-                localStorage.setItem('cachedUser', JSON.stringify(user));
-                
-                API_MANAGER.syncHistory().catch(function() {});
-            } else {
+            } catch(e) {
                 API_MANAGER.setToken(null);
                 localStorage.removeItem('cachedUser');
                 isLoggedIn = false;
@@ -868,65 +915,20 @@
                     historyNavBtn.style.display = 'none';
                 }
             }
-        }).catch(function(error) {
-            authCheckInProgress = false;
-            if (error.status === 401) {
-                API_MANAGER.setToken(null);
-                localStorage.removeItem('cachedUser');
-                isLoggedIn = false;
-                currentUser = null;
-                if (authBtn) {
-                    authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
-                    removeClass(authBtn, 'logged-in');
-                }
-                if (historyNavBtn) {
-                    historyNavBtn.style.display = 'none';
-                }
-                return;
+        } else {
+            // No cached user, show as logged out
+            isLoggedIn = false;
+            currentUser = null;
+            if (authBtn) {
+                authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                removeClass(authBtn, 'logged-in');
             }
-            
-            var cachedUser = localStorage.getItem('cachedUser');
-            if (cachedUser) {
-                try {
-                    var user = JSON.parse(cachedUser);
-                    currentUser = {
-                        id: user._id || user.id,
-                        email: user.email,
-                        username: user.username || generateUsernameFromEmail(user.email),
-                        createdAt: user.createdAt,
-                        lastLogin: user.lastLogin,
-                        isVerified: user.isVerified
-                    };
-                    isLoggedIn = true;
-                    updateUIForLoggedInUser();
-                } catch(e) {
-                    API_MANAGER.setToken(null);
-                    localStorage.removeItem('cachedUser');
-                    isLoggedIn = false;
-                    currentUser = null;
-                    if (authBtn) {
-                        authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
-                        removeClass(authBtn, 'logged-in');
-                    }
-                    if (historyNavBtn) {
-                        historyNavBtn.style.display = 'none';
-                    }
-                }
-            } else {
-                API_MANAGER.setToken(null);
-                localStorage.removeItem('cachedUser');
-                isLoggedIn = false;
-                currentUser = null;
-                if (authBtn) {
-                    authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
-                    removeClass(authBtn, 'logged-in');
-                }
-                if (historyNavBtn) {
-                    historyNavBtn.style.display = 'none';
-                }
+            if (historyNavBtn) {
+                historyNavBtn.style.display = 'none';
             }
-        });
-    }
+        }
+    });
+}
 
     // ============================================================
     // OPEN AUTH MODAL - No auto-fill
