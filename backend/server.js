@@ -1220,7 +1220,7 @@ app.post('/api/email/send', async (req, res) => {
 });
 
 // ============================================================
-// 14. RESET PASSWORD - FIXED: Verify new password different from current
+// 14. RESET PASSWORD - FIXED: Verifies new password different from current
 // ============================================================
 app.post('/api/auth/reset-password', async (req, res) => {
     try {
@@ -1258,11 +1258,11 @@ app.post('/api/auth/reset-password', async (req, res) => {
             if (isMatch) {
                 return res.status(400).json({ 
                     success: false, 
-                    message: 'New password must be different from current password.' 
+                    message: 'New password must be different from your current password.' 
                 });
             }
         } catch (compareError) {
-            console.error('❌ Password comparison error:', compareError);
+            console.error('❌ Password comparison error during reset:', compareError);
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
