@@ -20,29 +20,30 @@ require('dotenv').config();
 const app = express();
 
 // ============================================================
-// 2. MIDDLEWARE
+// 2. MIDDLEWARE - FIXED: Better CORS for cross-device
 // ============================================================
 app.use(helmet());
 
-// CORS configuration - Allow multiple origins for cross-device
+// CORS configuration - Allow multiple origins
 const allowedOrigins = [
     'https://m-nella.github.io',
     'http://localhost:5000',
     'http://localhost:3000',
-    'https://freetranslatelanguage.onrender.com',
     process.env.CORS_ORIGIN
 ].filter(Boolean);
 
 app.use(cors({
     origin: function(origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
+            // For development, allow any origin
             if (process.env.NODE_ENV === 'development') {
                 callback(null, true);
             } else {
-                callback(null, true);
+                callback(new Error('Not allowed by CORS'));
             }
         }
     },
@@ -76,6 +77,8 @@ if (!MONGODB_URI) {
 }
 
 mongoose.connect(MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
     serverSelectionTimeoutMS: 10000,
     socketTimeoutMS: 45000,
 }).then(() => {
@@ -86,7 +89,7 @@ mongoose.connect(MONGODB_URI, {
 });
 
 // ============================================================
-// 4. MODELS (Schemas)
+// 4. MODELS (Schemas) - FIXED: Better email handling
 // ============================================================
 
 // User Schema
@@ -242,7 +245,7 @@ const VerificationCode = mongoose.model('VerificationCode', VerificationCodeSche
 
 // Generate JWT Token
 function generateToken(userId) {
-    return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '30d' }); // Extended to 30 days for better cross-device experience
 }
 
 // Verify JWT Token
@@ -273,13 +276,14 @@ function hashPassword(password) {
     });
 }
 
-// Compare password - Trims password for mobile compatibility
+// Compare password - FIXED: Better error handling
 function comparePassword(password, hash) {
     return new Promise(function(resolve, reject) {
         if (!password || !hash) {
             reject(new Error('Password and hash are required'));
             return;
         }
+        // Trim password to remove any accidental spaces from mobile keyboards
         const trimmedPassword = typeof password === 'string' ? password.trim() : password;
         bcrypt.compare(trimmedPassword, hash, function(err, result) {
             if (err) {
@@ -291,7 +295,7 @@ function comparePassword(password, hash) {
     });
 }
 
-// Generate username from email
+// Generate username from email - SHORT and CLEAN
 function generateUsernameFromEmail(email) {
     if (!email) return 'user';
     var localPart = email.split('@')[0];
@@ -307,7 +311,7 @@ function generateUsernameFromEmail(email) {
     return clean.toLowerCase();
 }
 
-// Normalize email
+// Normalize email - FIXED: Consistent email handling
 function normalizeEmail(email) {
     if (!email) return '';
     return email.trim().toLowerCase();
@@ -472,7 +476,7 @@ function authMiddleware(req, res, next) {
 }
 
 // ============================================================
-// 7. AUTH APIs
+// 7. AUTH APIs - FIXED: Better email/password handling
 // ============================================================
 
 // POST /api/auth/signup
@@ -484,6 +488,7 @@ app.post('/api/auth/signup', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email and password are required.' });
         }
 
+        // Normalize email
         email = normalizeEmail(email);
         password = typeof password === 'string' ? password.trim() : password;
 
@@ -525,7 +530,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin - FIXED: Cross-device compatible
+// POST /api/auth/signin - FIXED: Better password handling
 app.post('/api/auth/signin', async (req, res) => {
     try {
         let { email, password } = req.body;
@@ -534,6 +539,7 @@ app.post('/api/auth/signin', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email and password are required.' });
         }
 
+        // Normalize email and trim password
         email = normalizeEmail(email);
         password = typeof password === 'string' ? password.trim() : password;
 
@@ -559,39 +565,18 @@ app.post('/api/auth/signin', async (req, res) => {
 
         user.lastLogin = new Date();
         await user.save();
-
-        // CRITICAL FIX: Check if user is already verified
-        // If verified, return token immediately (cross-device sign-in)
-        // If not verified, require verification (allows skip verification flow)
-        if (user.isVerified) {
-            const token = generateToken(user._id);
-            return res.json({
-                success: true,
-                message: 'Signed in successfully.',
-                token: token,
-                data: {
-                    id: user._id,
-                    username: user.username,
-                    email: user.email,
-                    createdAt: user.createdAt,
-                    lastLogin: user.lastLogin
-                }
-            });
-        } else {
-            // User is not verified - require verification
-            // This allows users who skipped verification during signup to sign in and get code
-            return res.status(403).json({
-                success: false,
-                message: 'Please verify your identity to sign in.',
-                requiresVerification: true,
-                email: user.email,
-                data: {
-                    id: user._id,
-                    username: user.username,
-                    email: user.email
-                }
-            });
-        }
+        
+        return res.status(403).json({
+            success: false,
+            message: 'Please verify your identity to sign in.',
+            requiresVerification: true,
+            email: user.email,
+            data: {
+                id: user._id,
+                username: user.username,
+                email: user.email
+            }
+        });
 
     } catch (error) {
         console.error('Signin error:', error);
@@ -1297,7 +1282,7 @@ app.post('/api/email/send', async (req, res) => {
 });
 
 // ============================================================
-// 14. RESET PASSWORD
+// 14. RESET PASSWORD - FIXED: Verifies new password different from current
 // ============================================================
 app.post('/api/auth/reset-password', async (req, res) => {
     try {
@@ -1315,6 +1300,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
+        // STEP 1: Verify the verification code
         const verification = await VerificationCode.findOne({
             email: normalizedEmail,
             code: verificationCode,
@@ -1331,6 +1317,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
         }
 
+        // STEP 2: Verify new password is different from current password
         try {
             const isMatch = await comparePassword(newPassword, user.passwordHash);
             if (isMatch) {
@@ -1344,6 +1331,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
+        // STEP 3: Mark code as used and update password
         verification.isUsed = true;
         await verification.save();
 
