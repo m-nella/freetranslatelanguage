@@ -1,5 +1,6 @@
 // ============================================================
 // FREE TRANSLATE LANGUAGE - COMPLETE BACKEND
+// With HTTP-Only Cookie Authentication
 // ============================================================
 
 const express = require('express');
@@ -21,6 +22,7 @@ const app = express();
 app.use(helmet());
 app.set('trust proxy', 1);
 
+// CORS - Allow credentials (cookies)
 app.use(cors({
     origin: function(origin, callback) {
         return callback(null, true);
@@ -116,6 +118,37 @@ function generateToken(userId) {
 
 function verifyToken(token) {
     try { return jwt.verify(token, process.env.JWT_SECRET); } catch (error) { return null; }
+}
+
+// Get token from cookie or Authorization header
+function getTokenFromRequest(req) {
+    // Check cookie first
+    if (req.cookies && req.cookies.authToken) {
+        return req.cookies.authToken;
+    }
+    // Check Authorization header
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        return authHeader.split(' ')[1];
+    }
+    return null;
+}
+
+function setTokenCookie(res, token) {
+    res.cookie('authToken', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+    });
+}
+
+function clearTokenCookie(res) {
+    res.clearCookie('authToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
+    });
 }
 
 function hashPassword(password) {
@@ -263,13 +296,17 @@ function sendEmailViaBrevo(email, code, action) {
 }
 
 // ============================================================
-// AUTH MIDDLEWARE
+// AUTH MIDDLEWARE - Uses cookies
 // ============================================================
 function authMiddleware(req, res, next) {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) { return res.status(401).json({ success: false, message: 'No token provided' }); }
+    const token = getTokenFromRequest(req);
+    if (!token) {
+        return res.status(401).json({ success: false, message: 'No token provided' });
+    }
     const decoded = verifyToken(token);
-    if (!decoded) { return res.status(401).json({ success: false, message: 'Invalid or expired token' }); }
+    if (!decoded) {
+        return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    }
     req.userId = decoded.userId;
     next();
 }
@@ -401,8 +438,12 @@ app.post('/api/auth/verify-password', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/auth/logout', authMiddleware, async (req, res) => {
-    try { res.json({ success: true, message: 'Logged out successfully.' }); } 
-    catch (error) { res.status(500).json({ success: false, message: 'Error logging out.' }); }
+    try {
+        clearTokenCookie(res);
+        res.json({ success: true, message: 'Logged out successfully.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error logging out.' });
+    }
 });
 
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
@@ -455,8 +496,7 @@ app.post('/api/auth/check-email', async (req, res) => {
 });
 
 // ============================================================
-// USER APIs - FIXED: These DO NOT check verification code again
-// They only verify that the user is authenticated
+// USER APIs
 // ============================================================
 
 app.put('/api/user/profile', authMiddleware, async (req, res) => {
@@ -499,7 +539,6 @@ app.put('/api/user/profile', authMiddleware, async (req, res) => {
     }
 });
 
-// CHANGE PASSWORD - No verification code check here (code is already verified)
 app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     try {
         let { currentPassword, newPassword } = req.body;
@@ -539,7 +578,6 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     }
 });
 
-// CHANGE EMAIL - No verification code check here (code is already verified)
 app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     try {
         let { newEmail, password } = req.body;
@@ -589,7 +627,6 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     }
 });
 
-// DELETE ACCOUNT - No verification code check here (code is already verified)
 app.delete('/api/user/delete', authMiddleware, async (req, res) => {
     try {
         let { password } = req.body;
@@ -615,6 +652,8 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
         await History.deleteMany({ userId: req.userId });
         await VerificationCode.deleteMany({ email: user.email });
         await User.findByIdAndDelete(req.userId);
+        
+        clearTokenCookie(res);
         
         res.json({ success: true, message: 'Account deleted successfully.', deleted: true });
     } catch (error) {
@@ -769,7 +808,6 @@ app.post('/api/verify/check-code', async (req, res) => {
         let token = null;
         let requiresSignIn = false;
         
-        // SIGNUP: Verify email and mark user as verified
         if (action === 'signup') {
             verification.isUsed = true;
             await verification.save();
@@ -788,7 +826,6 @@ app.post('/api/verify/check-code', async (req, res) => {
             });
         }
         
-        // SIGNIN: Verify and generate token
         if (action === 'signin') {
             verification.isUsed = true;
             await verification.save();
@@ -799,6 +836,8 @@ app.post('/api/verify/check-code', async (req, res) => {
                 user.lastLogin = new Date();
                 await user.save();
                 token = generateToken(user._id);
+                // Set cookie with token
+                setTokenCookie(res, token);
                 
                 return res.json({
                     success: true,
@@ -815,7 +854,6 @@ app.post('/api/verify/check-code', async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
         
-        // RESET: Mark as used and proceed
         if (action === 'reset') {
             verification.isUsed = true;
             await verification.save();
@@ -828,11 +866,9 @@ app.post('/api/verify/check-code', async (req, res) => {
             });
         }
         
-        // EMAIL: Mark as used and proceed - the action will be called with the code
         if (action === 'email') {
             verification.isUsed = true;
             await verification.save();
-            
             return res.json({
                 success: true,
                 message: 'Code verified successfully. Proceeding with email change.',
@@ -840,11 +876,9 @@ app.post('/api/verify/check-code', async (req, res) => {
             });
         }
         
-        // PASSWORD: Mark as used and proceed
         if (action === 'password') {
             verification.isUsed = true;
             await verification.save();
-            
             return res.json({
                 success: true,
                 message: 'Code verified successfully. Proceeding with password change.',
@@ -852,11 +886,9 @@ app.post('/api/verify/check-code', async (req, res) => {
             });
         }
         
-        // DELETE: Mark as used and proceed
         if (action === 'delete') {
             verification.isUsed = true;
             await verification.save();
-            
             return res.json({
                 success: true,
                 message: 'Code verified successfully. Proceeding with account deletion.',
