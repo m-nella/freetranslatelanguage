@@ -546,7 +546,7 @@
     }
 
     // ============================================================
-    // VERIFICATION MODAL - FIXED to capture code
+    // VERIFICATION MODAL - FIXED
     // ============================================================
     function openVerificationModal(email, action, callback) {
         pendingEmail = email;
@@ -645,14 +645,13 @@
                     setTimeout(function() {
                         modal.remove();
                         if (typeof pendingCallback === 'function') {
-                            // Pass both result and code
                             pendingCallback(result, code);
                         }
-                        // For signup, redirect to sign in
+                        // For signup, redirect to sign in - DO NOT reload immediately
                         if (action === 'signup') {
                             showNotification('Email verified! Please sign in.', 'success');
                             setTimeout(function() {
-                                window.location.reload();
+                                openModal('login');
                             }, 500);
                         } else if (action === 'email') {
                             showNotification('Email updated successfully!', 'success');
@@ -1163,7 +1162,7 @@
                 });
                 
             // ============================================================
-            // SIGN UP
+            // SIGN UP - FIXED: Only reload after verification, NOT before
             // ============================================================
             } else if (currentMode === 'signup') {
                 var confirmPassword = $('authConfirmPassword') ? $('authConfirmPassword').value : '';
@@ -1194,15 +1193,12 @@
                                 if (authModal) authModal.style.display = 'none';
                                 showNotification('Account created! Please verify your email.', 'success');
                                 
-                                setTimeout(function() {
-                                    window.location.reload();
-                                }, 500);
-                                
+                                // Open verification modal - DO NOT reload yet
                                 openVerificationModal(email, 'signup', function(result, code) {
                                     if (result.success) {
                                         showNotification('Email verified! Please sign in.', 'success');
                                         setTimeout(function() {
-                                            window.location.reload();
+                                            openModal('login');
                                         }, 500);
                                     }
                                 });
@@ -1212,9 +1208,6 @@
                                 authSubmitBtn.textContent = 'Create Account';
                                 if (authModal) authModal.style.display = 'none';
                                 openModal('login');
-                                setTimeout(function() {
-                                    window.location.reload();
-                                }, 500);
                             }
                         });
                     } else {
@@ -1225,9 +1218,6 @@
                             setTimeout(function() {
                                 if (authModal) authModal.style.display = 'none';
                                 openModal('login');
-                                setTimeout(function() {
-                                    window.location.reload();
-                                }, 500);
                             }, 1500);
                         } else {
                             showNotification(response.message || 'Error creating account. Please try again.', 'error');
@@ -1244,9 +1234,6 @@
                         setTimeout(function() {
                             if (authModal) authModal.style.display = 'none';
                             openModal('login');
-                            setTimeout(function() {
-                                window.location.reload();
-                            }, 500);
                         }, 1500);
                     } else {
                         showNotification(errorMsg || 'Error creating account. Please try again.', 'error');
@@ -1462,7 +1449,7 @@
     }
 
     // ============================================================
-    // ACCOUNT SETTINGS - COMPLETE FIXED - Sends verification code
+    // ACCOUNT SETTINGS
     // ============================================================
     function openAccountSettings() {
         var user = currentUser || DATA_MANAGER.getCurrentUser();
@@ -1514,9 +1501,6 @@
         var saveBtn = modal.querySelector('#saveSettingsBtn');
         var deleteBtn = modal.querySelector('#deleteAccountBtn');
         
-        // ============================================================
-        // SAVE SETTINGS - FIXED: Sends verification code with request
-        // ============================================================
         bindClick(saveBtn, function() {
             var newEmail = $('settingsEmail').value;
             var currentPassword = $('settingsCurrentPassword').value;
@@ -1528,9 +1512,6 @@
                 return;
             }
             
-            // ============================================================
-            // CHANGE EMAIL - Requires verification code
-            // ============================================================
             if (newEmail && newEmail !== user.email) {
                 if (!DATA_MANAGER.validateEmail(newEmail)) {
                     showNotification('Invalid email address.', 'error');
@@ -1560,8 +1541,6 @@
                         openVerificationModal(newEmail, 'email', function(verifyResult, code) {
                             if (verifyResult.success) {
                                 saveBtn.textContent = 'Updating email...';
-                                
-                                // Send the verification code to backend
                                 API_MANAGER.changeEmail(newEmail, currentPassword, code).then(function(response) {
                                     if (response.success) {
                                         showNotification('Email updated successfully! Username auto-updated.', 'success');
@@ -1647,9 +1626,6 @@
                 return;
             }
             
-            // ============================================================
-            // CHANGE PASSWORD - Requires verification code
-            // ============================================================
             if (newPassword || confirmPassword) {
                 if (newPassword !== confirmPassword) {
                     showNotification('Passwords do not match!', 'error');
@@ -1713,9 +1689,6 @@
             modal.remove();
         });
         
-        // ============================================================
-        // DELETE ACCOUNT - Requires verification code
-        // ============================================================
         bindClick(deleteBtn, function() {
             showConfirmationModal(
                 'Delete Account',
