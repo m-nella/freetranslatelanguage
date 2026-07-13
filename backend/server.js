@@ -506,7 +506,6 @@ app.post('/api/auth/signin', async (req, res) => {
             return res.status(500).json({ success: false, message: 'Account data corrupted. Please contact support.' });
         }
 
-        // Verify password first
         try {
             const isMatch = await comparePassword(password, user.passwordHash);
             if (!isMatch) {
@@ -517,7 +516,6 @@ app.post('/api/auth/signin', async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        // CRITICAL: If user is not verified, they MUST verify before signing in
         if (!user.isVerified) {
             user.lastLogin = new Date();
             await user.save();
@@ -675,7 +673,7 @@ app.put('/api/user/profile', authMiddleware, async (req, res) => {
     }
 });
 
-// PUT /api/user/change-password - REQUIRES VERIFICATION CODE
+// PUT /api/user/change-password - FIXED: Only mark code as used after successful action
 app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     try {
         const { currentPassword, newPassword, verificationCode } = req.body;
@@ -693,7 +691,7 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // Check verification code
+        // Check verification code - DO NOT mark as used yet
         const verification = await VerificationCode.findOne({
             email: user.email,
             code: verificationCode,
@@ -715,7 +713,7 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
             return res.status(401).json({ success: false, message: 'Current password is incorrect.' });
         }
 
-        // Mark code as used
+        // Mark code as used ONLY after successful action
         verification.isUsed = true;
         await verification.save();
 
@@ -732,7 +730,7 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     }
 });
 
-// PUT /api/user/change-email - REQUIRES VERIFICATION CODE
+// PUT /api/user/change-email - FIXED: Only mark code as used after successful action
 app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     try {
         const { newEmail, password, verificationCode } = req.body;
@@ -750,7 +748,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // Check verification code for the NEW email
+        // Check verification code for the NEW email - DO NOT mark as used yet
         const verification = await VerificationCode.findOne({
             email: newEmail.toLowerCase(),
             code: verificationCode,
@@ -777,14 +775,14 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email already in use.' });
         }
 
-        // Mark code as used
+        // Mark code as used ONLY after successful action
         verification.isUsed = true;
         await verification.save();
 
         user.email = newEmail.toLowerCase();
         user.username = generateUsernameFromEmail(newEmail);
         user.updatedAt = new Date();
-        user.isVerified = false; // Require re-verification
+        user.isVerified = false;
         await user.save();
 
         res.json({ 
@@ -802,7 +800,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     }
 });
 
-// DELETE /api/user/delete - REQUIRES VERIFICATION CODE
+// DELETE /api/user/delete - FIXED: Only mark code as used after successful action
 app.delete('/api/user/delete', authMiddleware, async (req, res) => {
     try {
         const { password, verificationCode } = req.body;
@@ -820,7 +818,7 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // Check verification code
+        // Check verification code - DO NOT mark as used yet
         const verification = await VerificationCode.findOne({
             email: user.email,
             code: verificationCode,
@@ -847,7 +845,7 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        // Mark code as used
+        // Mark code as used ONLY after successful action
         verification.isUsed = true;
         await verification.save();
 
@@ -978,7 +976,6 @@ app.post('/api/verify/send-code', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email and action are required.' });
         }
 
-        // For 'reset' action, check if email exists in database
         if (action === 'reset') {
             const user = await User.findOne({ email: email.toLowerCase() });
             if (!user) {
@@ -1029,7 +1026,7 @@ app.post('/api/verify/send-code', async (req, res) => {
     }
 });
 
-// POST /api/verify/check-code
+// POST /api/verify/check-code - FIXED: Only verify, do NOT mark as used
 app.post('/api/verify/check-code', async (req, res) => {
     try {
         const { email, code, action } = req.body;
@@ -1059,20 +1056,28 @@ app.post('/api/verify/check-code', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Too many failed attempts. Please request a new code.' });
         }
 
-        verification.isUsed = true;
-        await verification.save();
+        // IMPORTANT: DO NOT mark as used here - only verify that the code is valid
+        // The code will be marked as used when the actual action is performed
 
         let token = null;
 
-        // Mark user as verified for signup or signin action
+        // For signup or signin, we need to verify the user
         if (action === 'signup' || action === 'signin') {
             const user = await User.findOne({ email: email.toLowerCase() });
             if (user) {
-                user.isVerified = true;
-                await user.save();
-                // Generate token only for signin (not signup)
-                if (action === 'signin') {
+                // For signup, mark user as verified immediately
+                if (action === 'signup') {
+                    user.isVerified = true;
+                    await user.save();
+                    // Delete the verification code after successful signup verification
+                    await VerificationCode.deleteOne({ _id: verification._id });
+                } else if (action === 'signin') {
+                    // For signin, mark user as verified and generate token
+                    user.isVerified = true;
+                    await user.save();
                     token = generateToken(user._id);
+                    // Delete the verification code after successful signin verification
+                    await VerificationCode.deleteOne({ _id: verification._id });
                 }
             }
         }
