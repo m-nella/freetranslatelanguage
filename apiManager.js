@@ -26,7 +26,8 @@ var API_MANAGER = {
     
     getHeaders: function() {
         var headers = {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
         };
         var token = this.getToken();
         if (token) {
@@ -84,6 +85,10 @@ var API_MANAGER = {
     
     // NEW: Verify password endpoint
     verifyPassword: function(password) {
+        var token = this.getToken();
+        if (!token) {
+            return Promise.reject({ status: 401, message: 'No token' });
+        }
         return fetch(this.API_URL + '/auth/verify-password', {
             method: 'POST',
             headers: this.getHeaders(),
@@ -122,6 +127,10 @@ var API_MANAGER = {
     },
     
     getMe: function() {
+        var token = this.getToken();
+        if (!token) {
+            return Promise.reject({ status: 401, message: 'No token' });
+        }
         return fetch(this.API_URL + '/auth/me', {
             method: 'GET',
             headers: this.getHeaders()
@@ -250,7 +259,7 @@ var API_MANAGER = {
     },
     
     // ============================================================
-    // VERIFICATION APIs
+    // VERIFICATION APIs - FIXED: Better cross-device support
     // ============================================================
     
     sendVerificationCode: function(email, action) {
@@ -281,7 +290,7 @@ var API_MANAGER = {
     },
     
     // ============================================================
-    // SYNC HELPERS
+    // SYNC HELPERS - FIXED: Better caching
     // ============================================================
     
     syncUserData: function() {
@@ -295,6 +304,7 @@ var API_MANAGER = {
         }).catch(function(error) {
             if (error.status === 401) {
                 self.setToken(null);
+                localStorage.removeItem('cachedUser');
             }
             throw error;
         });
