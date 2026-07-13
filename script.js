@@ -1005,8 +1005,8 @@ function openVerificationModal(email, action, callback) {
             e.preventDefault();
             e.stopPropagation();
             
-            var email = $('authEmail').value;
-            var password = $('authPassword') ? $('authPassword').value : '';
+            var email = $('authEmail').value.trim();
+            var password = $('authPassword') ? $('authPassword').value.trim() : '';
             
             // ============================================================
             // SIGN IN
