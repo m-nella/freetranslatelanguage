@@ -82,6 +82,17 @@ var API_MANAGER = {
         }).then(this.handleResponse);
     },
     
+    // NEW: Verify password endpoint
+    verifyPassword: function(password) {
+        return fetch(this.API_URL + '/auth/verify-password', {
+            method: 'POST',
+            headers: this.getHeaders(),
+            body: JSON.stringify({
+                password: password
+            })
+        }).then(this.handleResponse);
+    },
+    
     logout: function() {
         var token = this.getToken();
         if (!token) {
