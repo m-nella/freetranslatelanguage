@@ -487,7 +487,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin - FIXED: Always send verification code for signin
+// POST /api/auth/signin - FIXED: Verify credentials first, then require verification
 app.post('/api/auth/signin', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -506,6 +506,7 @@ app.post('/api/auth/signin', async (req, res) => {
             return res.status(500).json({ success: false, message: 'Account data corrupted. Please contact support.' });
         }
 
+        // STEP 1: Verify password first
         try {
             const isMatch = await comparePassword(password, user.passwordHash);
             if (!isMatch) {
@@ -516,12 +517,10 @@ app.post('/api/auth/signin', async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        // ALWAYS require verification for signin (both verified and unverified users)
-        // This ensures security for all signins
+        // STEP 2: Password is correct, now require verification for ALL signins
         user.lastLogin = new Date();
         await user.save();
         
-        // Return requiresVerification: true for ALL signins
         return res.status(403).json({
             success: false,
             message: 'Please verify your identity to sign in.',
@@ -657,7 +656,7 @@ app.put('/api/user/profile', authMiddleware, async (req, res) => {
     }
 });
 
-// PUT /api/user/change-password - REQUIRES VERIFICATION CODE
+// PUT /api/user/change-password - FIXED: Verify current password first
 app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     try {
         const { currentPassword, newPassword, verificationCode } = req.body;
@@ -675,7 +674,18 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // Check verification code
+        // STEP 1: Verify current password is correct
+        const isMatch = await comparePassword(currentPassword, user.passwordHash);
+        if (!isMatch) {
+            return res.status(401).json({ success: false, message: 'Current password is incorrect.' });
+        }
+
+        // STEP 2: Verify new password is different from current
+        if (currentPassword === newPassword) {
+            return res.status(400).json({ success: false, message: 'New password must be different from current password.' });
+        }
+
+        // STEP 3: Check verification code
         const verification = await VerificationCode.findOne({
             email: user.email,
             code: verificationCode,
@@ -692,12 +702,7 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
         }
 
-        const isMatch = await comparePassword(currentPassword, user.passwordHash);
-        if (!isMatch) {
-            return res.status(401).json({ success: false, message: 'Current password is incorrect.' });
-        }
-
-        // Mark code as used
+        // STEP 4: Mark code as used and update password
         verification.isUsed = true;
         await verification.save();
 
@@ -714,7 +719,7 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     }
 });
 
-// PUT /api/user/change-email - REQUIRES VERIFICATION CODE
+// PUT /api/user/change-email - FIXED: Verify password and new email first
 app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     try {
         const { newEmail, password, verificationCode } = req.body;
@@ -732,19 +737,24 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // First verify password
+        // STEP 1: Verify new email is different from current
+        if (newEmail.toLowerCase() === user.email) {
+            return res.status(400).json({ success: false, message: 'New email must be different from current email.' });
+        }
+
+        // STEP 2: Verify password is correct
         const isMatch = await comparePassword(password, user.passwordHash);
         if (!isMatch) {
             return res.status(401).json({ success: false, message: 'Password is incorrect.' });
         }
 
-        // Check if new email already exists
+        // STEP 3: Check if new email already exists
         const existingUser = await User.findOne({ email: newEmail.toLowerCase() });
         if (existingUser && existingUser._id.toString() !== req.userId) {
             return res.status(400).json({ success: false, message: 'Email already in use.' });
         }
 
-        // Check verification code for the NEW email
+        // STEP 4: Check verification code for the NEW email
         const verification = await VerificationCode.findOne({
             email: newEmail.toLowerCase(),
             code: verificationCode,
@@ -761,7 +771,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
         }
 
-        // Mark code as used
+        // STEP 5: Mark code as used and update email
         verification.isUsed = true;
         await verification.save();
 
@@ -786,7 +796,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     }
 });
 
-// DELETE /api/user/delete - REQUIRES VERIFICATION CODE
+// DELETE /api/user/delete - FIXED: Verify password first
 app.delete('/api/user/delete', authMiddleware, async (req, res) => {
     try {
         const { password, verificationCode } = req.body;
@@ -804,7 +814,7 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // First verify password
+        // STEP 1: Verify password is correct
         try {
             const isMatch = await comparePassword(password, user.passwordHash);
             if (!isMatch) {
@@ -815,7 +825,7 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        // Check verification code
+        // STEP 2: Check verification code
         const verification = await VerificationCode.findOne({
             email: user.email,
             code: verificationCode,
@@ -832,7 +842,7 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
         }
 
-        // Mark code as used
+        // STEP 3: Mark code as used and delete account
         verification.isUsed = true;
         await verification.save();
 
@@ -1069,7 +1079,6 @@ app.post('/api/verify/check-code', async (req, res) => {
         } else {
             // For other actions (email, password, delete, reset), just verify the code
             // DO NOT mark as used here - it will be marked when the action is performed
-            // Just increment attempts
             verification.attempts += 1;
             await verification.save();
         }
