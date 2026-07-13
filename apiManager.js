@@ -36,7 +36,7 @@ var API_MANAGER = {
     },
     
     // ============================================================
-    // HELPER: Handle Response - FIXED: Better error handling
+    // HELPER: Handle Response
     // ============================================================
     handleResponse: function(response) {
         return response.json().then(function(data) {
@@ -103,7 +103,7 @@ var API_MANAGER = {
     },
     
     // ============================================================
-    // CHECK EMAIL EXISTS - FIXED
+    // CHECK EMAIL EXISTS
     // ============================================================
     checkEmailExists: function(email) {
         return fetch(this.API_URL + '/auth/check-email', {
@@ -127,7 +127,6 @@ var API_MANAGER = {
         }).then(this.handleResponse);
     },
     
-    // FIXED: Added verificationCode parameter
     changePassword: function(currentPassword, newPassword, verificationCode) {
         var body = {
             currentPassword: currentPassword,
@@ -143,7 +142,6 @@ var API_MANAGER = {
         }).then(this.handleResponse);
     },
     
-    // FIXED: Added verificationCode parameter
     changeEmail: function(newEmail, password, verificationCode) {
         var body = {
             newEmail: newEmail,
@@ -159,7 +157,6 @@ var API_MANAGER = {
         }).then(this.handleResponse);
     },
     
-    // FIXED: Added verificationCode parameter
     deleteAccount: function(password, verificationCode) {
         var body = {
             password: password
