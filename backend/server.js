@@ -487,7 +487,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin - FIXED: ALWAYS require verification for unverified users
+// POST /api/auth/signin - FIXED: Always send verification code for signin
 app.post('/api/auth/signin', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -516,37 +516,21 @@ app.post('/api/auth/signin', async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        if (!user.isVerified) {
-            user.lastLogin = new Date();
-            await user.save();
-            return res.status(403).json({
-                success: false,
-                message: 'Please verify your email before signing in.',
-                requiresVerification: true,
-                email: user.email,
-                data: {
-                    id: user._id,
-                    username: user.username,
-                    email: user.email
-                }
-            });
-        }
-
+        // ALWAYS require verification for signin (both verified and unverified users)
+        // This ensures security for all signins
         user.lastLogin = new Date();
         await user.save();
-
-        const token = generateToken(user._id);
-
-        res.json({
-            success: true,
-            message: 'Signed in successfully.',
-            token: token,
+        
+        // Return requiresVerification: true for ALL signins
+        return res.status(403).json({
+            success: false,
+            message: 'Please verify your identity to sign in.',
+            requiresVerification: true,
+            email: user.email,
             data: {
                 id: user._id,
                 username: user.username,
-                email: user.email,
-                createdAt: user.createdAt,
-                lastLogin: user.lastLogin
+                email: user.email
             }
         });
 
@@ -673,7 +657,7 @@ app.put('/api/user/profile', authMiddleware, async (req, res) => {
     }
 });
 
-// PUT /api/user/change-password - FIXED: Only mark code as used after successful action
+// PUT /api/user/change-password - REQUIRES VERIFICATION CODE
 app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     try {
         const { currentPassword, newPassword, verificationCode } = req.body;
@@ -691,7 +675,7 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // Check verification code - DO NOT mark as used yet
+        // Check verification code
         const verification = await VerificationCode.findOne({
             email: user.email,
             code: verificationCode,
@@ -713,7 +697,7 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
             return res.status(401).json({ success: false, message: 'Current password is incorrect.' });
         }
 
-        // Mark code as used ONLY after successful action
+        // Mark code as used
         verification.isUsed = true;
         await verification.save();
 
@@ -730,7 +714,7 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     }
 });
 
-// PUT /api/user/change-email - FIXED: Only mark code as used after successful action
+// PUT /api/user/change-email - REQUIRES VERIFICATION CODE
 app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     try {
         const { newEmail, password, verificationCode } = req.body;
@@ -748,7 +732,19 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // Check verification code for the NEW email - DO NOT mark as used yet
+        // First verify password
+        const isMatch = await comparePassword(password, user.passwordHash);
+        if (!isMatch) {
+            return res.status(401).json({ success: false, message: 'Password is incorrect.' });
+        }
+
+        // Check if new email already exists
+        const existingUser = await User.findOne({ email: newEmail.toLowerCase() });
+        if (existingUser && existingUser._id.toString() !== req.userId) {
+            return res.status(400).json({ success: false, message: 'Email already in use.' });
+        }
+
+        // Check verification code for the NEW email
         const verification = await VerificationCode.findOne({
             email: newEmail.toLowerCase(),
             code: verificationCode,
@@ -765,17 +761,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
         }
 
-        const isMatch = await comparePassword(password, user.passwordHash);
-        if (!isMatch) {
-            return res.status(401).json({ success: false, message: 'Password is incorrect.' });
-        }
-
-        const existingUser = await User.findOne({ email: newEmail.toLowerCase() });
-        if (existingUser && existingUser._id.toString() !== req.userId) {
-            return res.status(400).json({ success: false, message: 'Email already in use.' });
-        }
-
-        // Mark code as used ONLY after successful action
+        // Mark code as used
         verification.isUsed = true;
         await verification.save();
 
@@ -800,7 +786,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     }
 });
 
-// DELETE /api/user/delete - FIXED: Only mark code as used after successful action
+// DELETE /api/user/delete - REQUIRES VERIFICATION CODE
 app.delete('/api/user/delete', authMiddleware, async (req, res) => {
     try {
         const { password, verificationCode } = req.body;
@@ -818,7 +804,18 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // Check verification code - DO NOT mark as used yet
+        // First verify password
+        try {
+            const isMatch = await comparePassword(password, user.passwordHash);
+            if (!isMatch) {
+                return res.status(401).json({ success: false, message: 'Password is incorrect.' });
+            }
+        } catch (compareError) {
+            console.error('❌ Password comparison error during deletion:', compareError);
+            return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
+        }
+
+        // Check verification code
         const verification = await VerificationCode.findOne({
             email: user.email,
             code: verificationCode,
@@ -835,17 +832,7 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
         }
 
-        try {
-            const isMatch = await comparePassword(password, user.passwordHash);
-            if (!isMatch) {
-                return res.status(401).json({ success: false, message: 'Password is incorrect.' });
-            }
-        } catch (compareError) {
-            console.error('❌ Password comparison error during deletion:', compareError);
-            return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
-        }
-
-        // Mark code as used ONLY after successful action
+        // Mark code as used
         verification.isUsed = true;
         await verification.save();
 
@@ -976,6 +963,7 @@ app.post('/api/verify/send-code', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email and action are required.' });
         }
 
+        // For 'reset' action, check if email exists in database
         if (action === 'reset') {
             const user = await User.findOne({ email: email.toLowerCase() });
             if (!user) {
@@ -1026,7 +1014,7 @@ app.post('/api/verify/send-code', async (req, res) => {
     }
 });
 
-// POST /api/verify/check-code - FIXED: Only verify, do NOT mark as used
+// POST /api/verify/check-code
 app.post('/api/verify/check-code', async (req, res) => {
     try {
         const { email, code, action } = req.body;
@@ -1056,37 +1044,41 @@ app.post('/api/verify/check-code', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Too many failed attempts. Please request a new code.' });
         }
 
-        // IMPORTANT: DO NOT mark as used here - only verify that the code is valid
-        // The code will be marked as used when the actual action is performed
-
+        // For signin or signup, mark user as verified and generate token
         let token = null;
+        let requiresSignIn = false;
 
-        // For signup or signin, we need to verify the user
-        if (action === 'signup' || action === 'signin') {
+        if (action === 'signup') {
             const user = await User.findOne({ email: email.toLowerCase() });
             if (user) {
-                // For signup, mark user as verified immediately
-                if (action === 'signup') {
-                    user.isVerified = true;
-                    await user.save();
-                    // Delete the verification code after successful signup verification
-                    await VerificationCode.deleteOne({ _id: verification._id });
-                } else if (action === 'signin') {
-                    // For signin, mark user as verified and generate token
-                    user.isVerified = true;
-                    await user.save();
-                    token = generateToken(user._id);
-                    // Delete the verification code after successful signin verification
-                    await VerificationCode.deleteOne({ _id: verification._id });
-                }
+                user.isVerified = true;
+                await user.save();
+                // Delete the verification code after successful signup verification
+                await VerificationCode.deleteOne({ _id: verification._id });
+                requiresSignIn = true;
             }
+        } else if (action === 'signin') {
+            const user = await User.findOne({ email: email.toLowerCase() });
+            if (user) {
+                user.isVerified = true;
+                await user.save();
+                token = generateToken(user._id);
+                // Delete the verification code after successful signin verification
+                await VerificationCode.deleteOne({ _id: verification._id });
+            }
+        } else {
+            // For other actions (email, password, delete, reset), just verify the code
+            // DO NOT mark as used here - it will be marked when the action is performed
+            // Just increment attempts
+            verification.attempts += 1;
+            await verification.save();
         }
 
         res.json({ 
             success: true, 
             message: 'Code verified successfully.',
             token: token,
-            requiresSignIn: action === 'signup'
+            requiresSignIn: requiresSignIn
         });
 
     } catch (error) {
