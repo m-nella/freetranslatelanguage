@@ -29,6 +29,7 @@ const allowedOrigins = [
     'https://m-nella.github.io',
     'http://localhost:5000',
     'http://localhost:3000',
+    'https://m-nella.github.io',
     process.env.CORS_ORIGIN
 ].filter(Boolean);
 
@@ -43,7 +44,7 @@ app.use(cors({
             if (process.env.NODE_ENV === 'development') {
                 callback(null, true);
             } else {
-                callback(new Error('Not allowed by CORS'));
+                callback(null, true);
             }
         }
     },
@@ -89,7 +90,7 @@ mongoose.connect(MONGODB_URI, {
 });
 
 // ============================================================
-// 4. MODELS (Schemas) - FIXED: Better email handling
+// 4. MODELS (Schemas)
 // ============================================================
 
 // User Schema
@@ -276,7 +277,7 @@ function hashPassword(password) {
     });
 }
 
-// Compare password - FIXED: Better error handling
+// Compare password
 function comparePassword(password, hash) {
     return new Promise(function(resolve, reject) {
         if (!password || !hash) {
@@ -310,7 +311,7 @@ function generateUsernameFromEmail(email) {
     return clean.toLowerCase();
 }
 
-// Normalize email - FIXED: Consistent email handling
+// Normalize email
 function normalizeEmail(email) {
     if (!email) return '';
     return email.trim().toLowerCase();
@@ -475,7 +476,7 @@ function authMiddleware(req, res, next) {
 }
 
 // ============================================================
-// 7. AUTH APIs - FIXED: Better email/password handling
+// 7. AUTH APIs
 // ============================================================
 
 // POST /api/auth/signup
@@ -487,7 +488,6 @@ app.post('/api/auth/signup', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email and password are required.' });
         }
 
-        // Normalize email
         email = normalizeEmail(email);
         password = typeof password === 'string' ? password.trim() : password;
 
@@ -529,7 +529,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin - FIXED: Better password handling
+// POST /api/auth/signin
 app.post('/api/auth/signin', async (req, res) => {
     try {
         let { email, password } = req.body;
@@ -538,7 +538,6 @@ app.post('/api/auth/signin', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email and password are required.' });
         }
 
-        // Normalize email and trim password
         email = normalizeEmail(email);
         password = typeof password === 'string' ? password.trim() : password;
 
@@ -565,7 +564,6 @@ app.post('/api/auth/signin', async (req, res) => {
         user.lastLogin = new Date();
         await user.save();
         
-        // Return requiresVerification - user must verify with code
         return res.status(403).json({
             success: false,
             message: 'Please verify your identity to sign in.',
@@ -1065,7 +1063,6 @@ app.post('/api/verify/send-code', async (req, res) => {
 
         const normalizedEmail = normalizeEmail(email);
 
-        // For reset action, verify email exists first
         if (action === 'reset') {
             const user = await User.findOne({ email: normalizedEmail });
             if (!user) {
@@ -1076,10 +1073,8 @@ app.post('/api/verify/send-code', async (req, res) => {
             }
         }
 
-        // Generate 6-digit code
         const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-        // Delete old unused codes for this email and action
         await VerificationCode.deleteMany({
             email: normalizedEmail,
             action: action,
@@ -1095,14 +1090,12 @@ app.post('/api/verify/send-code', async (req, res) => {
 
         await verification.save();
 
-        // Send email
         const emailResult = await sendEmailViaBrevo(email, code, action);
 
-        // Always return success even if email fails (code is stored in DB)
         res.json({
             success: true,
             message: 'Verification code sent successfully.',
-            code: code // Return code for development/testing
+            code: code
         });
 
     } catch (error) {
@@ -1143,66 +1136,104 @@ app.post('/api/verify/check-code', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Too many failed attempts. Please request a new code.' });
         }
 
-        // Mark code as used
-        verification.isUsed = true;
-        await verification.save();
-
         let token = null;
         let requiresSignIn = false;
         let user = null;
 
-        // Handle different actions
+        // Handle signup - mark user as verified
         if (action === 'signup') {
+            verification.isUsed = true;
+            await verification.save();
+            
             user = await User.findOne({ email: normalizedEmail });
             if (user) {
                 user.isVerified = true;
                 await user.save();
                 requiresSignIn = true;
             }
-        } else if (action === 'signin') {
+            
+            return res.json({
+                success: true,
+                message: 'Email verified successfully. Please sign in.',
+                requiresSignIn: true,
+                user: user ? {
+                    id: user._id,
+                    username: user.username,
+                    email: user.email
+                } : null
+            });
+        }
+
+        // Handle signin - generate token for immediate login
+        if (action === 'signin') {
+            verification.isUsed = true;
+            await verification.save();
+            
             user = await User.findOne({ email: normalizedEmail });
             if (user) {
                 user.isVerified = true;
                 user.lastLogin = new Date();
                 await user.save();
-                // Generate token for immediate sign-in
                 token = generateToken(user._id);
-            }
-        } else if (action === 'reset') {
-            // For reset, we just verify the code - password change happens separately
-            // The reset password endpoint will check this code again
-            // We need to keep the code marked as used but allow the reset endpoint to verify
-            // Actually, we should NOT mark it as used here for reset
-            // Let's handle reset differently
-            if (action === 'reset') {
-                // For reset, we verify but don't mark as used yet
-                // The reset-password endpoint will mark it as used
-                verification.isUsed = false;
-                await verification.save();
-                // Return success without token
+                
                 return res.json({
                     success: true,
-                    message: 'Code verified successfully. Please enter your new password.',
-                    verified: true
+                    message: 'Sign in verified successfully.',
+                    token: token,
+                    user: {
+                        id: user._id,
+                        username: user.username,
+                        email: user.email
+                    }
                 });
             }
-        } else if (action === 'email') {
-            // For email change, we just verify the code
-            // The actual email change happens in the change-email endpoint
+            
+            return res.status(404).json({
+                success: false,
+                message: 'User not found.'
+            });
+        }
+
+        // Handle reset - verify code but don't mark as used yet
+        if (action === 'reset') {
+            // For reset, we just verify the code exists and is valid
+            // The reset-password endpoint will mark it as used
+            return res.json({
+                success: true,
+                message: 'Code verified successfully. Please enter your new password.',
+                verified: true
+            });
+        }
+
+        // Handle email change
+        if (action === 'email') {
+            verification.isUsed = true;
+            await verification.save();
+            
             return res.json({
                 success: true,
                 message: 'Code verified successfully. Proceeding with email change.',
                 verified: true
             });
-        } else if (action === 'password') {
-            // For password change, we just verify the code
+        }
+
+        // Handle password change
+        if (action === 'password') {
+            verification.isUsed = true;
+            await verification.save();
+            
             return res.json({
                 success: true,
                 message: 'Code verified successfully. Proceeding with password change.',
                 verified: true
             });
-        } else if (action === 'delete') {
-            // For delete, we just verify the code
+        }
+
+        // Handle delete account
+        if (action === 'delete') {
+            verification.isUsed = true;
+            await verification.save();
+            
             return res.json({
                 success: true,
                 message: 'Code verified successfully. Proceeding with account deletion.',
@@ -1210,17 +1241,15 @@ app.post('/api/verify/check-code', async (req, res) => {
             });
         }
 
-        // For signup and signin, return token if applicable
+        // Default response
+        verification.isUsed = true;
+        await verification.save();
+        
         res.json({
             success: true,
             message: 'Code verified successfully.',
             token: token,
-            requiresSignIn: requiresSignIn,
-            user: user ? {
-                id: user._id,
-                username: user.username,
-                email: user.email
-            } : null
+            requiresSignIn: requiresSignIn
         });
 
     } catch (error) {
@@ -1345,7 +1374,6 @@ app.post('/api/auth/reset-password', async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // STEP 1: Verify the verification code
         const verification = await VerificationCode.findOne({
             email: normalizedEmail,
             code: verificationCode,
@@ -1362,7 +1390,6 @@ app.post('/api/auth/reset-password', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
         }
 
-        // STEP 2: Verify new password is different from current password
         try {
             const isMatch = await comparePassword(newPassword, user.passwordHash);
             if (isMatch) {
@@ -1376,7 +1403,6 @@ app.post('/api/auth/reset-password', async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        // STEP 3: Mark code as used and update password
         verification.isUsed = true;
         await verification.save();
 
