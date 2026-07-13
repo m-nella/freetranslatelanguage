@@ -640,13 +640,11 @@
                         if (typeof pendingCallback === 'function') {
                             pendingCallback(result);
                         }
-                        // For signup, redirect to sign in
+                        // For signup, redirect to sign in - DO NOT pre-fill email
                         if (action === 'signup') {
                             showNotification('Account verified! Please sign in.', 'success');
                             setTimeout(function() {
                                 openModal('login');
-                                var emailInput = $('authEmail');
-                                if (emailInput) emailInput.value = email;
                             }, 500);
                         } else if (action === 'email') {
                             // Email change - refresh user data
@@ -833,7 +831,7 @@
     }
 
     // ============================================================
-    // OPEN AUTH MODAL
+    // OPEN AUTH MODAL - FIXED: No auto-fill
     // ============================================================
     function openModal(mode) {
         currentMode = mode;
@@ -862,6 +860,7 @@
             email.placeholder = 'Email address';
             email.required = true;
             email.style.marginBottom = '12px';
+            // DO NOT set value - no auto-fill
             authFields.appendChild(email);
             
             var passwordWrapper = createPasswordField('authPassword', 'Password');
@@ -885,6 +884,7 @@
             email.id = 'authEmail';
             email.placeholder = 'Email address';
             email.required = true;
+            // DO NOT set value - no auto-fill
             authFields.appendChild(email);
             forgotPasswordLink.style.display = 'none';
             
@@ -899,6 +899,7 @@
             email.placeholder = 'Email address';
             email.required = true;
             email.style.marginBottom = '12px';
+            // DO NOT set value - no auto-fill
             authFields.appendChild(email);
             
             var password = createPasswordField('authPassword', 'Password (min 8 chars)');
@@ -980,7 +981,7 @@
             var password = $('authPassword') ? $('authPassword').value : '';
             
             // ============================================================
-            // SIGN IN - FIXED: Better error handling
+            // SIGN IN - FIXED: Allow unverified users to sign in and get code
             // ============================================================
             if (currentMode === 'login') {
                 authSubmitBtn.disabled = true;
@@ -989,7 +990,7 @@
                 API_MANAGER.signin(email, password).then(function(response) {
                     if (response.success) {
                         if (response.requiresVerification) {
-                            showNotification('Please verify your email first. Code sent!', 'warning');
+                            showNotification('Please verify your email. Code sent!', 'warning');
                             if (authModal) authModal.style.display = 'none';
                             sendVerificationCode(email, 'signin').then(function(codeResult) {
                                 if (codeResult.success) {
@@ -1023,28 +1024,12 @@
                                 if (authModal) authModal.style.display = 'none';
                             });
                         } else {
-                            if (response.requiresVerification) {
-                                showNotification('Please verify your email first.', 'warning');
-                                if (authModal) authModal.style.display = 'none';
-                                sendVerificationCode(email, 'signin').then(function(codeResult) {
-                                    if (codeResult.success) {
-                                        openVerificationModal(email, 'signin', function(result) {
-                                            if (result.success && result.token) {
-                                                API_MANAGER.setToken(result.token);
-                                                showNotification('Signed in successfully!', 'success');
-                                                checkAuthStatus();
-                                            }
-                                        });
-                                    }
-                                });
-                            } else {
-                                showNotification(response.message || 'Sign in failed.', 'error');
-                            }
+                            showNotification(response.message || 'Sign in failed.', 'error');
                             authSubmitBtn.disabled = false;
                             authSubmitBtn.textContent = 'Sign In';
                         }
                     } else {
-                        // Check if account not found (404 status)
+                        // Check if account not found
                         if (response.message && response.message.toLowerCase().includes('account not found')) {
                             showNotification('Account not found. Please create an account.', 'error');
                             authSubmitBtn.disabled = false;
@@ -1052,9 +1037,24 @@
                             setTimeout(function() { 
                                 if (authModal) authModal.style.display = 'none';
                                 openModal('signup');
-                                var emailInput = $('authEmail');
-                                if (emailInput) emailInput.value = email;
                             }, 1500);
+                        } else if (response.message && response.message.toLowerCase().includes('verify your email')) {
+                            // User exists but not verified - send code
+                            showNotification('Please verify your email. Code sent!', 'warning');
+                            if (authModal) authModal.style.display = 'none';
+                            sendVerificationCode(email, 'signin').then(function(codeResult) {
+                                if (codeResult.success) {
+                                    openVerificationModal(email, 'signin', function(result) {
+                                        if (result.success && result.token) {
+                                            API_MANAGER.setToken(result.token);
+                                            showNotification('Signed in successfully!', 'success');
+                                            checkAuthStatus();
+                                        }
+                                    });
+                                }
+                            });
+                            authSubmitBtn.disabled = false;
+                            authSubmitBtn.textContent = 'Sign In';
                         } else {
                             showNotification(response.message || 'Sign in failed. Please try again.', 'error');
                             authSubmitBtn.disabled = false;
@@ -1070,8 +1070,6 @@
                         setTimeout(function() { 
                             if (authModal) authModal.style.display = 'none';
                             openModal('signup');
-                            var emailInput = $('authEmail');
-                            if (emailInput) emailInput.value = email;
                         }, 1500);
                     } else {
                         // Try localStorage fallback
@@ -1100,8 +1098,6 @@
                                 setTimeout(function() { 
                                     if (authModal) authModal.style.display = 'none';
                                     openModal('signup');
-                                    var emailInput = $('authEmail');
-                                    if (emailInput) emailInput.value = email;
                                 }, 1500);
                             } else {
                                 showNotification(result.error || 'Sign in failed. Please try again.', 'error');
@@ -1113,13 +1109,12 @@
                 });
                 
             // ============================================================
-            // RESET PASSWORD - FIXED: Better email check
+            // RESET PASSWORD - FIXED: No auto-fill
             // ============================================================
             } else if (currentMode === 'reset') {
                 authSubmitBtn.disabled = true;
                 authSubmitBtn.textContent = 'Checking email...';
                 
-                // First check if email exists
                 API_MANAGER.checkEmailExists(email).then(function(checkResult) {
                     if (!checkResult.success) {
                         showNotification('Email not registered. Please create an account.', 'error');
@@ -1128,7 +1123,6 @@
                         return;
                     }
                     
-                    // Email exists, send verification code
                     authSubmitBtn.textContent = 'Sending reset code...';
                     API_MANAGER.sendVerificationCode(email, 'reset').then(function(result) {
                         if (result.success) {
@@ -1159,7 +1153,6 @@
                         authSubmitBtn.textContent = 'Send Reset Code';
                     });
                 }).catch(function(error) {
-                    // Check if error is 404 (email not found)
                     if (error.status === 404) {
                         showNotification('Email not registered. Please create an account.', 'error');
                     } else {
@@ -1170,7 +1163,7 @@
                 });
                 
             // ============================================================
-            // SIGN UP - FIXED
+            // SIGN UP - FIXED: No auto-fill after verification
             // ============================================================
             } else if (currentMode === 'signup') {
                 var confirmPassword = $('authConfirmPassword') ? $('authConfirmPassword').value : '';
@@ -1195,7 +1188,6 @@
                 
                 API_MANAGER.signup(email, password, username).then(function(response) {
                     if (response.success) {
-                        // Send verification code
                         authSubmitBtn.textContent = 'Sending verification code...';
                         API_MANAGER.sendVerificationCode(email, 'signup').then(function(codeResult) {
                             if (codeResult.success) {
@@ -1206,8 +1198,7 @@
                                         showNotification('Email verified! Please sign in.', 'success');
                                         setTimeout(function() {
                                             openModal('login');
-                                            var emailInput = $('authEmail');
-                                            if (emailInput) emailInput.value = email;
+                                            // DO NOT pre-fill email
                                         }, 500);
                                     }
                                 });
@@ -1227,8 +1218,7 @@
                             setTimeout(function() {
                                 if (authModal) authModal.style.display = 'none';
                                 openModal('login');
-                                var emailInput = $('authEmail');
-                                if (emailInput) emailInput.value = email;
+                                // DO NOT pre-fill email
                             }, 1500);
                         } else {
                             showNotification(response.message || 'Error creating account. Please try again.', 'error');
@@ -1245,8 +1235,7 @@
                         setTimeout(function() {
                             if (authModal) authModal.style.display = 'none';
                             openModal('login');
-                            var emailInput = $('authEmail');
-                            if (emailInput) emailInput.value = email;
+                            // DO NOT pre-fill email
                         }, 1500);
                     } else {
                         showNotification(errorMsg || 'Error creating account. Please try again.', 'error');
@@ -1462,7 +1451,7 @@
     }
 
     // ============================================================
-    // ACCOUNT SETTINGS - COMPLETE FIXED with loading states
+    // ACCOUNT SETTINGS - COMPLETE FIXED
     // ============================================================
     function openAccountSettings() {
         var user = currentUser || DATA_MANAGER.getCurrentUser();
@@ -1511,9 +1500,6 @@
         
         bindClick(modal.querySelector('.close-settings'), function() { modal.remove(); });
         
-        // ============================================================
-        // SAVE SETTINGS - FIXED with loading states
-        // ============================================================
         var saveBtn = modal.querySelector('#saveSettingsBtn');
         var deleteBtn = modal.querySelector('#deleteAccountBtn');
         
@@ -1528,14 +1514,12 @@
                 return;
             }
             
-            // Check if email changed
             if (newEmail && newEmail !== user.email) {
                 if (!DATA_MANAGER.validateEmail(newEmail)) {
                     showNotification('Invalid email address.', 'error');
                     return;
                 }
                 
-                // Check if email already exists
                 saveBtn.disabled = true;
                 saveBtn.textContent = 'Checking email...';
                 
@@ -1547,7 +1531,6 @@
                         return;
                     }
                     
-                    // Send verification code for new email
                     saveBtn.textContent = 'Sending verification code...';
                     sendVerificationCode(newEmail, 'email').then(function(result) {
                         if (!result.success) {
@@ -1557,15 +1540,12 @@
                             return;
                         }
                         
-                        // Open verification modal for email change
                         openVerificationModal(newEmail, 'email', function(verifyResult) {
                             if (verifyResult.success) {
                                 saveBtn.textContent = 'Updating email...';
-                                // Update email
                                 API_MANAGER.changeEmail(newEmail, currentPassword).then(function(response) {
                                     if (response.success) {
                                         showNotification('Email updated successfully! Username auto-updated.', 'success');
-                                        // Update local user data
                                         user.email = newEmail;
                                         user.username = response.data.username || generateUsernameFromEmail(newEmail);
                                         localStorage.setItem('cachedUser', JSON.stringify({
@@ -1573,7 +1553,6 @@
                                             email: user.email,
                                             username: user.username
                                         }));
-                                        // Refresh user data
                                         checkAuthStatus();
                                         saveBtn.disabled = false;
                                         saveBtn.textContent = 'Save Changes';
@@ -1597,8 +1576,6 @@
                     });
                 }).catch(function(error) {
                     if (error.status === 404) {
-                        // Email not found, which is what we want for new email
-                        // Continue with sending code
                         saveBtn.textContent = 'Sending verification code...';
                         sendVerificationCode(newEmail, 'email').then(function(result) {
                             if (!result.success) {
@@ -1651,7 +1628,6 @@
                 return;
             }
             
-            // Check if password changed
             if (newPassword || confirmPassword) {
                 if (newPassword !== confirmPassword) {
                     showNotification('Passwords do not match!', 'error');
@@ -1671,7 +1647,6 @@
                     return;
                 }
                 
-                // Verify password change with code
                 saveBtn.disabled = true;
                 saveBtn.textContent = 'Sending verification code...';
                 
@@ -1716,9 +1691,6 @@
             modal.remove();
         });
         
-        // ============================================================
-        // DELETE ACCOUNT - FIXED with loading state
-        // ============================================================
         bindClick(deleteBtn, function() {
             showConfirmationModal(
                 'Delete Account',
@@ -1742,7 +1714,6 @@
                         return;
                     }
                     
-                    // Verify deletion with code
                     deleteBtn.disabled = true;
                     deleteBtn.textContent = 'Sending verification code...';
                     
