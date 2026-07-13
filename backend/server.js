@@ -1,11 +1,7 @@
 // ============================================================
 // FREE TRANSLATE LANGUAGE - COMPLETE BACKEND
-// All APIs in ONE file - Simplified Structure
 // ============================================================
 
-// ============================================================
-// 1. IMPORTS
-// ============================================================
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -20,13 +16,15 @@ require('dotenv').config();
 const app = express();
 
 // ============================================================
-// 2. MIDDLEWARE - FIXED: Allow all origins for cross-device
+// MIDDLEWARE - FIXED
 // ============================================================
 app.use(helmet());
 
+// FIX: Trust proxy for Render
+app.set('trust proxy', 1);
+
 app.use(cors({
     origin: function(origin, callback) {
-        if (!origin) return callback(null, true);
         return callback(null, true);
     },
     credentials: true,
@@ -38,15 +36,19 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// FIX: Rate Limiting - Use simpler key generator
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
-    message: { success: false, message: 'Too many requests, please try again later.' }
+    message: { success: false, message: 'Too many requests, please try again later.' },
+    keyGenerator: function(req) {
+        return req.ip || req.connection.remoteAddress || 'unknown';
+    }
 });
 app.use('/api/', limiter);
 
 // ============================================================
-// 3. DATABASE CONNECTION
+// DATABASE CONNECTION
 // ============================================================
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
@@ -62,7 +64,7 @@ mongoose.connect(MONGODB_URI).then(() => {
 });
 
 // ============================================================
-// 4. MODELS
+// MODELS
 // ============================================================
 
 const UserSchema = new mongoose.Schema({
@@ -108,7 +110,7 @@ const History = mongoose.model('History', HistorySchema);
 const VerificationCode = mongoose.model('VerificationCode', VerificationCodeSchema);
 
 // ============================================================
-// 5. HELPER FUNCTIONS
+// HELPER FUNCTIONS
 // ============================================================
 
 function generateToken(userId) {
@@ -264,7 +266,7 @@ function sendEmailViaBrevo(email, code, action) {
 }
 
 // ============================================================
-// 6. AUTH MIDDLEWARE
+// AUTH MIDDLEWARE
 // ============================================================
 function authMiddleware(req, res, next) {
     const token = req.headers.authorization?.split(' ')[1];
@@ -276,10 +278,9 @@ function authMiddleware(req, res, next) {
 }
 
 // ============================================================
-// 7. AUTH APIs
+// AUTH APIs
 // ============================================================
 
-// POST /api/auth/signup
 app.post('/api/auth/signup', async (req, res) => {
     try {
         let { email, password, username } = req.body;
@@ -324,7 +325,6 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin
 app.post('/api/auth/signin', async (req, res) => {
     try {
         let { email, password } = req.body;
@@ -371,7 +371,6 @@ app.post('/api/auth/signin', async (req, res) => {
     }
 });
 
-// POST /api/auth/verify-password
 app.post('/api/auth/verify-password', authMiddleware, async (req, res) => {
     try {
         let { password } = req.body;
@@ -404,13 +403,11 @@ app.post('/api/auth/verify-password', authMiddleware, async (req, res) => {
     }
 });
 
-// POST /api/auth/logout
 app.post('/api/auth/logout', authMiddleware, async (req, res) => {
     try { res.json({ success: true, message: 'Logged out successfully.' }); } 
     catch (error) { res.status(500).json({ success: false, message: 'Error logging out.' }); }
 });
 
-// GET /api/auth/me
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
     try {
         const user = await User.findById(req.userId).select('-passwordHash');
@@ -442,9 +439,6 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
     }
 });
 
-// ============================================================
-// 8. CHECK EMAIL EXISTS
-// ============================================================
 app.post('/api/auth/check-email', async (req, res) => {
     try {
         const { email } = req.body;
@@ -464,10 +458,9 @@ app.post('/api/auth/check-email', async (req, res) => {
 });
 
 // ============================================================
-// 9. USER APIs
+// USER APIs
 // ============================================================
 
-// PUT /api/user/profile
 app.put('/api/user/profile', authMiddleware, async (req, res) => {
     try {
         const { photo, theme, preferredSourceLanguage, preferredTargetLanguage, voiceSpeed, voicePitch, autoDetect, notificationSettings } = req.body;
@@ -508,7 +501,6 @@ app.put('/api/user/profile', authMiddleware, async (req, res) => {
     }
 });
 
-// PUT /api/user/change-password
 app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     try {
         let { currentPassword, newPassword, verificationCode } = req.body;
@@ -569,7 +561,6 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     }
 });
 
-// PUT /api/user/change-email
 app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     try {
         let { newEmail, password, verificationCode } = req.body;
@@ -640,7 +631,6 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     }
 });
 
-// DELETE /api/user/delete
 app.delete('/api/user/delete', authMiddleware, async (req, res) => {
     try {
         let { password, verificationCode } = req.body;
@@ -696,7 +686,7 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
 });
 
 // ============================================================
-// 10. HISTORY APIs
+// HISTORY APIs
 // ============================================================
 
 app.get('/api/history', authMiddleware, async (req, res) => {
@@ -762,10 +752,9 @@ app.delete('/api/history/clear', authMiddleware, async (req, res) => {
 });
 
 // ============================================================
-// 11. VERIFICATION APIs
+// VERIFICATION APIs
 // ============================================================
 
-// POST /api/verify/send-code
 app.post('/api/verify/send-code', async (req, res) => {
     try {
         const { email, action } = req.body;
@@ -811,7 +800,6 @@ app.post('/api/verify/send-code', async (req, res) => {
     }
 });
 
-// POST /api/verify/check-code
 app.post('/api/verify/check-code', async (req, res) => {
     try {
         const { email, code, action } = req.body;
@@ -889,12 +877,15 @@ app.post('/api/verify/check-code', async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
         
-        // RESET: Just verify the code
+        // RESET: Just verify the code - DON'T mark as used yet
         if (action === 'reset') {
+            // For reset, we just verify the code exists and is valid
+            // The reset-password endpoint will mark it as used
             return res.json({
                 success: true,
                 message: 'Code verified successfully. Please enter your new password.',
-                verified: true
+                verified: true,
+                code: code
             });
         }
         
@@ -947,7 +938,7 @@ app.post('/api/verify/check-code', async (req, res) => {
 });
 
 // ============================================================
-// 12. SETTINGS APIs
+// SETTINGS APIs
 // ============================================================
 
 app.get('/api/settings', authMiddleware, async (req, res) => {
@@ -1007,9 +998,6 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
     }
 });
 
-// ============================================================
-// 13. EMAIL SEND
-// ============================================================
 app.post('/api/email/send', async (req, res) => {
     try {
         const { email, code, action } = req.body;
@@ -1029,7 +1017,7 @@ app.post('/api/email/send', async (req, res) => {
 });
 
 // ============================================================
-// 14. RESET PASSWORD
+// RESET PASSWORD
 // ============================================================
 app.post('/api/auth/reset-password', async (req, res) => {
     try {
@@ -1093,7 +1081,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
 });
 
 // ============================================================
-// 15. HEALTH CHECK
+// HEALTH CHECK
 // ============================================================
 app.get('/health', (req, res) => {
     res.json({
@@ -1108,20 +1096,12 @@ app.get('/', (req, res) => {
     res.json({
         service: 'FreeTranslateLanguage API',
         version: '2.0.0',
-        status: 'running',
-        endpoints: {
-            auth: '/api/auth/*',
-            user: '/api/user/*',
-            history: '/api/history/*',
-            settings: '/api/settings',
-            verify: '/api/verify/*',
-            health: '/health'
-        }
+        status: 'running'
     });
 });
 
 // ============================================================
-// 16. START SERVER
+// START SERVER
 // ============================================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
