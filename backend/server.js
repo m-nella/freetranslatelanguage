@@ -20,16 +20,40 @@ require('dotenv').config();
 const app = express();
 
 // ============================================================
-// 2. MIDDLEWARE
+// 2. MIDDLEWARE - FIXED: Better CORS for cross-device
 // ============================================================
 app.use(helmet());
+
+// CORS configuration - Allow multiple origins
+const allowedOrigins = [
+    'https://m-nella.github.io',
+    'http://localhost:5000',
+    'http://localhost:3000',
+    process.env.CORS_ORIGIN
+].filter(Boolean);
+
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || 'https://m-nella.github.io',
+    origin: function(origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            // For development, allow any origin
+            if (process.env.NODE_ENV === 'development') {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        }
+    },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
-app.use(express.json());
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Rate Limiting
@@ -52,7 +76,12 @@ if (!MONGODB_URI) {
     process.exit(1);
 }
 
-mongoose.connect(MONGODB_URI).then(() => {
+mongoose.connect(MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+}).then(() => {
     console.log('✅ MongoDB Atlas connected successfully!');
 }).catch((err) => {
     console.error('❌ MongoDB connection error:', err);
@@ -60,7 +89,7 @@ mongoose.connect(MONGODB_URI).then(() => {
 });
 
 // ============================================================
-// 4. MODELS (Schemas)
+// 4. MODELS (Schemas) - FIXED: Better email handling
 // ============================================================
 
 // User Schema
@@ -77,7 +106,8 @@ const UserSchema = new mongoose.Schema({
         required: true,
         unique: true,
         lowercase: true,
-        trim: true
+        trim: true,
+        index: true
     },
     passwordHash: {
         type: String,
@@ -171,7 +201,8 @@ const VerificationCodeSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
-        lowercase: true
+        lowercase: true,
+        trim: true
     },
     code: {
         type: String,
@@ -214,7 +245,7 @@ const VerificationCode = mongoose.model('VerificationCode', VerificationCodeSche
 
 // Generate JWT Token
 function generateToken(userId) {
-    return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '30d' }); // Extended to 30 days for better cross-device experience
 }
 
 // Verify JWT Token
@@ -245,14 +276,16 @@ function hashPassword(password) {
     });
 }
 
-// Compare password
+// Compare password - FIXED: Better error handling
 function comparePassword(password, hash) {
     return new Promise(function(resolve, reject) {
         if (!password || !hash) {
             reject(new Error('Password and hash are required'));
             return;
         }
-        bcrypt.compare(password, hash, function(err, result) {
+        // Trim password to remove any accidental spaces from mobile keyboards
+        const trimmedPassword = typeof password === 'string' ? password.trim() : password;
+        bcrypt.compare(trimmedPassword, hash, function(err, result) {
             if (err) {
                 reject(err);
                 return;
@@ -276,6 +309,12 @@ function generateUsernameFromEmail(email) {
         clean = clean + random;
     }
     return clean.toLowerCase();
+}
+
+// Normalize email - FIXED: Consistent email handling
+function normalizeEmail(email) {
+    if (!email) return '';
+    return email.trim().toLowerCase();
 }
 
 // Send Email via Brevo API
@@ -437,19 +476,23 @@ function authMiddleware(req, res, next) {
 }
 
 // ============================================================
-// 7. AUTH APIs
+// 7. AUTH APIs - FIXED: Better email/password handling
 // ============================================================
 
 // POST /api/auth/signup
 app.post('/api/auth/signup', async (req, res) => {
     try {
-        const { email, password, username } = req.body;
+        let { email, password, username } = req.body;
 
         if (!email || !password) {
             return res.status(400).json({ success: false, message: 'Email and password are required.' });
         }
 
-        const existingUser = await User.findOne({ email: email.toLowerCase() });
+        // Normalize email
+        email = normalizeEmail(email);
+        password = typeof password === 'string' ? password.trim() : password;
+
+        const existingUser = await User.findOne({ email: email });
         if (existingUser) {
             return res.status(400).json({ success: false, message: 'Email already registered. Please sign in.' });
         }
@@ -463,7 +506,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
         const user = new User({
             username: finalUsername,
-            email: email.toLowerCase(),
+            email: email,
             passwordHash: passwordHash,
             isVerified: false
         });
@@ -487,16 +530,20 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin
+// POST /api/auth/signin - FIXED: Better password handling
 app.post('/api/auth/signin', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        let { email, password } = req.body;
 
         if (!email || !password) {
             return res.status(400).json({ success: false, message: 'Email and password are required.' });
         }
 
-        const user = await User.findOne({ email: email.toLowerCase() });
+        // Normalize email and trim password
+        email = normalizeEmail(email);
+        password = typeof password === 'string' ? password.trim() : password;
+
+        const user = await User.findOne({ email: email });
         if (!user) {
             return res.status(404).json({ success: false, message: 'Account not found. Please create an account.' });
         }
@@ -540,11 +587,13 @@ app.post('/api/auth/signin', async (req, res) => {
 // POST /api/auth/verify-password
 app.post('/api/auth/verify-password', authMiddleware, async (req, res) => {
     try {
-        const { password } = req.body;
+        let { password } = req.body;
 
         if (!password) {
             return res.status(400).json({ success: false, message: 'Password is required.' });
         }
+
+        password = typeof password === 'string' ? password.trim() : password;
 
         const user = await User.findById(req.userId);
         if (!user) {
@@ -627,7 +676,8 @@ app.post('/api/auth/check-email', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email is required.' });
         }
 
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const normalizedEmail = normalizeEmail(email);
+        const user = await User.findOne({ email: normalizedEmail });
         if (!user) {
             return res.status(404).json({ success: false, message: 'Email not registered. Please create an account.' });
         }
@@ -693,7 +743,7 @@ app.put('/api/user/profile', authMiddleware, async (req, res) => {
 // PUT /api/user/change-password
 app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     try {
-        const { currentPassword, newPassword, verificationCode } = req.body;
+        let { currentPassword, newPassword, verificationCode } = req.body;
 
         if (!currentPassword || !newPassword) {
             return res.status(400).json({ success: false, message: 'Current and new password are required.' });
@@ -702,6 +752,9 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
         if (!verificationCode) {
             return res.status(400).json({ success: false, message: 'Verification code is required to change password.' });
         }
+
+        currentPassword = typeof currentPassword === 'string' ? currentPassword.trim() : currentPassword;
+        newPassword = typeof newPassword === 'string' ? newPassword.trim() : newPassword;
 
         const user = await User.findById(req.userId);
         if (!user) {
@@ -757,7 +810,7 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
 // PUT /api/user/change-email
 app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     try {
-        const { newEmail, password, verificationCode } = req.body;
+        let { newEmail, password, verificationCode } = req.body;
 
         if (!newEmail || !password) {
             return res.status(400).json({ success: false, message: 'New email and password are required.' });
@@ -767,12 +820,15 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Verification code is required to change email.' });
         }
 
+        newEmail = normalizeEmail(newEmail);
+        password = typeof password === 'string' ? password.trim() : password;
+
         const user = await User.findById(req.userId);
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        if (newEmail.toLowerCase() === user.email) {
+        if (newEmail === user.email) {
             return res.status(400).json({ success: false, message: 'New email must be different from current email.' });
         }
 
@@ -786,13 +842,13 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        const existingUser = await User.findOne({ email: newEmail.toLowerCase() });
+        const existingUser = await User.findOne({ email: newEmail });
         if (existingUser && existingUser._id.toString() !== req.userId) {
             return res.status(400).json({ success: false, message: 'Email already in use.' });
         }
 
         const verification = await VerificationCode.findOne({
-            email: newEmail.toLowerCase(),
+            email: newEmail,
             code: verificationCode,
             action: 'email',
             isUsed: false
@@ -810,7 +866,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
         verification.isUsed = true;
         await verification.save();
 
-        user.email = newEmail.toLowerCase();
+        user.email = newEmail;
         user.username = generateUsernameFromEmail(newEmail);
         user.updatedAt = new Date();
         user.isVerified = false;
@@ -834,7 +890,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
 // DELETE /api/user/delete
 app.delete('/api/user/delete', authMiddleware, async (req, res) => {
     try {
-        const { password, verificationCode } = req.body;
+        let { password, verificationCode } = req.body;
 
         if (!password) {
             return res.status(400).json({ success: false, message: 'Password is required to delete account.' });
@@ -843,6 +899,8 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
         if (!verificationCode) {
             return res.status(400).json({ success: false, message: 'Verification code is required to delete account.' });
         }
+
+        password = typeof password === 'string' ? password.trim() : password;
 
         const user = await User.findById(req.userId);
         if (!user) {
@@ -1005,8 +1063,10 @@ app.post('/api/verify/send-code', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email and action are required.' });
         }
 
+        const normalizedEmail = normalizeEmail(email);
+
         if (action === 'reset') {
-            const user = await User.findOne({ email: email.toLowerCase() });
+            const user = await User.findOne({ email: normalizedEmail });
             if (!user) {
                 return res.status(404).json({ 
                     success: false, 
@@ -1018,13 +1078,13 @@ app.post('/api/verify/send-code', async (req, res) => {
         const code = Math.floor(100000 + Math.random() * 900000).toString();
 
         await VerificationCode.deleteMany({
-            email: email.toLowerCase(),
+            email: normalizedEmail,
             action: action,
             isUsed: false
         });
 
         const verification = new VerificationCode({
-            email: email.toLowerCase(),
+            email: normalizedEmail,
             code: code,
             action: action,
             expiresAt: new Date(Date.now() + 15 * 60 * 1000)
@@ -1064,8 +1124,10 @@ app.post('/api/verify/check-code', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email, code and action are required.' });
         }
 
+        const normalizedEmail = normalizeEmail(email);
+
         const verification = await VerificationCode.findOne({
-            email: email.toLowerCase(),
+            email: normalizedEmail,
             code: code,
             action: action,
             isUsed: false
@@ -1089,7 +1151,7 @@ app.post('/api/verify/check-code', async (req, res) => {
         let requiresSignIn = false;
 
         if (action === 'signup') {
-            const user = await User.findOne({ email: email.toLowerCase() });
+            const user = await User.findOne({ email: normalizedEmail });
             if (user) {
                 user.isVerified = true;
                 await user.save();
@@ -1097,7 +1159,7 @@ app.post('/api/verify/check-code', async (req, res) => {
                 requiresSignIn = true;
             }
         } else if (action === 'signin') {
-            const user = await User.findOne({ email: email.toLowerCase() });
+            const user = await User.findOne({ email: normalizedEmail });
             if (user) {
                 user.isVerified = true;
                 await user.save();
@@ -1224,20 +1286,23 @@ app.post('/api/email/send', async (req, res) => {
 // ============================================================
 app.post('/api/auth/reset-password', async (req, res) => {
     try {
-        const { email, newPassword, verificationCode } = req.body;
+        let { email, newPassword, verificationCode } = req.body;
 
         if (!email || !newPassword || !verificationCode) {
             return res.status(400).json({ success: false, message: 'Email, new password and verification code are required.' });
         }
 
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const normalizedEmail = normalizeEmail(email);
+        newPassword = typeof newPassword === 'string' ? newPassword.trim() : newPassword;
+
+        const user = await User.findOne({ email: normalizedEmail });
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
         // STEP 1: Verify the verification code
         const verification = await VerificationCode.findOne({
-            email: email.toLowerCase(),
+            email: normalizedEmail,
             code: verificationCode,
             action: 'reset',
             isUsed: false
