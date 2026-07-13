@@ -487,7 +487,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin - FIXED: Allow unverified users to sign in with verification requirement
+// POST /api/auth/signin - FIXED
 app.post('/api/auth/signin', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -601,7 +601,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 // ============================================================
-// 8. CHECK EMAIL EXISTS - FIXED
+// 8. CHECK EMAIL EXISTS
 // ============================================================
 app.post('/api/auth/check-email', async (req, res) => {
     try {
@@ -628,7 +628,7 @@ app.post('/api/auth/check-email', async (req, res) => {
 // 9. USER APIs
 // ============================================================
 
-// PUT /api/user/profile - ONLY FOR PHOTO AND SETTINGS, NOT USERNAME/EMAIL
+// PUT /api/user/profile
 app.put('/api/user/profile', authMiddleware, async (req, res) => {
     try {
         const { photo, theme, preferredSourceLanguage, preferredTargetLanguage, voiceSpeed, voicePitch, autoDetect, notificationSettings } = req.body;
@@ -706,7 +706,7 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     }
 });
 
-// PUT /api/user/change-email - Auto-updates username
+// PUT /api/user/change-email
 app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     try {
         const { newEmail, password } = req.body;
@@ -730,11 +730,10 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email already in use.' });
         }
 
-        // Update email and auto-generate new username from new email
         user.email = newEmail.toLowerCase();
         user.username = generateUsernameFromEmail(newEmail);
         user.updatedAt = new Date();
-        user.isVerified = false; // Require re-verification
+        user.isVerified = false;
         await user.save();
 
         res.json({ 
@@ -891,7 +890,7 @@ app.delete('/api/history/clear', authMiddleware, async (req, res) => {
 });
 
 // ============================================================
-// 11. VERIFICATION APIs
+// 11. VERIFICATION APIs - FIXED
 // ============================================================
 
 // POST /api/verify/send-code
@@ -954,7 +953,7 @@ app.post('/api/verify/send-code', async (req, res) => {
     }
 });
 
-// POST /api/verify/check-code
+// POST /api/verify/check-code - FIXED: token variable issue
 app.post('/api/verify/check-code', async (req, res) => {
     try {
         const { email, code, action } = req.body;
@@ -987,23 +986,19 @@ app.post('/api/verify/check-code', async (req, res) => {
         verification.isUsed = true;
         await verification.save();
 
+        // FIXED: Properly declare and initialize token variable
+        let token = null;
+
         // Mark user as verified for signup or signin action
         if (action === 'signup' || action === 'signin') {
             const user = await User.findOne({ email: email.toLowerCase() });
             if (user) {
                 user.isVerified = true;
                 await user.save();
-                // Generate token after verification
-                token = generateToken(user._id);
-            }
-        }
-
-        // Generate token for signin action only
-        let token = null;
-        if (action === 'signin') {
-            const user = await User.findOne({ email: email.toLowerCase() });
-            if (user && user.isVerified) {
-                token = generateToken(user._id);
+                // Generate token after verification for signin
+                if (action === 'signin') {
+                    token = generateToken(user._id);
+                }
             }
         }
 
