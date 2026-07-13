@@ -487,7 +487,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-// POST /api/auth/signin - FIXED: Always require verification for unverified users
+// POST /api/auth/signin - FIXED: ALWAYS require verification for unverified users
 app.post('/api/auth/signin', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -506,6 +506,7 @@ app.post('/api/auth/signin', async (req, res) => {
             return res.status(500).json({ success: false, message: 'Account data corrupted. Please contact support.' });
         }
 
+        // Verify password first
         try {
             const isMatch = await comparePassword(password, user.passwordHash);
             if (!isMatch) {
@@ -516,11 +517,11 @@ app.post('/api/auth/signin', async (req, res) => {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
 
-        // IMPORTANT: If user is not verified, they MUST verify before signing in
+        // CRITICAL: If user is not verified, they MUST verify before signing in
         if (!user.isVerified) {
             user.lastLogin = new Date();
             await user.save();
-            return res.json({
+            return res.status(403).json({
                 success: false,
                 message: 'Please verify your email before signing in.',
                 requiresVerification: true,
@@ -683,9 +684,8 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Current and new password are required.' });
         }
 
-        // Verify the verification code
         if (!verificationCode) {
-            return res.status(400).json({ success: false, message: 'Verification code is required.' });
+            return res.status(400).json({ success: false, message: 'Verification code is required to change password.' });
         }
 
         const user = await User.findById(req.userId);
@@ -741,9 +741,8 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'New email and password are required.' });
         }
 
-        // Verify the verification code
         if (!verificationCode) {
-            return res.status(400).json({ success: false, message: 'Verification code is required.' });
+            return res.status(400).json({ success: false, message: 'Verification code is required to change email.' });
         }
 
         const user = await User.findById(req.userId);
@@ -813,7 +812,7 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
         }
 
         if (!verificationCode) {
-            return res.status(400).json({ success: false, message: 'Verification code is required.' });
+            return res.status(400).json({ success: false, message: 'Verification code is required to delete account.' });
         }
 
         const user = await User.findById(req.userId);
@@ -1030,7 +1029,7 @@ app.post('/api/verify/send-code', async (req, res) => {
     }
 });
 
-// POST /api/verify/check-code - FIXED
+// POST /api/verify/check-code
 app.post('/api/verify/check-code', async (req, res) => {
     try {
         const { email, code, action } = req.body;
