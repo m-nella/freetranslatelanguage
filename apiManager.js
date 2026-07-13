@@ -36,7 +36,6 @@ var API_MANAGER = {
                 var error = new Error(data.message || 'Request failed');
                 error.status = response.status;
                 error.data = data;
-                error.success = false;
                 throw error;
             }
             return data;
