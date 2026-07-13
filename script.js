@@ -635,7 +635,6 @@
                     codeInput.disabled = true;
                     showNotification('Verification successful!', 'success');
                     
-                    // Store the code for later use
                     pendingVerificationCode = code;
                     
                     if (result.token && action !== 'signup') {
@@ -647,15 +646,25 @@
                         if (typeof pendingCallback === 'function') {
                             pendingCallback(result, code);
                         }
-                        // For signup, redirect to sign in - DO NOT reload immediately
+                        // For signup, redirect to sign in with refresh
                         if (action === 'signup') {
                             showNotification('Email verified! Please sign in.', 'success');
                             setTimeout(function() {
-                                openModal('login');
+                                window.location.reload();
                             }, 500);
+                        } else if (action === 'signin') {
+                            // Signin successful, check auth status
+                            checkAuthStatus();
                         } else if (action === 'email') {
                             showNotification('Email updated successfully!', 'success');
-                            checkAuthStatus();
+                            window.location.reload();
+                        } else if (action === 'password') {
+                            showNotification('Password updated successfully!', 'success');
+                            window.location.reload();
+                        } else if (action === 'delete') {
+                            // Deletion handled separately
+                        } else if (action === 'reset') {
+                            // Reset handled separately
                         } else {
                             checkAuthStatus();
                         }
@@ -984,7 +993,7 @@
             var password = $('authPassword') ? $('authPassword').value : '';
             
             // ============================================================
-            // SIGN IN
+            // SIGN IN - FIXED: Verify credentials first, then require verification
             // ============================================================
             if (currentMode === 'login') {
                 authSubmitBtn.disabled = true;
@@ -1013,8 +1022,9 @@
                             authSubmitBtn.textContent = 'Sign In';
                         }
                     } else {
+                        // Check if user needs verification (password was correct)
                         if (response.requiresVerification) {
-                            showNotification('Please verify your email. Code sent!', 'warning');
+                            showNotification('Please verify your identity. Code sent!', 'warning');
                             if (authModal) authModal.style.display = 'none';
                             sendVerificationCode(email, 'signin').then(function(codeResult) {
                                 if (codeResult.success) {
@@ -1032,6 +1042,7 @@
                             return;
                         }
                         
+                        // Account not found
                         if (response.message && response.message.toLowerCase().includes('account not found')) {
                             showNotification('Account not found. Please create an account.', 'error');
                             authSubmitBtn.disabled = false;
@@ -1047,6 +1058,7 @@
                         }
                     }
                 }).catch(function(error) {
+                    // Account not found
                     if (error.status === 404) {
                         showNotification('Account not found. Please create an account.', 'error');
                         authSubmitBtn.disabled = false;
@@ -1055,8 +1067,10 @@
                             if (authModal) authModal.style.display = 'none';
                             openModal('signup');
                         }, 1500);
-                    } else if (error.data && error.data.requiresVerification) {
-                        showNotification('Please verify your email. Code sent!', 'warning');
+                    } 
+                    // Requires verification
+                    else if (error.data && error.data.requiresVerification) {
+                        showNotification('Please verify your identity. Code sent!', 'warning');
                         if (authModal) authModal.style.display = 'none';
                         sendVerificationCode(email, 'signin').then(function(codeResult) {
                             if (codeResult.success) {
@@ -1071,7 +1085,15 @@
                         });
                         authSubmitBtn.disabled = false;
                         authSubmitBtn.textContent = 'Sign In';
-                    } else {
+                    }
+                    // Incorrect password
+                    else if (error.status === 401) {
+                        showNotification('Incorrect password. Please try again.', 'error');
+                        authSubmitBtn.disabled = false;
+                        authSubmitBtn.textContent = 'Sign In';
+                    }
+                    // Other errors - try localStorage fallback
+                    else {
                         var result = DATA_MANAGER.login(email, password);
                         if (result.success) {
                             sendVerificationCode(email, 'signin').then(function(codeResult) {
@@ -1108,7 +1130,7 @@
                 });
                 
             // ============================================================
-            // RESET PASSWORD
+            // RESET PASSWORD - FIXED: Verify email exists, then send code
             // ============================================================
             } else if (currentMode === 'reset') {
                 authSubmitBtn.disabled = true;
@@ -1138,7 +1160,9 @@
                                     showNotification('Password reset successfully! Please sign in.', 'success');
                                     authSubmitBtn.disabled = false;
                                     authSubmitBtn.textContent = 'Send Reset Code';
-                                    setTimeout(function() { openModal('login'); }, 2000);
+                                    setTimeout(function() {
+                                        window.location.reload();
+                                    }, 500);
                                 });
                             });
                         } else {
@@ -1162,7 +1186,7 @@
                 });
                 
             // ============================================================
-            // SIGN UP - FIXED: Only reload after verification, NOT before
+            // SIGN UP - FIXED: Create account, send code, verify, refresh
             // ============================================================
             } else if (currentMode === 'signup') {
                 var confirmPassword = $('authConfirmPassword') ? $('authConfirmPassword').value : '';
@@ -1193,12 +1217,11 @@
                                 if (authModal) authModal.style.display = 'none';
                                 showNotification('Account created! Please verify your email.', 'success');
                                 
-                                // Open verification modal - DO NOT reload yet
                                 openVerificationModal(email, 'signup', function(result, code) {
                                     if (result.success) {
                                         showNotification('Email verified! Please sign in.', 'success');
                                         setTimeout(function() {
-                                            openModal('login');
+                                            window.location.reload();
                                         }, 500);
                                     }
                                 });
@@ -1449,7 +1472,7 @@
     }
 
     // ============================================================
-    // ACCOUNT SETTINGS
+    // ACCOUNT SETTINGS - COMPLETE FIXED
     // ============================================================
     function openAccountSettings() {
         var user = currentUser || DATA_MANAGER.getCurrentUser();
@@ -1501,6 +1524,9 @@
         var saveBtn = modal.querySelector('#saveSettingsBtn');
         var deleteBtn = modal.querySelector('#deleteAccountBtn');
         
+        // ============================================================
+        // CHANGE EMAIL - FIXED: Verify new email different, password correct
+        // ============================================================
         bindClick(saveBtn, function() {
             var newEmail = $('settingsEmail').value;
             var currentPassword = $('settingsCurrentPassword').value;
@@ -1512,6 +1538,9 @@
                 return;
             }
             
+            // ============================================================
+            // CHANGE EMAIL
+            // ============================================================
             if (newEmail && newEmail !== user.email) {
                 if (!DATA_MANAGER.validateEmail(newEmail)) {
                     showNotification('Invalid email address.', 'error');
@@ -1521,59 +1550,24 @@
                 saveBtn.disabled = true;
                 saveBtn.textContent = 'Checking email...';
                 
-                API_MANAGER.checkEmailExists(newEmail).then(function(checkResult) {
-                    if (checkResult.success) {
-                        showNotification('Email already registered. Please use a different email.', 'error');
+                // First verify current password is correct
+                API_MANAGER.signin(user.email, currentPassword).then(function(loginResult) {
+                    if (!loginResult.success && loginResult.message && loginResult.message.toLowerCase().includes('incorrect password')) {
+                        showNotification('Current password is incorrect.', 'error');
                         saveBtn.disabled = false;
                         saveBtn.textContent = 'Save Changes';
                         return;
                     }
                     
-                    saveBtn.textContent = 'Sending verification code...';
-                    sendVerificationCode(newEmail, 'email').then(function(result) {
-                        if (!result.success) {
-                            showNotification('Failed to send verification code. Please try again.', 'error');
+                    // Check if new email already exists
+                    API_MANAGER.checkEmailExists(newEmail).then(function(checkResult) {
+                        if (checkResult.success) {
+                            showNotification('Email already registered. Please use a different email.', 'error');
                             saveBtn.disabled = false;
                             saveBtn.textContent = 'Save Changes';
                             return;
                         }
                         
-                        openVerificationModal(newEmail, 'email', function(verifyResult, code) {
-                            if (verifyResult.success) {
-                                saveBtn.textContent = 'Updating email...';
-                                API_MANAGER.changeEmail(newEmail, currentPassword, code).then(function(response) {
-                                    if (response.success) {
-                                        showNotification('Email updated successfully! Username auto-updated.', 'success');
-                                        user.email = newEmail;
-                                        user.username = response.data.username || generateUsernameFromEmail(newEmail);
-                                        localStorage.setItem('cachedUser', JSON.stringify({
-                                            _id: user.id,
-                                            email: user.email,
-                                            username: user.username
-                                        }));
-                                        checkAuthStatus();
-                                        saveBtn.disabled = false;
-                                        saveBtn.textContent = 'Save Changes';
-                                        modal.remove();
-                                    } else {
-                                        showNotification(response.message || 'Failed to update email. Please try again.', 'error');
-                                        saveBtn.disabled = false;
-                                        saveBtn.textContent = 'Save Changes';
-                                    }
-                                }).catch(function(error) {
-                                    showNotification(error.message || 'Failed to update email. Please try again.', 'error');
-                                    saveBtn.disabled = false;
-                                    saveBtn.textContent = 'Save Changes';
-                                });
-                            } else {
-                                showNotification('Verification failed. Please try again.', 'error');
-                                saveBtn.disabled = false;
-                                saveBtn.textContent = 'Save Changes';
-                            }
-                        });
-                    });
-                }).catch(function(error) {
-                    if (error.status === 404) {
                         saveBtn.textContent = 'Sending verification code...';
                         sendVerificationCode(newEmail, 'email').then(function(result) {
                             if (!result.success) {
@@ -1600,6 +1594,9 @@
                                             saveBtn.disabled = false;
                                             saveBtn.textContent = 'Save Changes';
                                             modal.remove();
+                                            setTimeout(function() {
+                                                window.location.reload();
+                                            }, 500);
                                         } else {
                                             showNotification(response.message || 'Failed to update email. Please try again.', 'error');
                                             saveBtn.disabled = false;
@@ -1617,15 +1614,72 @@
                                 }
                             });
                         });
-                    } else {
-                        showNotification('Error checking email. Please try again.', 'error');
-                        saveBtn.disabled = false;
-                        saveBtn.textContent = 'Save Changes';
-                    }
+                    }).catch(function(error) {
+                        if (error.status === 404) {
+                            // Email not found, which is good for new email
+                            saveBtn.textContent = 'Sending verification code...';
+                            sendVerificationCode(newEmail, 'email').then(function(result) {
+                                if (!result.success) {
+                                    showNotification('Failed to send verification code. Please try again.', 'error');
+                                    saveBtn.disabled = false;
+                                    saveBtn.textContent = 'Save Changes';
+                                    return;
+                                }
+                                
+                                openVerificationModal(newEmail, 'email', function(verifyResult, code) {
+                                    if (verifyResult.success) {
+                                        saveBtn.textContent = 'Updating email...';
+                                        API_MANAGER.changeEmail(newEmail, currentPassword, code).then(function(response) {
+                                            if (response.success) {
+                                                showNotification('Email updated successfully! Username auto-updated.', 'success');
+                                                user.email = newEmail;
+                                                user.username = response.data.username || generateUsernameFromEmail(newEmail);
+                                                localStorage.setItem('cachedUser', JSON.stringify({
+                                                    _id: user.id,
+                                                    email: user.email,
+                                                    username: user.username
+                                                }));
+                                                checkAuthStatus();
+                                                saveBtn.disabled = false;
+                                                saveBtn.textContent = 'Save Changes';
+                                                modal.remove();
+                                                setTimeout(function() {
+                                                    window.location.reload();
+                                                }, 500);
+                                            } else {
+                                                showNotification(response.message || 'Failed to update email. Please try again.', 'error');
+                                                saveBtn.disabled = false;
+                                                saveBtn.textContent = 'Save Changes';
+                                            }
+                                        }).catch(function(error) {
+                                            showNotification(error.message || 'Failed to update email. Please try again.', 'error');
+                                            saveBtn.disabled = false;
+                                            saveBtn.textContent = 'Save Changes';
+                                        });
+                                    } else {
+                                        showNotification('Verification failed. Please try again.', 'error');
+                                        saveBtn.disabled = false;
+                                        saveBtn.textContent = 'Save Changes';
+                                    }
+                                });
+                            });
+                        } else {
+                            showNotification('Error checking email. Please try again.', 'error');
+                            saveBtn.disabled = false;
+                            saveBtn.textContent = 'Save Changes';
+                        }
+                    });
+                }).catch(function(error) {
+                    showNotification('Current password is incorrect.', 'error');
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save Changes';
                 });
                 return;
             }
             
+            // ============================================================
+            // CHANGE PASSWORD - FIXED: Verify current password correct, new different
+            // ============================================================
             if (newPassword || confirmPassword) {
                 if (newPassword !== confirmPassword) {
                     showNotification('Passwords do not match!', 'error');
@@ -1646,41 +1700,59 @@
                 }
                 
                 saveBtn.disabled = true;
-                saveBtn.textContent = 'Sending verification code...';
+                saveBtn.textContent = 'Verifying current password...';
                 
-                sendVerificationCode(user.email, 'password').then(function(result) {
-                    if (!result.success) {
-                        showNotification('Failed to send verification code. Please try again.', 'error');
+                // First verify current password is correct
+                API_MANAGER.signin(user.email, currentPassword).then(function(loginResult) {
+                    if (!loginResult.success && loginResult.message && loginResult.message.toLowerCase().includes('incorrect password')) {
+                        showNotification('Current password is incorrect.', 'error');
                         saveBtn.disabled = false;
                         saveBtn.textContent = 'Save Changes';
                         return;
                     }
                     
-                    openVerificationModal(user.email, 'password', function(verifyResult, code) {
-                        if (verifyResult.success) {
-                            saveBtn.textContent = 'Updating password...';
-                            API_MANAGER.changePassword(currentPassword, newPassword, code).then(function(response) {
-                                if (response.success) {
-                                    showNotification('Password updated successfully!', 'success');
-                                    saveBtn.disabled = false;
-                                    saveBtn.textContent = 'Save Changes';
-                                    modal.remove();
-                                } else {
-                                    showNotification(response.message || 'Failed to update password. Please try again.', 'error');
-                                    saveBtn.disabled = false;
-                                    saveBtn.textContent = 'Save Changes';
-                                }
-                            }).catch(function(error) {
-                                showNotification(error.message || 'Failed to update password. Please try again.', 'error');
-                                saveBtn.disabled = false;
-                                saveBtn.textContent = 'Save Changes';
-                            });
-                        } else {
-                            showNotification('Verification failed. Please try again.', 'error');
+                    saveBtn.textContent = 'Sending verification code...';
+                    sendVerificationCode(user.email, 'password').then(function(result) {
+                        if (!result.success) {
+                            showNotification('Failed to send verification code. Please try again.', 'error');
                             saveBtn.disabled = false;
                             saveBtn.textContent = 'Save Changes';
+                            return;
                         }
+                        
+                        openVerificationModal(user.email, 'password', function(verifyResult, code) {
+                            if (verifyResult.success) {
+                                saveBtn.textContent = 'Updating password...';
+                                API_MANAGER.changePassword(currentPassword, newPassword, code).then(function(response) {
+                                    if (response.success) {
+                                        showNotification('Password updated successfully!', 'success');
+                                        saveBtn.disabled = false;
+                                        saveBtn.textContent = 'Save Changes';
+                                        modal.remove();
+                                        setTimeout(function() {
+                                            window.location.reload();
+                                        }, 500);
+                                    } else {
+                                        showNotification(response.message || 'Failed to update password. Please try again.', 'error');
+                                        saveBtn.disabled = false;
+                                        saveBtn.textContent = 'Save Changes';
+                                    }
+                                }).catch(function(error) {
+                                    showNotification(error.message || 'Failed to update password. Please try again.', 'error');
+                                    saveBtn.disabled = false;
+                                    saveBtn.textContent = 'Save Changes';
+                                });
+                            } else {
+                                showNotification('Verification failed. Please try again.', 'error');
+                                saveBtn.disabled = false;
+                                saveBtn.textContent = 'Save Changes';
+                            }
+                        });
                     });
+                }).catch(function(error) {
+                    showNotification('Current password is incorrect.', 'error');
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save Changes';
                 });
                 return;
             }
@@ -1689,6 +1761,9 @@
             modal.remove();
         });
         
+        // ============================================================
+        // DELETE ACCOUNT - FIXED: Verify password first
+        // ============================================================
         bindClick(deleteBtn, function() {
             showConfirmationModal(
                 'Delete Account',
@@ -1713,57 +1788,72 @@
                     }
                     
                     deleteBtn.disabled = true;
-                    deleteBtn.textContent = 'Sending verification code...';
+                    deleteBtn.textContent = 'Verifying password...';
                     
-                    sendVerificationCode(user.email, 'delete').then(function(result) {
-                        if (!result.success) {
-                            showNotification('Failed to send verification code. Please try again.', 'error');
+                    // First verify password is correct
+                    API_MANAGER.signin(user.email, password).then(function(loginResult) {
+                        if (!loginResult.success && loginResult.message && loginResult.message.toLowerCase().includes('incorrect password')) {
+                            showNotification('Password is incorrect.', 'error');
                             deleteBtn.disabled = false;
                             deleteBtn.textContent = 'Delete Account';
                             return;
                         }
                         
-                        deleteBtn.textContent = 'Verifying...';
-                        openVerificationModal(user.email, 'delete', function(verifyResult, code) {
-                            if (verifyResult.success) {
-                                deleteBtn.textContent = 'Deleting account...';
-                                API_MANAGER.deleteAccount(password, code).then(function(response) {
-                                    if (response.success) {
-                                        API_MANAGER.setToken(null);
-                                        localStorage.removeItem('cachedUser');
-                                        localStorage.removeItem('cachedHistory');
-                                        showNotification('Account deleted successfully.', 'success');
-                                        deleteBtn.disabled = false;
-                                        deleteBtn.textContent = 'Delete Account';
-                                        modal.remove();
-                                        isLoggedIn = false;
-                                        currentUser = null;
-                                        var authBtn = $('authBtn');
-                                        if (authBtn) {
-                                            authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
-                                            removeClass(authBtn, 'logged-in');
-                                        }
-                                        var historyNavBtn = $('historyNavBtn');
-                                        if (historyNavBtn) {
-                                            historyNavBtn.style.display = 'none';
-                                        }
-                                        window.location.reload();
-                                    } else {
-                                        showNotification(response.message || 'Failed to delete account. Please try again.', 'error');
-                                        deleteBtn.disabled = false;
-                                        deleteBtn.textContent = 'Delete Account';
-                                    }
-                                }).catch(function(error) {
-                                    showNotification(error.message || 'Failed to delete account. Please try again.', 'error');
-                                    deleteBtn.disabled = false;
-                                    deleteBtn.textContent = 'Delete Account';
-                                });
-                            } else {
-                                showNotification('Verification failed. Please try again.', 'error');
+                        deleteBtn.textContent = 'Sending verification code...';
+                        sendVerificationCode(user.email, 'delete').then(function(result) {
+                            if (!result.success) {
+                                showNotification('Failed to send verification code. Please try again.', 'error');
                                 deleteBtn.disabled = false;
                                 deleteBtn.textContent = 'Delete Account';
+                                return;
                             }
+                            
+                            deleteBtn.textContent = 'Verifying...';
+                            openVerificationModal(user.email, 'delete', function(verifyResult, code) {
+                                if (verifyResult.success) {
+                                    deleteBtn.textContent = 'Deleting account...';
+                                    API_MANAGER.deleteAccount(password, code).then(function(response) {
+                                        if (response.success) {
+                                            API_MANAGER.setToken(null);
+                                            localStorage.removeItem('cachedUser');
+                                            localStorage.removeItem('cachedHistory');
+                                            showNotification('Account deleted successfully.', 'success');
+                                            deleteBtn.disabled = false;
+                                            deleteBtn.textContent = 'Delete Account';
+                                            modal.remove();
+                                            isLoggedIn = false;
+                                            currentUser = null;
+                                            var authBtn = $('authBtn');
+                                            if (authBtn) {
+                                                authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                                                removeClass(authBtn, 'logged-in');
+                                            }
+                                            var historyNavBtn = $('historyNavBtn');
+                                            if (historyNavBtn) {
+                                                historyNavBtn.style.display = 'none';
+                                            }
+                                            window.location.reload();
+                                        } else {
+                                            showNotification(response.message || 'Failed to delete account. Please try again.', 'error');
+                                            deleteBtn.disabled = false;
+                                            deleteBtn.textContent = 'Delete Account';
+                                        }
+                                    }).catch(function(error) {
+                                        showNotification(error.message || 'Failed to delete account. Please try again.', 'error');
+                                        deleteBtn.disabled = false;
+                                        deleteBtn.textContent = 'Delete Account';
+                                    });
+                                } else {
+                                    showNotification('Verification failed. Please try again.', 'error');
+                                    deleteBtn.disabled = false;
+                                    deleteBtn.textContent = 'Delete Account';
+                                }
+                            });
                         });
+                    }).catch(function(error) {
+                        showNotification('Password is incorrect.', 'error');
+                        deleteBtn.disabled = false;
+                        deleteBtn.textContent = 'Delete Account';
                     });
                 });
             });
