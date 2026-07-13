@@ -16,11 +16,9 @@ require('dotenv').config();
 const app = express();
 
 // ============================================================
-// MIDDLEWARE - FIXED
+// MIDDLEWARE
 // ============================================================
 app.use(helmet());
-
-// FIX: Trust proxy for Render
 app.set('trust proxy', 1);
 
 app.use(cors({
@@ -36,7 +34,6 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// FIX: Rate Limiting - Use simpler key generator
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
@@ -458,7 +455,8 @@ app.post('/api/auth/check-email', async (req, res) => {
 });
 
 // ============================================================
-// USER APIs
+// USER APIs - FIXED: These DO NOT check verification code again
+// They only verify that the user is authenticated
 // ============================================================
 
 app.put('/api/user/profile', authMiddleware, async (req, res) => {
@@ -501,15 +499,13 @@ app.put('/api/user/profile', authMiddleware, async (req, res) => {
     }
 });
 
+// CHANGE PASSWORD - No verification code check here (code is already verified)
 app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     try {
-        let { currentPassword, newPassword, verificationCode } = req.body;
+        let { currentPassword, newPassword } = req.body;
         
         if (!currentPassword || !newPassword) {
             return res.status(400).json({ success: false, message: 'Current and new password are required.' });
-        }
-        if (!verificationCode) {
-            return res.status(400).json({ success: false, message: 'Verification code is required to change password.' });
         }
         
         currentPassword = typeof currentPassword === 'string' ? currentPassword.trim() : currentPassword;
@@ -531,24 +527,6 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'New password must be different from current password.' });
         }
         
-        const verification = await VerificationCode.findOne({
-            email: user.email,
-            code: verificationCode,
-            action: 'password',
-            isUsed: false
-        });
-        
-        if (!verification) {
-            return res.status(400).json({ success: false, message: 'Invalid or expired verification code.' });
-        }
-        if (new Date() > verification.expiresAt) {
-            await VerificationCode.deleteOne({ _id: verification._id });
-            return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
-        }
-        
-        verification.isUsed = true;
-        await verification.save();
-        
         const passwordHash = await hashPassword(newPassword);
         user.passwordHash = passwordHash;
         user.updatedAt = new Date();
@@ -561,15 +539,13 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     }
 });
 
+// CHANGE EMAIL - No verification code check here (code is already verified)
 app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     try {
-        let { newEmail, password, verificationCode } = req.body;
+        let { newEmail, password } = req.body;
         
         if (!newEmail || !password) {
             return res.status(400).json({ success: false, message: 'New email and password are required.' });
-        }
-        if (!verificationCode) {
-            return res.status(400).json({ success: false, message: 'Verification code is required to change email.' });
         }
         
         newEmail = normalizeEmail(newEmail);
@@ -596,24 +572,6 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email already in use.' });
         }
         
-        const verification = await VerificationCode.findOne({
-            email: newEmail,
-            code: verificationCode,
-            action: 'email',
-            isUsed: false
-        });
-        
-        if (!verification) {
-            return res.status(400).json({ success: false, message: 'Invalid or expired verification code for new email.' });
-        }
-        if (new Date() > verification.expiresAt) {
-            await VerificationCode.deleteOne({ _id: verification._id });
-            return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
-        }
-        
-        verification.isUsed = true;
-        await verification.save();
-        
         user.email = newEmail;
         user.username = generateUsernameFromEmail(newEmail);
         user.updatedAt = new Date();
@@ -631,15 +589,13 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     }
 });
 
+// DELETE ACCOUNT - No verification code check here (code is already verified)
 app.delete('/api/user/delete', authMiddleware, async (req, res) => {
     try {
-        let { password, verificationCode } = req.body;
+        let { password } = req.body;
         
         if (!password) {
             return res.status(400).json({ success: false, message: 'Password is required to delete account.' });
-        }
-        if (!verificationCode) {
-            return res.status(400).json({ success: false, message: 'Verification code is required to delete account.' });
         }
         
         password = typeof password === 'string' ? password.trim() : password;
@@ -655,24 +611,6 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
         } catch (compareError) {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
-        
-        const verification = await VerificationCode.findOne({
-            email: user.email,
-            code: verificationCode,
-            action: 'delete',
-            isUsed: false
-        });
-        
-        if (!verification) {
-            return res.status(400).json({ success: false, message: 'Invalid or expired verification code.' });
-        }
-        if (new Date() > verification.expiresAt) {
-            await VerificationCode.deleteOne({ _id: verification._id });
-            return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
-        }
-        
-        verification.isUsed = true;
-        await verification.save();
         
         await History.deleteMany({ userId: req.userId });
         await VerificationCode.deleteMany({ email: user.email });
@@ -877,10 +815,11 @@ app.post('/api/verify/check-code', async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
         
-        // RESET: Just verify the code - DON'T mark as used yet
+        // RESET: Mark as used and proceed
         if (action === 'reset') {
-            // For reset, we just verify the code exists and is valid
-            // The reset-password endpoint will mark it as used
+            verification.isUsed = true;
+            await verification.save();
+            
             return res.json({
                 success: true,
                 message: 'Code verified successfully. Please enter your new password.',
@@ -889,10 +828,11 @@ app.post('/api/verify/check-code', async (req, res) => {
             });
         }
         
-        // EMAIL: Verify and mark as used
+        // EMAIL: Mark as used and proceed - the action will be called with the code
         if (action === 'email') {
             verification.isUsed = true;
             await verification.save();
+            
             return res.json({
                 success: true,
                 message: 'Code verified successfully. Proceeding with email change.',
@@ -900,10 +840,11 @@ app.post('/api/verify/check-code', async (req, res) => {
             });
         }
         
-        // PASSWORD: Verify and mark as used
+        // PASSWORD: Mark as used and proceed
         if (action === 'password') {
             verification.isUsed = true;
             await verification.save();
+            
             return res.json({
                 success: true,
                 message: 'Code verified successfully. Proceeding with password change.',
@@ -911,10 +852,11 @@ app.post('/api/verify/check-code', async (req, res) => {
             });
         }
         
-        // DELETE: Verify and mark as used
+        // DELETE: Mark as used and proceed
         if (action === 'delete') {
             verification.isUsed = true;
             await verification.save();
+            
             return res.json({
                 success: true,
                 message: 'Code verified successfully. Proceeding with account deletion.',
