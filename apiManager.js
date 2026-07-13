@@ -116,7 +116,7 @@ var API_MANAGER = {
     },
     
     // ============================================================
-    // USER APIs
+    // USER APIs - ALL WITH VERIFICATION CODE
     // ============================================================
     
     updateProfile: function(updates) {
@@ -127,35 +127,50 @@ var API_MANAGER = {
         }).then(this.handleResponse);
     },
     
-    changePassword: function(currentPassword, newPassword) {
+    // FIXED: Added verificationCode parameter
+    changePassword: function(currentPassword, newPassword, verificationCode) {
+        var body = {
+            currentPassword: currentPassword,
+            newPassword: newPassword
+        };
+        if (verificationCode) {
+            body.verificationCode = verificationCode;
+        }
         return fetch(this.API_URL + '/user/change-password', {
             method: 'PUT',
             headers: this.getHeaders(),
-            body: JSON.stringify({
-                currentPassword: currentPassword,
-                newPassword: newPassword
-            })
+            body: JSON.stringify(body)
         }).then(this.handleResponse);
     },
     
-    changeEmail: function(newEmail, password) {
+    // FIXED: Added verificationCode parameter
+    changeEmail: function(newEmail, password, verificationCode) {
+        var body = {
+            newEmail: newEmail,
+            password: password
+        };
+        if (verificationCode) {
+            body.verificationCode = verificationCode;
+        }
         return fetch(this.API_URL + '/user/change-email', {
             method: 'PUT',
             headers: this.getHeaders(),
-            body: JSON.stringify({
-                newEmail: newEmail,
-                password: password
-            })
+            body: JSON.stringify(body)
         }).then(this.handleResponse);
     },
     
-    deleteAccount: function(password) {
+    // FIXED: Added verificationCode parameter
+    deleteAccount: function(password, verificationCode) {
+        var body = {
+            password: password
+        };
+        if (verificationCode) {
+            body.verificationCode = verificationCode;
+        }
         return fetch(this.API_URL + '/user/delete', {
             method: 'DELETE',
             headers: this.getHeaders(),
-            body: JSON.stringify({
-                password: password
-            })
+            body: JSON.stringify(body)
         }).then(this.handleResponse);
     },
     
