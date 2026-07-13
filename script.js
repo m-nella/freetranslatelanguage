@@ -92,10 +92,8 @@
         if (!el) return;
         el.addEventListener('click', handler);
         el.addEventListener('touchstart', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
             handler(e);
-        }, { passive: false });
+        }, { passive: true });
     }
 
     function createElement(tag, className, html) {
@@ -547,7 +545,7 @@
     }
 
     // ============================================================
-    // VERIFICATION MODAL - COMPLETE FIXED
+    // VERIFICATION MODAL - FIXED
     // ============================================================
     function openVerificationModal(email, action, callback) {
         pendingEmail = email;
@@ -641,7 +639,6 @@
                     
                     pendingVerificationCode = code;
                     
-                    // SIGNUP: Mark verified and redirect to sign in
                     if (action === 'signup') {
                         setTimeout(function() {
                             modal.remove();
@@ -658,7 +655,6 @@
                         return;
                     }
                     
-                    // SIGNIN: Set token and log in
                     if (action === 'signin') {
                         if (result.token) {
                             API_MANAGER.setToken(result.token);
@@ -682,7 +678,6 @@
                         return;
                     }
                     
-                    // RESET: Proceed to password reset
                     if (action === 'reset') {
                         setTimeout(function() {
                             modal.remove();
@@ -695,8 +690,7 @@
                         return;
                     }
                     
-                    // EMAIL: Proceed to email change
-                    if (action === 'email') {
+                    if (action === 'email' || action === 'password' || action === 'delete') {
                         setTimeout(function() {
                             modal.remove();
                             if (typeof pendingCallback === 'function') {
@@ -708,33 +702,6 @@
                         return;
                     }
                     
-                    // PASSWORD: Proceed to password change
-                    if (action === 'password') {
-                        setTimeout(function() {
-                            modal.remove();
-                            if (typeof pendingCallback === 'function') {
-                                pendingCallback(result, code);
-                            }
-                            isVerifying = false;
-                            verificationDone = false;
-                        }, 500);
-                        return;
-                    }
-                    
-                    // DELETE: Proceed to account deletion
-                    if (action === 'delete') {
-                        setTimeout(function() {
-                            modal.remove();
-                            if (typeof pendingCallback === 'function') {
-                                pendingCallback(result, code);
-                            }
-                            isVerifying = false;
-                            verificationDone = false;
-                        }, 500);
-                        return;
-                    }
-                    
-                    // Default
                     setTimeout(function() {
                         modal.remove();
                         if (typeof pendingCallback === 'function') {
@@ -814,51 +781,19 @@
     }
 
     // ============================================================
-// AUTH STATE - FIXED: Uses cookies for cross-device authentication
-// ============================================================
-function checkAuthStatus() {
-    if (authCheckInProgress) return;
-    authCheckInProgress = true;
-    
-    var token = API_MANAGER.getToken();
-    var authBtn = $('authBtn');
-    var historyNavBtn = $('historyNavBtn');
-    
-    // No token = not logged in
-    if (!token) {
-        isLoggedIn = false;
-        currentUser = null;
-        if (authBtn) {
-            authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
-            removeClass(authBtn, 'logged-in');
-        }
-        if (historyNavBtn) {
-            historyNavBtn.style.display = 'none';
-        }
-        authCheckInProgress = false;
-        return;
-    }
-    
-    // Token exists - verify it with server
-    API_MANAGER.getMe().then(function(response) {
-        authCheckInProgress = false;
-        if (response.success && response.data) {
-            var user = response.data;
-            currentUser = {
-                id: user._id || user.id,
-                email: user.email,
-                username: user.username || generateUsernameFromEmail(user.email),
-                createdAt: user.createdAt,
-                lastLogin: user.lastLogin,
-                isVerified: user.isVerified
-            };
-            isLoggedIn = true;
-            updateUIForLoggedInUser();
-            localStorage.setItem('cachedUser', JSON.stringify(user));
-        } else {
-            // Token invalid - clear it
-            API_MANAGER.setToken(null);
-            localStorage.removeItem('cachedUser');
+    // AUTH STATE - FIXED: No auto-login attempts without token
+    // ============================================================
+    function checkAuthStatus() {
+        if (authCheckInProgress) return;
+        authCheckInProgress = true;
+        
+        var token = API_MANAGER.getToken();
+        var authBtn = $('authBtn');
+        var historyNavBtn = $('historyNavBtn');
+        
+        // CRITICAL FIX: If no token, user is definitely NOT logged in
+        // Do NOT attempt any API calls without a token
+        if (!token) {
             isLoggedIn = false;
             currentUser = null;
             if (authBtn) {
@@ -868,30 +803,17 @@ function checkAuthStatus() {
             if (historyNavBtn) {
                 historyNavBtn.style.display = 'none';
             }
-        }
-    }).catch(function(error) {
-        authCheckInProgress = false;
-        // Only clear token on 401 (unauthorized)
-        if (error.status === 401) {
-            API_MANAGER.setToken(null);
+            // Clear any cached user data
             localStorage.removeItem('cachedUser');
-            isLoggedIn = false;
-            currentUser = null;
-            if (authBtn) {
-                authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
-                removeClass(authBtn, 'logged-in');
-            }
-            if (historyNavBtn) {
-                historyNavBtn.style.display = 'none';
-            }
+            authCheckInProgress = false;
             return;
         }
         
-        // For other errors, try cached user data
-        var cachedUser = localStorage.getItem('cachedUser');
-        if (cachedUser) {
-            try {
-                var user = JSON.parse(cachedUser);
+        // Only proceed if we have a token
+        API_MANAGER.getMe().then(function(response) {
+            authCheckInProgress = false;
+            if (response.success && response.data) {
+                var user = response.data;
                 currentUser = {
                     id: user._id || user.id,
                     email: user.email,
@@ -902,7 +824,9 @@ function checkAuthStatus() {
                 };
                 isLoggedIn = true;
                 updateUIForLoggedInUser();
-            } catch(e) {
+                localStorage.setItem('cachedUser', JSON.stringify(user));
+            } else {
+                // Token invalid - clear it
                 API_MANAGER.setToken(null);
                 localStorage.removeItem('cachedUser');
                 isLoggedIn = false;
@@ -915,8 +839,12 @@ function checkAuthStatus() {
                     historyNavBtn.style.display = 'none';
                 }
             }
-        } else {
-            // No cached user, show as logged out
+        }).catch(function(error) {
+            authCheckInProgress = false;
+            // Token is invalid (401) or server error
+            // Clear everything and show logged out
+            API_MANAGER.setToken(null);
+            localStorage.removeItem('cachedUser');
             isLoggedIn = false;
             currentUser = null;
             if (authBtn) {
@@ -926,9 +854,8 @@ function checkAuthStatus() {
             if (historyNavBtn) {
                 historyNavBtn.style.display = 'none';
             }
-        }
-    });
-}
+        });
+    }
 
     // ============================================================
     // OPEN AUTH MODAL - No auto-fill
@@ -1399,7 +1326,7 @@ function checkAuthStatus() {
     }
 
     // ============================================================
-    // PROFILE MENU
+    // PROFILE MENU - FIXED: Better click handling
     // ============================================================
     function toggleProfileMenu() {
         if (profileMenu) {
@@ -1462,7 +1389,7 @@ function checkAuthStatus() {
         var items = profileMenu.querySelectorAll('.user-menu-item');
         for (var i = 0; i < items.length; i++) {
             (function(item) {
-                item.addEventListener('click', function(e) {
+                var handler = function(e) {
                     e.preventDefault();
                     e.stopPropagation();
                     var action = this.getAttribute('data-action');
@@ -1478,28 +1405,13 @@ function checkAuthStatus() {
                     } else if (action === 'logout') {
                         logoutUser();
                     }
-                });
-                
-                item.addEventListener('touchstart', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    var action = this.getAttribute('data-action');
-                    var menu = document.getElementById('profileMenu');
-                    if (menu) {
-                        menu.remove();
-                        profileMenu = null;
-                    }
-                    if (action === 'profile') {
-                        openProfileModal();
-                    } else if (action === 'account') {
-                        openAccountSettings();
-                    } else if (action === 'logout') {
-                        logoutUser();
-                    }
-                }, { passive: false });
+                };
+                item.addEventListener('click', handler);
+                item.addEventListener('touchstart', handler, { passive: false });
             })(items[i]);
         }
         
+        // Close menu when clicking outside
         setTimeout(function() {
             var closeHandler = function(e) {
                 var menu = document.getElementById('profileMenu');
@@ -1513,7 +1425,7 @@ function checkAuthStatus() {
             };
             document.addEventListener('click', closeHandler);
             document.addEventListener('touchstart', closeHandler);
-        }, 100);
+        }, 50);
     }
 
     // ============================================================
@@ -1654,9 +1566,6 @@ function checkAuthStatus() {
         var saveBtn = modal.querySelector('#saveSettingsBtn');
         var deleteBtn = modal.querySelector('#deleteAccountBtn');
         
-        // ============================================================
-        // CHANGE EMAIL - FIXED: No verification code in changeEmail call
-        // ============================================================
         bindClick(saveBtn, function() {
             var newEmail = $('settingsEmail').value;
             var currentPassword = $('settingsCurrentPassword').value;
@@ -1668,9 +1577,6 @@ function checkAuthStatus() {
                 return;
             }
             
-            // ============================================================
-            // CHANGE EMAIL
-            // ============================================================
             if (newEmail && newEmail !== user.email) {
                 if (!DATA_MANAGER.validateEmail(newEmail)) {
                     showNotification('Invalid email address.', 'error');
@@ -1805,9 +1711,6 @@ function checkAuthStatus() {
                 return;
             }
             
-            // ============================================================
-            // CHANGE PASSWORD - FIXED: No verification code in changePassword call
-            // ============================================================
             if (newPassword || confirmPassword) {
                 if (newPassword !== confirmPassword) {
                     showNotification('Passwords do not match!', 'error');
@@ -1888,9 +1791,6 @@ function checkAuthStatus() {
             modal.remove();
         });
         
-        // ============================================================
-        // DELETE ACCOUNT - FIXED: No verification code in deleteAccount call
-        // ============================================================
         bindClick(deleteBtn, function() {
             showConfirmationModal(
                 'Delete Account',
@@ -2281,7 +2181,7 @@ function checkAuthStatus() {
     }
 
     // ============================================================
-    // TRANSLATION ENGINE - Full implementation
+    // TRANSLATION ENGINE
     // ============================================================
     function setupTranslation() {
         var sourceLang = $('sourceLang');
