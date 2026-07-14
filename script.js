@@ -546,7 +546,7 @@
     }
 
     // ============================================================
-    // VERIFICATION MODAL - FIXED
+    // VERIFICATION MODAL - FIXED: Refresh on cancel for ALL actions
     // ============================================================
     function openVerificationModal(email, action, callback) {
         pendingEmail = email;
@@ -607,9 +607,8 @@
             modal.remove();
             isVerifying = false;
             verificationDone = false;
-            if (action === 'signup' || action === 'signin') {
-                window.location.reload();
-            }
+            // REFRESH PAGE FOR ALL ACTIONS when user cancels/closes
+            window.location.reload();
         });
         
         var form = $('verificationForm');
@@ -757,9 +756,8 @@
                 modal.remove();
                 isVerifying = false;
                 verificationDone = false;
-                if (action === 'signup' || action === 'signin') {
-                    window.location.reload();
-                }
+                // REFRESH PAGE FOR ALL ACTIONS when clicking outside
+                window.location.reload();
             }
         });
     }
@@ -782,10 +780,9 @@
     }
 
     // ============================================================
-    // AUTH STATE - THE FIX: No auto-login without token
+    // AUTH STATE - FIXED: No auto-login without token
     // ============================================================
     function checkAuthStatus() {
-        // Prevent multiple simultaneous checks
         if (authCheckInProgress) return;
         authCheckInProgress = true;
         
@@ -793,18 +790,10 @@
         var authBtn = $('authBtn');
         var historyNavBtn = $('historyNavBtn');
         
-        // ============================================================
-        // CRITICAL FIX: If no token, user is NOT logged in
-        // Do NOT call any API without a token
-        // ============================================================
         if (!token) {
             isLoggedIn = false;
             currentUser = null;
-            
-            // Clear any cached user data from previous sessions
             localStorage.removeItem('cachedUser');
-            
-            // Update UI to show "Sign In"
             if (authBtn) {
                 authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
                 removeClass(authBtn, 'logged-in');
@@ -812,19 +801,14 @@
             if (historyNavBtn) {
                 historyNavBtn.style.display = 'none';
             }
-            
             authCheckInProgress = false;
             initialAuthCheckDone = true;
             return;
         }
         
-        // ============================================================
-        // ONLY proceed if we have a token
-        // ============================================================
         API_MANAGER.getMe().then(function(response) {
             authCheckInProgress = false;
             initialAuthCheckDone = true;
-            
             if (response.success && response.data) {
                 var user = response.data;
                 currentUser = {
@@ -839,7 +823,6 @@
                 updateUIForLoggedInUser();
                 localStorage.setItem('cachedUser', JSON.stringify(user));
             } else {
-                // Token invalid - clear everything
                 API_MANAGER.setToken(null);
                 localStorage.removeItem('cachedUser');
                 isLoggedIn = false;
@@ -855,18 +838,60 @@
         }).catch(function(error) {
             authCheckInProgress = false;
             initialAuthCheckDone = true;
-            
-            // Any error (401, network, etc.) - clear everything and show logged out
-            API_MANAGER.setToken(null);
-            localStorage.removeItem('cachedUser');
-            isLoggedIn = false;
-            currentUser = null;
-            if (authBtn) {
-                authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
-                removeClass(authBtn, 'logged-in');
+            if (error.status === 401) {
+                API_MANAGER.setToken(null);
+                localStorage.removeItem('cachedUser');
+                isLoggedIn = false;
+                currentUser = null;
+                if (authBtn) {
+                    authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                    removeClass(authBtn, 'logged-in');
+                }
+                if (historyNavBtn) {
+                    historyNavBtn.style.display = 'none';
+                }
+                return;
             }
-            if (historyNavBtn) {
-                historyNavBtn.style.display = 'none';
+            
+            var cachedUser = localStorage.getItem('cachedUser');
+            if (cachedUser) {
+                try {
+                    var user = JSON.parse(cachedUser);
+                    currentUser = {
+                        id: user._id || user.id,
+                        email: user.email,
+                        username: user.username || generateUsernameFromEmail(user.email),
+                        createdAt: user.createdAt,
+                        lastLogin: user.lastLogin,
+                        isVerified: user.isVerified
+                    };
+                    isLoggedIn = true;
+                    updateUIForLoggedInUser();
+                } catch(e) {
+                    API_MANAGER.setToken(null);
+                    localStorage.removeItem('cachedUser');
+                    isLoggedIn = false;
+                    currentUser = null;
+                    if (authBtn) {
+                        authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                        removeClass(authBtn, 'logged-in');
+                    }
+                    if (historyNavBtn) {
+                        historyNavBtn.style.display = 'none';
+                    }
+                }
+            } else {
+                API_MANAGER.setToken(null);
+                localStorage.removeItem('cachedUser');
+                isLoggedIn = false;
+                currentUser = null;
+                if (authBtn) {
+                    authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                    removeClass(authBtn, 'logged-in');
+                }
+                if (historyNavBtn) {
+                    historyNavBtn.style.display = 'none';
+                }
             }
         });
     }
@@ -1340,7 +1365,7 @@
     }
 
     // ============================================================
-    // PROFILE MENU - FIXED: Better click handling
+    // PROFILE MENU - FIXED: Better click/touch handling
     // ============================================================
     function toggleProfileMenu() {
         if (profileMenu) {
