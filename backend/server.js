@@ -26,7 +26,7 @@ app.use(helmet());
 app.set('trust proxy', 1);
 
 // ============================================================
-// CORS - FIXED: Allow your frontend domains
+// CORS - FIXED: Only allow your Render frontend
 // ============================================================
 const allowedOrigins = [
     'https://freetranslatelanguage.onrender.com',
@@ -44,17 +44,15 @@ app.use(cors({
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
-            // Log the blocked origin for debugging
             console.log('Blocked origin:', origin);
-            callback(null, true); // TEMPORARY: Allow all for testing
-            // callback(new Error('Not allowed by CORS'));
+            // For production, reject if not allowed:
+            callback(new Error('Not allowed by CORS'));
         }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
 }));
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
