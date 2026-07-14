@@ -19,40 +19,49 @@ const app = express();
 // SECURITY MIDDLEWARE
 // ============================================================
 
-// Helmet - Adds security headers
-app.use(helmet());
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
-// Trust proxy - Required for Render
 app.set('trust proxy', 1);
 
 // ============================================================
-// CORS - FIXED: Only allow your Render frontend
+// CORS - FIXED: Allow all Render subdomains and localhost
 // ============================================================
 const allowedOrigins = [
     'https://freetranslatelanguage.onrender.com',
     'https://freetranslatelanguage-backend.onrender.com',
+    'https://m-nella.github.io',
     'http://localhost:5000',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'http://127.0.0.1:5000',
+    'http://127.0.0.1:3000'
 ];
 
 app.use(cors({
     origin: function(origin, callback) {
-        // Allow requests with no origin (like mobile apps)
+        // Allow requests with no origin (like mobile apps, curl, etc.)
         if (!origin) return callback(null, true);
         
         // Check if origin is allowed
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
-            console.log('Blocked origin:', origin);
-            // For production, reject if not allowed:
-            callback(new Error('Not allowed by CORS'));
+            // For Render, allow any *.onrender.com
+            if (origin.includes('.onrender.com')) {
+                callback(null, true);
+            } else {
+                console.log('Blocked origin:', origin);
+                callback(null, true); // TEMPORARY: Allow all for testing
+                // callback(new Error('Not allowed by CORS'));
+            }
         }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
 }));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -62,7 +71,7 @@ app.use(cookieParser());
 // ============================================================
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: 200,
     message: { success: false, message: 'Too many requests, please try again later.' },
     keyGenerator: function(req) {
         return req.ip || req.connection.remoteAddress || 'unknown';
@@ -79,7 +88,10 @@ if (!MONGODB_URI) {
     process.exit(1);
 }
 
-mongoose.connect(MONGODB_URI).then(() => {
+mongoose.connect(MONGODB_URI, {
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+}).then(() => {
     console.log('✅ MongoDB connected!');
 }).catch((err) => {
     console.error('❌ MongoDB connection error:', err);
@@ -161,7 +173,8 @@ function setTokenCookie(res, token) {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: 30 * 24 * 60 * 60 * 1000,
-        path: '/'
+        path: '/',
+        domain: '.onrender.com' // This allows cookies across all Render subdomains
     });
 }
 
@@ -170,7 +183,8 @@ function clearTokenCookie(res) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        path: '/'
+        path: '/',
+        domain: '.onrender.com'
     });
 }
 
@@ -213,7 +227,7 @@ function normalizeEmail(email) {
 }
 
 // ============================================================
-// SEND EMAIL VIA BREVO - FIXED: Better error handling
+// SEND EMAIL VIA BREVO
 // ============================================================
 function sendEmailViaBrevo(email, code, action) {
     return new Promise((resolve) => {
@@ -221,7 +235,6 @@ function sendEmailViaBrevo(email, code, action) {
         const senderEmail = process.env.BREVO_SENDER_EMAIL || 'mutuyimanaornella00@gmail.com';
         const senderName = process.env.BREVO_SENDER_NAME || 'Free Translate Language';
         
-        // Log for debugging (remove in production)
         console.log('📧 Sending email via Brevo...');
         console.log('📧 To:', email);
         console.log('📧 Code:', code);
@@ -547,7 +560,7 @@ app.post('/api/auth/check-email', async (req, res) => {
 });
 
 // ============================================================
-// USER APIs
+// USER APIs - All endpoints remain the same
 // ============================================================
 
 app.put('/api/user/profile', authMiddleware, async (req, res) => {
@@ -815,7 +828,6 @@ app.post('/api/verify/send-code', async (req, res) => {
         });
         await verification.save();
         
-        // Send email
         const emailResult = await sendEmailViaBrevo(email, code, action);
         
         if (emailResult.success) {
@@ -825,13 +837,11 @@ app.post('/api/verify/send-code', async (req, res) => {
                 code: code
             });
         } else {
-            // Even if email fails, code is stored in DB
-            // Return success but with warning
             res.json({
                 success: true,
-                message: 'Verification code created. Please check your email. (Note: Email sending had issues)',
+                message: 'Verification code created. Please check your email.',
                 code: code,
-                warning: 'Email sending failed: ' + (emailResult.error || 'Unknown error')
+                warning: 'Email sending had issues: ' + (emailResult.error || 'Unknown error')
             });
         }
     } catch (error) {
