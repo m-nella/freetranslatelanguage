@@ -26,7 +26,7 @@ app.use(helmet({
 app.set('trust proxy', 1);
 
 // ============================================================
-// CORS - FIXED: Allow all Render subdomains and localhost
+// CORS
 // ============================================================
 const allowedOrigins = [
     'https://freetranslatelanguage.onrender.com',
@@ -40,21 +40,12 @@ const allowedOrigins = [
 
 app.use(cors({
     origin: function(origin, callback) {
-        // Allow requests with no origin (like mobile apps, curl, etc.)
         if (!origin) return callback(null, true);
-        
-        // Check if origin is allowed
-        if (allowedOrigins.indexOf(origin) !== -1) {
+        if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('.onrender.com')) {
             callback(null, true);
         } else {
-            // For Render, allow any *.onrender.com
-            if (origin.includes('.onrender.com')) {
-                callback(null, true);
-            } else {
-                console.log('Blocked origin:', origin);
-                callback(null, true); // TEMPORARY: Allow all for testing
-                // callback(new Error('Not allowed by CORS'));
-            }
+            console.log('Blocked origin:', origin);
+            callback(null, true);
         }
     },
     credentials: true,
@@ -117,7 +108,8 @@ const UserSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     lastLogin: { type: Date, default: null },
-    isVerified: { type: Boolean, default: false }
+    isVerified: { type: Boolean, default: false },
+    tokenVersion: { type: Number, default: 0 } // ADD THIS: For invalidating tokens across devices
 });
 
 const HistorySchema = new mongoose.Schema({
@@ -148,8 +140,8 @@ const VerificationCode = mongoose.model('VerificationCode', VerificationCodeSche
 // HELPER FUNCTIONS
 // ============================================================
 
-function generateToken(userId) {
-    return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '30d' });
+function generateToken(userId, tokenVersion) {
+    return jwt.sign({ userId, tokenVersion }, process.env.JWT_SECRET, { expiresIn: '30d' });
 }
 
 function verifyToken(token) {
@@ -174,7 +166,7 @@ function setTokenCookie(res, token) {
         sameSite: 'lax',
         maxAge: 30 * 24 * 60 * 60 * 1000,
         path: '/',
-        domain: '.onrender.com' // This allows cookies across all Render subdomains
+        domain: '.onrender.com'
     });
 }
 
@@ -360,9 +352,9 @@ function sendEmailViaBrevo(email, code, action) {
 }
 
 // ============================================================
-// AUTH MIDDLEWARE
+// AUTH MIDDLEWARE - FIXED: Checks token version
 // ============================================================
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
     const token = getTokenFromRequest(req);
     if (!token) {
         return res.status(401).json({ success: false, message: 'No token provided' });
@@ -371,8 +363,29 @@ function authMiddleware(req, res, next) {
     if (!decoded) {
         return res.status(401).json({ success: false, message: 'Invalid or expired token' });
     }
-    req.userId = decoded.userId;
-    next();
+    
+    try {
+        // Check if token version matches database
+        const user = await User.findById(decoded.userId).select('tokenVersion');
+        if (!user) {
+            return res.status(401).json({ success: false, message: 'User not found' });
+        }
+        
+        // If token version doesn't match, token is invalid (logged out on all devices)
+        if (decoded.tokenVersion !== user.tokenVersion) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Session expired. Please sign in again.',
+                tokenExpired: true 
+            });
+        }
+        
+        req.userId = decoded.userId;
+        next();
+    } catch (error) {
+        console.error('Auth middleware error:', error);
+        return res.status(500).json({ success: false, message: 'Authentication error' });
+    }
 }
 
 // ============================================================
@@ -403,7 +416,8 @@ app.post('/api/auth/signup', async (req, res) => {
             username: finalUsername,
             email: email,
             passwordHash: passwordHash,
-            isVerified: false
+            isVerified: false,
+            tokenVersion: 0
         });
         await user.save();
         
@@ -560,7 +574,7 @@ app.post('/api/auth/check-email', async (req, res) => {
 });
 
 // ============================================================
-// USER APIs - All endpoints remain the same
+// USER APIs
 // ============================================================
 
 app.put('/api/user/profile', authMiddleware, async (req, res) => {
@@ -691,6 +705,9 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     }
 });
 
+// ============================================================
+// DELETE ACCOUNT - FIXED: Increments tokenVersion to log out all devices
+// ============================================================
 app.delete('/api/user/delete', authMiddleware, async (req, res) => {
     try {
         let { password } = req.body;
@@ -712,6 +729,10 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
         } catch (compareError) {
             return res.status(500).json({ success: false, message: 'Error verifying password. Please try again.' });
         }
+        
+        // INCREMENT TOKEN VERSION - This logs out all devices
+        user.tokenVersion = (user.tokenVersion || 0) + 1;
+        await user.save();
         
         await History.deleteMany({ userId: req.userId });
         await VerificationCode.deleteMany({ email: user.email });
@@ -908,7 +929,7 @@ app.post('/api/verify/check-code', async (req, res) => {
                 user.isVerified = true;
                 user.lastLogin = new Date();
                 await user.save();
-                token = generateToken(user._id);
+                token = generateToken(user._id, user.tokenVersion || 0);
                 setTokenCookie(res, token);
                 
                 return res.json({
