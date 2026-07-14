@@ -1,5 +1,5 @@
 // ============================================================
-// FREE TRANSLATE LANGUAGE - COMPLETE BACKEND
+// FREE TRANSLATE LANGUAGE - SECURE BACKEND
 // ============================================================
 
 const express = require('express');
@@ -16,37 +16,50 @@ require('dotenv').config();
 const app = express();
 
 // ============================================================
-// MIDDLEWARE
+// SECURITY MIDDLEWARE
 // ============================================================
+
+// Helmet - Adds security headers
 app.use(helmet());
+
+// Trust proxy - Required for Render
 app.set('trust proxy', 1);
+
+// ============================================================
+// CORS - SECURE: Only allow your frontend domain
+// ============================================================
+const allowedOrigins = [
+    'https://freetranslatelanguage.onrender.com',
+    'http://localhost:5000',
+    'http://localhost:3000'
+];
 
 app.use(cors({
     origin: function(origin, callback) {
-        const allowedOrigins = [
-            'https://freetranslatelanguage.onrender.com',
-            'https://freetranslatelanguage-backend.onrender.com',
-            'http://localhost:5000',
-            'http://localhost:3000'
-        ];
+        // Allow requests with no origin (like mobile apps)
         if (!origin) return callback(null, true);
+        
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
-            callback(null, true);
+            callback(new Error('Not allowed by CORS'));
         }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
 }));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// ============================================================
+// RATE LIMITING - Prevent brute force attacks
+// ============================================================
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // 100 requests per window
     message: { success: false, message: 'Too many requests, please try again later.' },
     keyGenerator: function(req) {
         return req.ip || req.connection.remoteAddress || 'unknown';
@@ -126,6 +139,36 @@ function generateToken(userId) {
 
 function verifyToken(token) {
     try { return jwt.verify(token, process.env.JWT_SECRET); } catch (error) { return null; }
+}
+
+function getTokenFromRequest(req) {
+    if (req.cookies && req.cookies.authToken) {
+        return req.cookies.authToken;
+    }
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        return authHeader.split(' ')[1];
+    }
+    return null;
+}
+
+function setTokenCookie(res, token) {
+    res.cookie('authToken', token, {
+        httpOnly: true,
+        secure: true, // Always secure in production
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        path: '/'
+    });
+}
+
+function clearTokenCookie(res) {
+    res.clearCookie('authToken', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/'
+    });
 }
 
 function hashPassword(password) {
@@ -276,7 +319,7 @@ function sendEmailViaBrevo(email, code, action) {
 // AUTH MIDDLEWARE
 // ============================================================
 function authMiddleware(req, res, next) {
-    const token = req.headers.authorization?.split(' ')[1];
+    const token = getTokenFromRequest(req);
     if (!token) {
         return res.status(401).json({ success: false, message: 'No token provided' });
     }
@@ -289,7 +332,7 @@ function authMiddleware(req, res, next) {
 }
 
 // ============================================================
-// AUTH APIs
+// AUTH APIs - (Same as before, keep all endpoints)
 // ============================================================
 
 app.post('/api/auth/signup', async (req, res) => {
@@ -415,8 +458,12 @@ app.post('/api/auth/verify-password', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/auth/logout', authMiddleware, async (req, res) => {
-    try { res.json({ success: true, message: 'Logged out successfully.' }); } 
-    catch (error) { res.status(500).json({ success: false, message: 'Error logging out.' }); }
+    try {
+        clearTokenCookie(res);
+        res.json({ success: true, message: 'Logged out successfully.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error logging out.' });
+    }
 });
 
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
@@ -626,6 +673,8 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
         await VerificationCode.deleteMany({ email: user.email });
         await User.findByIdAndDelete(req.userId);
         
+        clearTokenCookie(res);
+        
         res.json({ success: true, message: 'Account deleted successfully.', deleted: true });
     } catch (error) {
         console.error('Delete account error:', error);
@@ -807,6 +856,7 @@ app.post('/api/verify/check-code', async (req, res) => {
                 user.lastLogin = new Date();
                 await user.save();
                 token = generateToken(user._id);
+                setTokenCookie(res, token);
                 
                 return res.json({
                     success: true,
