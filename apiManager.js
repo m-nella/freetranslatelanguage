@@ -4,7 +4,7 @@
 // ============================================================
 
 var API_MANAGER = {
-    API_URL: 'https://freetranslatelanguage.onrender.com/api',
+    API_URL: 'https://freetranslatelanguage-backend.onrender.com/api',
     
     getToken: function() {
         return localStorage.getItem('authToken');
