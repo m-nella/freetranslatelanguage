@@ -1,6 +1,5 @@
 // ============================================================
 // FREE TRANSLATE LANGUAGE - COMPLETE BACKEND
-// With HTTP-Only Cookie Authentication
 // ============================================================
 
 const express = require('express');
@@ -22,7 +21,6 @@ const app = express();
 app.use(helmet());
 app.set('trust proxy', 1);
 
-// CORS - Allow credentials (cookies)
 app.use(cors({
     origin: function(origin, callback) {
         return callback(null, true);
@@ -118,37 +116,6 @@ function generateToken(userId) {
 
 function verifyToken(token) {
     try { return jwt.verify(token, process.env.JWT_SECRET); } catch (error) { return null; }
-}
-
-// Get token from cookie or Authorization header
-function getTokenFromRequest(req) {
-    // Check cookie first
-    if (req.cookies && req.cookies.authToken) {
-        return req.cookies.authToken;
-    }
-    // Check Authorization header
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        return authHeader.split(' ')[1];
-    }
-    return null;
-}
-
-function setTokenCookie(res, token) {
-    res.cookie('authToken', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-    });
-}
-
-function clearTokenCookie(res) {
-    res.clearCookie('authToken', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax'
-    });
 }
 
 function hashPassword(password) {
@@ -296,10 +263,10 @@ function sendEmailViaBrevo(email, code, action) {
 }
 
 // ============================================================
-// AUTH MIDDLEWARE - Uses cookies
+// AUTH MIDDLEWARE
 // ============================================================
 function authMiddleware(req, res, next) {
-    const token = getTokenFromRequest(req);
+    const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
         return res.status(401).json({ success: false, message: 'No token provided' });
     }
@@ -438,12 +405,8 @@ app.post('/api/auth/verify-password', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/auth/logout', authMiddleware, async (req, res) => {
-    try {
-        clearTokenCookie(res);
-        res.json({ success: true, message: 'Logged out successfully.' });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Error logging out.' });
-    }
+    try { res.json({ success: true, message: 'Logged out successfully.' }); } 
+    catch (error) { res.status(500).json({ success: false, message: 'Error logging out.' }); }
 });
 
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
@@ -653,8 +616,6 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
         await VerificationCode.deleteMany({ email: user.email });
         await User.findByIdAndDelete(req.userId);
         
-        clearTokenCookie(res);
-        
         res.json({ success: true, message: 'Account deleted successfully.', deleted: true });
     } catch (error) {
         console.error('Delete account error:', error);
@@ -836,8 +797,6 @@ app.post('/api/verify/check-code', async (req, res) => {
                 user.lastLogin = new Date();
                 await user.save();
                 token = generateToken(user._id);
-                // Set cookie with token
-                setTokenCookie(res, token);
                 
                 return res.json({
                     success: true,
