@@ -46,6 +46,7 @@
     var isProcessingRecording = false;
     var authCheckInProgress = false;
     var initialAuthCheckDone = false;
+    var translationInProgress = false;
 
     // ============================================================
     // LANGUAGE LIST
@@ -2250,7 +2251,7 @@
     }
 
     // ============================================================
-    // TRANSLATION ENGINE
+    // TRANSLATION ENGINE - FIXED: Translate From button + Speech recognition
     // ============================================================
     function setupTranslation() {
         var sourceLang = $('sourceLang');
@@ -2276,6 +2277,7 @@
         isDetectionRunning = false;
         isProcessingRecording = false;
         lastSpeechTime = null;
+        translationInProgress = false;
         
         translateFromContainer = document.createElement('div');
         translateFromContainer.className = 'translate-from-container';
@@ -2298,6 +2300,9 @@
         translateFromBtn.textContent = 'Translate from: ';
         translateFromContainer.appendChild(translateFromBtn);
 
+        // ============================================================
+        // FIXED: Translate From button - Swaps languages properly
+        // ============================================================
         function handleTranslateFromClick(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -2310,9 +2315,35 @@
                         break;
                     }
                 }
-                if (langExists && sourceLang) {
-                    sourceLang.value = detectedLang;
+                if (langExists && sourceLang && targetLang) {
+                    // Get current languages
+                    var currentSource = sourceLang.value;
+                    var currentTarget = targetLang.value;
+                    
+                    // If detected language is the same as current target, swap them
+                    if (detectedLang === currentTarget) {
+                        // Swap: target becomes source, source becomes target
+                        sourceLang.value = currentTarget;
+                        targetLang.value = currentSource;
+                    } else {
+                        // Just set source to detected language
+                        sourceLang.value = detectedLang;
+                        // Ensure target is different
+                        if (sourceLang.value === targetLang.value) {
+                            // Find a different language for target
+                            var allLangs = LANGUAGES.map(function(l) { return l.code; });
+                            for (var i = 0; i < allLangs.length; i++) {
+                                if (allLangs[i] !== sourceLang.value) {
+                                    targetLang.value = allLangs[i];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Ensure they are different
                     ensureDifferentLanguages();
+                    
                     translateFromContainer.style.display = 'none';
                     translateFromBtn.setAttribute('data-lang', '');
                     translateFromBtn.textContent = 'Translate from: ';
@@ -2496,6 +2527,9 @@
             }
         }
 
+        // ============================================================
+        // FIXED: performTranslation - Removes blocking for recording
+        // ============================================================
         function performTranslation() {
             var text = inputText ? inputText.value.trim() : '';
             if (!text) {
@@ -2507,6 +2541,7 @@
                 resetTranslateFromBtn();
                 forceTranslationWithDetectedLang = false;
                 pendingDetectedLang = '';
+                translationInProgress = false;
                 return;
             }
             
@@ -2535,15 +2570,51 @@
                 resetTranslateFromBtn();
                 forceTranslationWithDetectedLang = false;
                 pendingDetectedLang = '';
+                translationInProgress = false;
                 return;
             }
             
-            if (isTranslating) {
+            // FIXED: During recording, allow translation without blocking
+            if (isRecording) {
+                // During recording, don't block - translate immediately
+                if (forceTranslationWithDetectedLang && pendingDetectedLang) {
+                    var detectedLang = pendingDetectedLang;
+                    forceTranslationWithDetectedLang = false;
+                    pendingDetectedLang = '';
+                    translateText(text, sourceLangCode, targetLangCode).then(function(translated) {
+                        if (outputDisplay) outputDisplay.textContent = translated;
+                        if (isLoggedIn && currentUser) {
+                            saveToHistory(text, translated, sourceLangCode, targetLangCode);
+                        }
+                    }).catch(function(error) {
+                        // Silent fail during recording to avoid interrupting
+                    });
+                    return;
+                }
+                
+                detectLanguage(text).then(function(detectedLang) {
+                    if (!isRecording && detectedLang && detectedLang !== 'auto') {
+                        updateTranslateFromBtn(detectedLang, text);
+                    }
+                    return translateText(text, sourceLangCode, targetLangCode);
+                }).then(function(translated) {
+                    if (outputDisplay) outputDisplay.textContent = translated;
+                    if (isLoggedIn && currentUser) {
+                        saveToHistory(text, translated, sourceLangCode, targetLangCode);
+                    }
+                }).catch(function(error) {
+                    // Silent fail during recording
+                });
+                return;
+            }
+            
+            // Normal translation flow (not recording)
+            if (translationInProgress) {
                 translateQueue = true;
                 return;
             }
             translateQueue = false;
-            isTranslating = true;
+            translationInProgress = true;
             if (translateBtn) {
                 translateBtn.disabled = true;
                 translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
@@ -2565,7 +2636,7 @@
                     if (isLoggedIn && currentUser) {
                         saveToHistory(text, translated, sourceLangCode, targetLangCode);
                     }
-                    isTranslating = false;
+                    translationInProgress = false;
                     if (translateBtn) {
                         translateBtn.disabled = false;
                         translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
@@ -2575,7 +2646,7 @@
                     }
                 }).catch(function(error) {
                     if (outputDisplay) outputDisplay.innerHTML = '<span class="placeholder">Error: ' + error.message + '</span>';
-                    isTranslating = false;
+                    translationInProgress = false;
                     if (translateBtn) {
                         translateBtn.disabled = false;
                         translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
@@ -2599,7 +2670,7 @@
                 if (isLoggedIn && currentUser) {
                     saveToHistory(text, translated, sourceLangCode, targetLangCode);
                 }
-                isTranslating = false;
+                translationInProgress = false;
                 if (translateBtn) {
                     translateBtn.disabled = false;
                     translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
@@ -2609,7 +2680,7 @@
                 }
             }).catch(function(error) {
                 if (outputDisplay) outputDisplay.innerHTML = '<span class="placeholder">Error: ' + error.message + '</span>';
-                isTranslating = false;
+                translationInProgress = false;
                 if (translateBtn) {
                     translateBtn.disabled = false;
                     translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
@@ -2621,7 +2692,7 @@
         }
 
         bindClick(translateBtn, function() {
-            if (!isTranslating) {
+            if (!translationInProgress || isRecording) {
                 performTranslation();
             }
         });
@@ -2641,6 +2712,7 @@
                     pendingDetectedLang = '';
                     lastDetectedText = '';
                     lastDetectedLangResult = '';
+                    translationInProgress = false;
                     return;
                 }
                 
@@ -2717,6 +2789,7 @@
             pendingDetectedLang = '';
             lastDetectedText = '';
             lastDetectedLangResult = '';
+            translationInProgress = false;
         });
 
         bindClick(copyOutputBtn, function() {
@@ -2762,6 +2835,7 @@
             lastDetectedLangResult = '';
             finalTranscript = '';
             interimTranscript = '';
+            translationInProgress = false;
         });
 
         function stopRecordingIfActive() {
@@ -2800,6 +2874,7 @@
                 finalTranscript = '';
                 interimTranscript = '';
                 lastSpeechTime = null;
+                translationInProgress = false;
             }
         }
 
@@ -2882,6 +2957,7 @@
                             translateBtn.disabled = true;
                             translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
                         }
+                        // FIXED: Always translate during recording, don't block
                         if (!isProcessingRecording) {
                             performTranslation();
                         }
@@ -3006,6 +3082,7 @@
                         interimTranscript = '';
                         lastSpeechTime = null;
                     }
+                    translationInProgress = false;
                 };
             }
             
@@ -3047,6 +3124,7 @@
                     finalTranscript = '';
                     interimTranscript = '';
                     lastSpeechTime = null;
+                    translationInProgress = false;
                 } else {
                     var lang = sourceLang ? sourceLang.value || 'en' : 'en';
                     var langName = getLanguageName(lang);
