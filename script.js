@@ -45,6 +45,7 @@
     var isDetectionRunning = false;
     var isProcessingRecording = false;
     var authCheckInProgress = false;
+    var initialAuthCheckDone = false;
 
     // ============================================================
     // LANGUAGE LIST
@@ -128,7 +129,7 @@
     }
 
     // ============================================================
-    // USERNAME GENERATION - SHORT and UNCHANGEABLE
+    // USERNAME GENERATION
     // ============================================================
     function generateUsernameFromEmail(email) {
         if (!email) return 'user';
@@ -781,9 +782,10 @@
     }
 
     // ============================================================
-    // AUTH STATE - FIXED: No auto-login attempts without token
+    // AUTH STATE - THE FIX: No auto-login without token
     // ============================================================
     function checkAuthStatus() {
+        // Prevent multiple simultaneous checks
         if (authCheckInProgress) return;
         authCheckInProgress = true;
         
@@ -791,11 +793,18 @@
         var authBtn = $('authBtn');
         var historyNavBtn = $('historyNavBtn');
         
-        // CRITICAL FIX: If no token, user is definitely NOT logged in
-        // Do NOT attempt any API calls without a token
+        // ============================================================
+        // CRITICAL FIX: If no token, user is NOT logged in
+        // Do NOT call any API without a token
+        // ============================================================
         if (!token) {
             isLoggedIn = false;
             currentUser = null;
+            
+            // Clear any cached user data from previous sessions
+            localStorage.removeItem('cachedUser');
+            
+            // Update UI to show "Sign In"
             if (authBtn) {
                 authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
                 removeClass(authBtn, 'logged-in');
@@ -803,15 +812,19 @@
             if (historyNavBtn) {
                 historyNavBtn.style.display = 'none';
             }
-            // Clear any cached user data
-            localStorage.removeItem('cachedUser');
+            
             authCheckInProgress = false;
+            initialAuthCheckDone = true;
             return;
         }
         
-        // Only proceed if we have a token
+        // ============================================================
+        // ONLY proceed if we have a token
+        // ============================================================
         API_MANAGER.getMe().then(function(response) {
             authCheckInProgress = false;
+            initialAuthCheckDone = true;
+            
             if (response.success && response.data) {
                 var user = response.data;
                 currentUser = {
@@ -826,7 +839,7 @@
                 updateUIForLoggedInUser();
                 localStorage.setItem('cachedUser', JSON.stringify(user));
             } else {
-                // Token invalid - clear it
+                // Token invalid - clear everything
                 API_MANAGER.setToken(null);
                 localStorage.removeItem('cachedUser');
                 isLoggedIn = false;
@@ -841,8 +854,9 @@
             }
         }).catch(function(error) {
             authCheckInProgress = false;
-            // Token is invalid (401) or server error
-            // Clear everything and show logged out
+            initialAuthCheckDone = true;
+            
+            // Any error (401, network, etc.) - clear everything and show logged out
             API_MANAGER.setToken(null);
             localStorage.removeItem('cachedUser');
             isLoggedIn = false;
@@ -858,7 +872,7 @@
     }
 
     // ============================================================
-    // OPEN AUTH MODAL - No auto-fill
+    // OPEN AUTH MODAL
     // ============================================================
     function openModal(mode) {
         currentMode = mode;
@@ -1133,7 +1147,7 @@
                 });
                 
             // ============================================================
-            // RESET PASSWORD - FIXED: Properly handles verification code
+            // RESET PASSWORD
             // ============================================================
             } else if (currentMode === 'reset') {
                 authSubmitBtn.disabled = true;
@@ -1411,7 +1425,6 @@
             })(items[i]);
         }
         
-        // Close menu when clicking outside
         setTimeout(function() {
             var closeHandler = function(e) {
                 var menu = document.getElementById('profileMenu');
