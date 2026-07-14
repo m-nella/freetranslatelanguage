@@ -780,7 +780,7 @@
     }
 
     // ============================================================
-    // AUTH STATE - FIXED: No auto-login without token
+    // AUTH STATE - FIXED: No auto-login without token + Token Expired handling
     // ============================================================
     function checkAuthStatus() {
         if (authCheckInProgress) return;
@@ -838,6 +838,35 @@
         }).catch(function(error) {
             authCheckInProgress = false;
             initialAuthCheckDone = true;
+            
+            // ============================================================
+            // TOKEN EXPIRED HANDLING - Account deleted elsewhere
+            // ============================================================
+            if (error.data && error.data.tokenExpired === true) {
+                API_MANAGER.setToken(null);
+                localStorage.removeItem('cachedUser');
+                localStorage.removeItem('cachedHistory');
+                isLoggedIn = false;
+                currentUser = null;
+                if (authBtn) {
+                    authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
+                    removeClass(authBtn, 'logged-in');
+                }
+                if (historyNavBtn) {
+                    historyNavBtn.style.display = 'none';
+                }
+                // Close any open modals
+                if (profileMenu) {
+                    profileMenu.remove();
+                    profileMenu = null;
+                }
+                showNotification('Your session has expired. Please sign in again.', 'warning');
+                return;
+            }
+            
+            // ============================================================
+            // Regular 401 Unauthorized - Token invalid
+            // ============================================================
             if (error.status === 401) {
                 API_MANAGER.setToken(null);
                 localStorage.removeItem('cachedUser');
@@ -853,6 +882,9 @@
                 return;
             }
             
+            // ============================================================
+            // Try cached user data as fallback
+            // ============================================================
             var cachedUser = localStorage.getItem('cachedUser');
             if (cachedUser) {
                 try {
