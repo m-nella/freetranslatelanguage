@@ -23,13 +23,23 @@ app.set('trust proxy', 1);
 
 app.use(cors({
     origin: function(origin, callback) {
-        return callback(null, true);
+        const allowedOrigins = [
+            'https://freetranslatelanguage.onrender.com',
+            'https://freetranslatelanguage-backend.onrender.com',
+            'http://localhost:5000',
+            'http://localhost:3000'
+        ];
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(null, true);
+        }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
