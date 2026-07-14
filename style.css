@@ -1427,7 +1427,7 @@ body {
 }
 
 /* ============================================================
-   RESPONSIVE - ALL DEVICES - FIXED: Better spacing on mobile
+   RESPONSIVE - ALL DEVICES
    ============================================================ */
 
 @media (max-width: 1024px) {
@@ -1464,7 +1464,7 @@ body {
 }
 
 /* ============================================================
-   MOBILE PHONES - FIXED: Better spacing, no overlapping
+   MOBILE PHONES - FIXED: Nav button spacing, Profile button icon only
    ============================================================ */
 @media (max-width: 768px) {
     :root {
@@ -1477,7 +1477,7 @@ body {
     .logo-text { font-size: 0.95rem; }
 
     .nav-controls { 
-        gap: 4px; 
+        gap: 6px; 
     }
 
     .theme-btn {
@@ -1490,30 +1490,38 @@ body {
         font-size: 0.9rem;
     }
 
+    /* ============================================================
+       History & About buttons - Show icon + text with spacing
+       ============================================================ */
     .auth-btn,
     .nav-btn {
-        padding: 4px 8px;
+        padding: 4px 10px;
         font-size: 0.7rem;
         min-height: 32px;
-        gap: 4px;
+        gap: 8px;
         border-radius: 6px;
     }
     .auth-btn i,
     .nav-btn i {
-        font-size: 0.8rem;
+        font-size: 0.85rem;
     }
     .auth-btn span,
     .nav-btn span {
-        font-size: 0.65rem !important;
+        font-size: 0.7rem !important;
+        display: inline !important;
     }
 
+    /* ============================================================
+       PROFILE BUTTON - ICON ONLY on mobile
+       ============================================================ */
     .auth-btn.logged-in span {
         display: none !important;
     }
     .auth-btn.logged-in {
-        padding: 4px 8px;
-        min-width: 32px;
+        padding: 4px 10px;
+        min-width: 36px;
         justify-content: center;
+        gap: 0;
     }
     .auth-btn.logged-in i {
         font-size: 0.9rem;
@@ -1619,7 +1627,6 @@ body {
     .footer-links { gap: 10px !important; }
     .footer-links a { font-size: 0.9rem !important; padding: 2px 6px !important; gap: 3px !important; }
 
-    /* MODAL - FIXED: Better spacing on mobile */
     .modal-content {
         padding: 16px 12px !important;
         max-width: 100% !important;
@@ -1709,7 +1716,7 @@ body {
     .nav-logo img { height: 24px; }
     .logo-text { font-size: 0.8rem; }
 
-    .nav-controls { gap: 3px; }
+    .nav-controls { gap: 4px; }
     .theme-btn {
         padding: 2px 6px !important;
         min-width: 26px !important;
@@ -1718,29 +1725,44 @@ body {
     .theme-btn i {
         font-size: 0.75rem !important;
     }
+
+    /* ============================================================
+       History & About buttons - Show icon + text with spacing
+       ============================================================ */
     .auth-btn,
     .nav-btn {
-        padding: 2px 6px !important;
-        min-width: 26px !important;
-        min-height: 26px !important;
-        gap: 3px !important;
+        padding: 3px 8px !important;
+        min-width: auto !important;
+        min-height: 28px !important;
+        gap: 6px !important;
         border-radius: 4px !important;
+        font-size: 0.65rem !important;
     }
     .auth-btn i,
     .nav-btn i {
-        font-size: 0.7rem !important;
+        font-size: 0.75rem !important;
     }
     .auth-btn span,
     .nav-btn span {
-        font-size: 0.5rem !important;
+        font-size: 0.6rem !important;
+        display: inline !important;
     }
+
+    /* ============================================================
+       PROFILE BUTTON - ICON ONLY on very small phones
+       ============================================================ */
     .auth-btn.logged-in span {
         display: none !important;
     }
     .auth-btn.logged-in {
-        padding: 2px 6px !important;
-        min-width: 26px !important;
+        padding: 3px 8px !important;
+        min-width: 30px !important;
         justify-content: center !important;
+        gap: 0 !important;
+    }
+    .auth-btn.logged-in i {
+        font-size: 0.8rem !important;
+        margin: 0;
     }
 
     .container { padding: 4px 6px 8px; }
