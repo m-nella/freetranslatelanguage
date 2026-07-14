@@ -1498,7 +1498,7 @@ body {
         padding: 4px 10px;
         font-size: 0.7rem;
         min-height: 32px;
-        gap: 10px;
+        gap: 12px;
         border-radius: 6px;
     }
     .auth-btn i,
@@ -1734,7 +1734,7 @@ body {
         padding: 3px 8px !important;
         min-width: auto !important;
         min-height: 28px !important;
-        gap: 8px !important;
+        gap: 10px !important;
         border-radius: 4px !important;
         font-size: 0.65rem !important;
     }
