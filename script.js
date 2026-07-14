@@ -780,7 +780,7 @@
     }
 
     // ============================================================
-    // AUTH STATE - FIXED: No auto-login without token + Token Expired handling
+    // AUTH STATE - FIXED: Works correctly with token expiration
     // ============================================================
     function checkAuthStatus() {
         if (authCheckInProgress) return;
@@ -840,7 +840,7 @@
             initialAuthCheckDone = true;
             
             // ============================================================
-            // TOKEN EXPIRED HANDLING - Account deleted elsewhere
+            // TOKEN EXPIRED - Account deleted elsewhere
             // ============================================================
             if (error.data && error.data.tokenExpired === true) {
                 API_MANAGER.setToken(null);
@@ -855,7 +855,6 @@
                 if (historyNavBtn) {
                     historyNavBtn.style.display = 'none';
                 }
-                // Close any open modals
                 if (profileMenu) {
                     profileMenu.remove();
                     profileMenu = null;
@@ -865,7 +864,7 @@
             }
             
             // ============================================================
-            // Regular 401 Unauthorized - Token invalid
+            // Regular 401 - Token invalid
             // ============================================================
             if (error.status === 401) {
                 API_MANAGER.setToken(null);
