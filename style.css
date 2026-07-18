@@ -1490,30 +1490,25 @@ body {
         font-size: 0.9rem;
     }
 
-    /* ============================================================
-       History & About buttons - Show icon + text with spacing
-       ============================================================ */
     .auth-btn,
-.nav-btn {
-    padding: 4px 12px !important;  /* ← INCREASED padding */
-    font-size: 0.7rem;
-    min-height: 32px;
-    gap: 12px !important;          /* ← INCREASED gap with !important */
-    border-radius: 6px;
-}
-.auth-btn i,
-.nav-btn i {
-    font-size: 0.85rem;
-}
-.auth-btn span,
-.nav-btn span {
-    font-size: 0.7rem !important;
-    display: inline !important;
-    margin-left: 2px;             /* ← ADD extra space after icon */
-}
-    /* ============================================================
-       PROFILE BUTTON - ICON ONLY on mobile
-       ============================================================ */
+    .nav-btn {
+        padding: 4px 12px !important;
+        font-size: 0.7rem;
+        min-height: 32px;
+        gap: 12px !important;
+        border-radius: 6px;
+    }
+    .auth-btn i,
+    .nav-btn i {
+        font-size: 0.85rem;
+    }
+    .auth-btn span,
+    .nav-btn span {
+        font-size: 0.7rem !important;
+        display: inline !important;
+        margin-left: 2px;
+    }
+
     .auth-btn.logged-in span {
         display: none !important;
     }
@@ -1580,6 +1575,9 @@ body {
         padding: 6px 10px !important;
     }
 
+    /* ============================================================
+       FIXED: Added 15px spacing around Translate button on mobile
+       ============================================================ */
     .translation-area.side-by-side .translate-btn {
         order: 2 !important;
         flex-direction: row !important;
@@ -1589,7 +1587,7 @@ body {
         font-size: 0.75rem !important;
         border-radius: 25px !important;
         gap: 6px !important;
-        margin: 0 !important;
+        margin: 12px 0 !important;
     }
     .translation-area.side-by-side .translate-btn i {
         transform: rotate(0deg) !important;
@@ -1726,32 +1724,26 @@ body {
         font-size: 0.75rem !important;
     }
 
-    /* ============================================================
-       History & About buttons - Show icon + text with spacing
-       ============================================================ */
     .auth-btn,
-.nav-btn {
-    padding: 3px 10px !important;  /* ← INCREASED padding */
-    min-width: auto !important;
-    min-height: 28px !important;
-    gap: 10px !important;          /* ← INCREASED gap */
-    border-radius: 4px !important;
-    font-size: 0.65rem !important;
-}
-.auth-btn i,
-.nav-btn i {
-    font-size: 0.75rem !important;
-}
-.auth-btn span,
-.nav-btn span {
-    font-size: 0.6rem !important;
-    display: inline !important;
-    margin-left: 2px;             /* ← ADD extra space after icon */
-}
+    .nav-btn {
+        padding: 3px 10px !important;
+        min-width: auto !important;
+        min-height: 28px !important;
+        gap: 10px !important;
+        border-radius: 4px !important;
+        font-size: 0.65rem !important;
+    }
+    .auth-btn i,
+    .nav-btn i {
+        font-size: 0.75rem !important;
+    }
+    .auth-btn span,
+    .nav-btn span {
+        font-size: 0.6rem !important;
+        display: inline !important;
+        margin-left: 2px;
+    }
 
-    /* ============================================================
-       PROFILE BUTTON - ICON ONLY on very small phones
-       ============================================================ */
     .auth-btn.logged-in span {
         display: none !important;
     }
@@ -1807,12 +1799,16 @@ body {
         padding: 4px 6px !important;
     }
 
+    /* ============================================================
+       FIXED: Added spacing around Translate button on very small phones
+       ============================================================ */
     .translation-area.side-by-side .translate-btn {
         min-height: 34px !important;
         padding: 4px 12px !important;
         font-size: 0.65rem !important;
         border-radius: 20px !important;
         gap: 4px !important;
+        margin: 10px 0 !important;
     }
     .translation-area.side-by-side .translate-btn i {
         font-size: 0.65rem !important;
