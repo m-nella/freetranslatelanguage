@@ -47,6 +47,7 @@
     var authCheckInProgress = false;
     var initialAuthCheckDone = false;
     var translationInProgress = false;
+    var isMicClick = false;
 
     // ============================================================
     // LANGUAGE LIST
@@ -94,8 +95,9 @@
         if (!el) return;
         el.addEventListener('click', handler);
         el.addEventListener('touchstart', function(e) {
+            e.preventDefault();
             handler(e);
-        }, { passive: true });
+        }, { passive: false });
     }
 
     function createElement(tag, className, html) {
@@ -547,7 +549,7 @@
     }
 
     // ============================================================
-    // VERIFICATION MODAL - FIXED: Refresh on cancel for ALL actions
+    // VERIFICATION MODAL - FIXED: Stays open until correct code
     // ============================================================
     function openVerificationModal(email, action, callback) {
         pendingEmail = email;
@@ -608,12 +610,22 @@
             modal.remove();
             isVerifying = false;
             verificationDone = false;
-            // REFRESH PAGE FOR ALL ACTIONS when user cancels/closes
-            window.location.reload();
+            // For signup, cancel = delete account (not registered)
+            if (action === 'signup') {
+                // Show notification and reload
+                showNotification('Account creation cancelled.', 'info');
+                window.location.reload();
+            } else {
+                window.location.reload();
+            }
         });
         
         var form = $('verificationForm');
         var submitBtn = $('verifySubmitBtn');
+        var errorMessage = document.createElement('p');
+        errorMessage.style.cssText = 'color: var(--danger); font-size: 0.8rem; text-align: center; margin-top: 4px; display: none;';
+        errorMessage.id = 'verificationError';
+        form.appendChild(errorMessage);
         
         form.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -629,6 +641,7 @@
             submitBtn.disabled = true;
             submitBtn.textContent = 'Verifying...';
             isVerifying = true;
+            errorMessage.style.display = 'none';
             
             API_MANAGER.verifyCode(email, code, action).then(function(result) {
                 if (result.success) {
@@ -640,14 +653,16 @@
                     
                     pendingVerificationCode = code;
                     
+                    // SIGNUP: Account is now verified and created
                     if (action === 'signup') {
                         setTimeout(function() {
                             modal.remove();
                             if (typeof pendingCallback === 'function') {
                                 pendingCallback(result, code);
                             }
-                            showNotification('Email verified! Please sign in.', 'success');
+                            showNotification('Account created and verified!', 'success');
                             setTimeout(function() {
+                                // Redirect to sign in
                                 window.location.reload();
                             }, 500);
                             isVerifying = false;
@@ -656,6 +671,7 @@
                         return;
                     }
                     
+                    // SIGNIN: Log in immediately
                     if (action === 'signin') {
                         if (result.token) {
                             API_MANAGER.setToken(result.token);
@@ -679,6 +695,7 @@
                         return;
                     }
                     
+                    // RESET: Proceed to password reset
                     if (action === 'reset') {
                         setTimeout(function() {
                             modal.remove();
@@ -691,7 +708,34 @@
                         return;
                     }
                     
-                    if (action === 'email' || action === 'password' || action === 'delete') {
+                    // EMAIL: Update email
+                    if (action === 'email') {
+                        setTimeout(function() {
+                            modal.remove();
+                            if (typeof pendingCallback === 'function') {
+                                pendingCallback(result, code);
+                            }
+                            isVerifying = false;
+                            verificationDone = false;
+                        }, 500);
+                        return;
+                    }
+                    
+                    // PASSWORD: Update password
+                    if (action === 'password') {
+                        setTimeout(function() {
+                            modal.remove();
+                            if (typeof pendingCallback === 'function') {
+                                pendingCallback(result, code);
+                            }
+                            isVerifying = false;
+                            verificationDone = false;
+                        }, 500);
+                        return;
+                    }
+                    
+                    // DELETE: Delete account
+                    if (action === 'delete') {
                         setTimeout(function() {
                             modal.remove();
                             if (typeof pendingCallback === 'function') {
@@ -713,20 +757,25 @@
                         verificationDone = false;
                     }, 800);
                 } else {
-                    showNotification(result.message || 'Invalid code.', 'error');
+                    // Show error but keep modal open
+                    errorMessage.textContent = result.message || 'Invalid code. Please try again.';
+                    errorMessage.style.display = 'block';
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Verify';
                     submitBtn.style.backgroundColor = '';
                     isVerifying = false;
                     codeInput.value = '';
                     codeInput.focus();
+                    showNotification(result.message || 'Invalid code. Please try again.', 'error');
                 }
             }).catch(function(error) {
-                showNotification(error.message || 'Verification error. Please try again.', 'error');
+                errorMessage.textContent = error.message || 'Verification error. Please try again.';
+                errorMessage.style.display = 'block';
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Verify';
                 submitBtn.style.backgroundColor = '';
                 isVerifying = false;
+                showNotification(error.message || 'Verification error. Please try again.', 'error');
             });
         });
         
@@ -741,13 +790,21 @@
             codeInput.disabled = false;
             codeInput.value = '';
             codeInput.focus();
+            errorMessage.style.display = 'none';
+            submitBtn.textContent = 'Sending code...';
+            submitBtn.disabled = true;
+            
             API_MANAGER.sendVerificationCode(email, action).then(function(result) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Verify';
                 if (result.success) {
                     showNotification('New code sent! Check your email.', 'success');
                 } else {
                     showNotification(result.message || 'Error sending code.', 'error');
                 }
             }).catch(function() {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Verify';
                 showNotification('Error sending code.', 'error');
             });
         });
@@ -757,8 +814,19 @@
                 modal.remove();
                 isVerifying = false;
                 verificationDone = false;
-                // REFRESH PAGE FOR ALL ACTIONS when clicking outside
-                window.location.reload();
+                if (action === 'signup') {
+                    showNotification('Account creation cancelled.', 'info');
+                    window.location.reload();
+                } else {
+                    window.location.reload();
+                }
+            }
+        });
+        
+        // Enter key support
+        codeInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                form.dispatchEvent(new Event('submit'));
             }
         });
     }
@@ -1204,7 +1272,7 @@
                 });
                 
             // ============================================================
-            // RESET PASSWORD
+            // RESET PASSWORD - FIXED
             // ============================================================
             } else if (currentMode === 'reset') {
                 authSubmitBtn.disabled = true;
@@ -1314,7 +1382,7 @@
                 });
                 
             // ============================================================
-            // SIGN UP
+            // SIGN UP - FIXED: Account only created after verification
             // ============================================================
             } else if (currentMode === 'signup') {
                 var confirmPassword = $('authConfirmPassword') ? $('authConfirmPassword').value : '';
@@ -1347,23 +1415,22 @@
                                 
                                 openVerificationModal(email, 'signup', function(result, code) {
                                     if (result.success) {
-                                        showNotification('Email verified! Please sign in.', 'success');
+                                        showNotification('Email verified! Account activated.', 'success');
                                         setTimeout(function() {
+                                            // Redirect to sign in
                                             window.location.reload();
                                         }, 500);
                                     }
                                 });
                             } else {
-                                showNotification('Account created but verification failed. Please try signing in.', 'warning');
+                                showNotification('Failed to send verification code. Please try again.', 'error');
                                 authSubmitBtn.disabled = false;
                                 authSubmitBtn.textContent = 'Create Account';
-                                if (authModal) authModal.style.display = 'none';
-                                openModal('login');
                             }
                         });
                     } else {
                         if (response.message && response.message.toLowerCase().includes('already registered')) {
-                            showNotification('Email already registered. Redirecting to Sign In...', 'error');
+                            showNotification('Email already registered. Please sign in.', 'error');
                             authSubmitBtn.disabled = false;
                             authSubmitBtn.textContent = 'Create Account';
                             setTimeout(function() {
@@ -1379,7 +1446,7 @@
                 }).catch(function(error) {
                     var errorMsg = error.message || '';
                     if (errorMsg.toLowerCase().includes('already registered')) {
-                        showNotification('Email already registered. Redirecting to Sign In...', 'error');
+                        showNotification('Email already registered. Please sign in.', 'error');
                         authSubmitBtn.disabled = false;
                         authSubmitBtn.textContent = 'Create Account';
                         setTimeout(function() {
@@ -2278,6 +2345,7 @@
         isProcessingRecording = false;
         lastSpeechTime = null;
         translationInProgress = false;
+        isMicClick = false;
         
         translateFromContainer = document.createElement('div');
         translateFromContainer.className = 'translate-from-container';
@@ -3088,8 +3156,12 @@
             
             initRecognition();
             
+            // ============================================================
+            // FIXED: Mic button - Click to start/stop, stays on until clicked again
+            // ============================================================
             bindClick(micBtn, function() {
                 if (isRecording) {
+                    // Stop recording
                     isRecording = false;
                     isProcessingRecording = false;
                     if (silenceTimeout) {
@@ -3126,6 +3198,7 @@
                     lastSpeechTime = null;
                     translationInProgress = false;
                 } else {
+                    // Start recording
                     var lang = sourceLang ? sourceLang.value || 'en' : 'en';
                     var langName = getLanguageName(lang);
                     currentRecordingLang = lang;
@@ -3144,6 +3217,11 @@
                         recognition.continuous = true;
                         try {
                             recognition.start();
+                            addClass(micBtn, 'recording');
+                            micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+                            if (recordingStatus) {
+                                recordingStatus.textContent = '🎤 Recording in ' + langName + '... Click to stop';
+                            }
                             showNotification('🎤 Listening in ' + langName + '...', 'info', 2000);
                         } catch (e) {
                             initRecognition();
@@ -3152,6 +3230,11 @@
                                 recognition.continuous = true;
                                 try {
                                     recognition.start();
+                                    addClass(micBtn, 'recording');
+                                    micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+                                    if (recordingStatus) {
+                                        recordingStatus.textContent = '🎤 Recording in ' + langName + '... Click to stop';
+                                    }
                                     showNotification('🎤 Listening in ' + langName + '...', 'info', 2000);
                                 } catch (e2) {
                                     showNotification('Error starting microphone. Please try again.', 'error');
@@ -3165,6 +3248,11 @@
                             recognition.continuous = true;
                             try {
                                 recognition.start();
+                                addClass(micBtn, 'recording');
+                                micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+                                if (recordingStatus) {
+                                    recordingStatus.textContent = '🎤 Recording in ' + langName + '... Click to stop';
+                                }
                                 showNotification('🎤 Listening in ' + langName + '...', 'info', 2000);
                             } catch (e) {
                                 showNotification('Error starting microphone. Please try again.', 'error');
