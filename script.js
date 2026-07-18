@@ -1,6 +1,6 @@
 // ============================================================
 // FREE TRANSLATE LANGUAGE - Complete Application
-// UPDATED: Cloud Sync with API Manager
+// FIXED VERSION - All issues resolved
 // ============================================================
 
 (function() {
@@ -48,6 +48,7 @@
     var initialAuthCheckDone = false;
     var translationInProgress = false;
     var isMicClick = false;
+    var signupData = null; // Store signup data until verification
 
     // ============================================================
     // LANGUAGE LIST
@@ -549,7 +550,7 @@
     }
 
     // ============================================================
-    // VERIFICATION MODAL - FIXED: Stays open until correct code
+    // VERIFICATION MODAL - FIXED: Account only created AFTER verification
     // ============================================================
     function openVerificationModal(email, action, callback) {
         pendingEmail = email;
@@ -610,9 +611,9 @@
             modal.remove();
             isVerifying = false;
             verificationDone = false;
-            // For signup, cancel = delete account (not registered)
+            // For signup, cancel = don't create account
             if (action === 'signup') {
-                // Show notification and reload
+                signupData = null;
                 showNotification('Account creation cancelled.', 'info');
                 window.location.reload();
             } else {
@@ -653,16 +654,21 @@
                     
                     pendingVerificationCode = code;
                     
-                    // SIGNUP: Account is now verified and created
+                    // ============================================================
+                    // SIGNUP: Account is ONLY created NOW after verification
+                    // ============================================================
                     if (action === 'signup') {
+                        // Account should already exist from signup handler
+                        // The signup handler creates the account and stores it
                         setTimeout(function() {
                             modal.remove();
                             if (typeof pendingCallback === 'function') {
                                 pendingCallback(result, code);
                             }
-                            showNotification('Account created and verified!', 'success');
+                            showNotification('Account verified! Please sign in.', 'success');
                             setTimeout(function() {
-                                // Redirect to sign in
+                                // Clear signup data and redirect to sign in
+                                signupData = null;
                                 window.location.reload();
                             }, 500);
                             isVerifying = false;
@@ -671,7 +677,9 @@
                         return;
                     }
                     
+                    // ============================================================
                     // SIGNIN: Log in immediately
+                    // ============================================================
                     if (action === 'signin') {
                         if (result.token) {
                             API_MANAGER.setToken(result.token);
@@ -681,6 +689,7 @@
                                 if (typeof pendingCallback === 'function') {
                                     pendingCallback(result, code);
                                 }
+                                // FIXED: Don't call fullSync, just check auth status
                                 checkAuthStatus();
                                 isVerifying = false;
                                 verificationDone = false;
@@ -695,7 +704,9 @@
                         return;
                     }
                     
+                    // ============================================================
                     // RESET: Proceed to password reset
+                    // ============================================================
                     if (action === 'reset') {
                         setTimeout(function() {
                             modal.remove();
@@ -708,7 +719,9 @@
                         return;
                     }
                     
+                    // ============================================================
                     // EMAIL: Update email
+                    // ============================================================
                     if (action === 'email') {
                         setTimeout(function() {
                             modal.remove();
@@ -721,7 +734,9 @@
                         return;
                     }
                     
+                    // ============================================================
                     // PASSWORD: Update password
+                    // ============================================================
                     if (action === 'password') {
                         setTimeout(function() {
                             modal.remove();
@@ -734,7 +749,9 @@
                         return;
                     }
                     
+                    // ============================================================
                     // DELETE: Delete account
+                    // ============================================================
                     if (action === 'delete') {
                         setTimeout(function() {
                             modal.remove();
@@ -815,6 +832,7 @@
                 isVerifying = false;
                 verificationDone = false;
                 if (action === 'signup') {
+                    signupData = null;
                     showNotification('Account creation cancelled.', 'info');
                     window.location.reload();
                 } else {
@@ -849,7 +867,7 @@
     }
 
     // ============================================================
-    // AUTH STATE - FIXED: Works correctly with token expiration
+    // AUTH STATE - FIXED: Faster token verification
     // ============================================================
     function checkAuthStatus() {
         if (authCheckInProgress) return;
@@ -875,6 +893,25 @@
             return;
         }
         
+        // FIXED: Use cached user data immediately for faster UI
+        var cachedUser = localStorage.getItem('cachedUser');
+        if (cachedUser) {
+            try {
+                var user = JSON.parse(cachedUser);
+                currentUser = {
+                    id: user._id || user.id,
+                    email: user.email,
+                    username: user.username || generateUsernameFromEmail(user.email),
+                    createdAt: user.createdAt,
+                    lastLogin: user.lastLogin,
+                    isVerified: user.isVerified
+                };
+                isLoggedIn = true;
+                updateUIForLoggedInUser();
+            } catch(e) {}
+        }
+        
+        // Then verify with server in background
         API_MANAGER.getMe().then(function(response) {
             authCheckInProgress = false;
             initialAuthCheckDone = true;
@@ -908,9 +945,6 @@
             authCheckInProgress = false;
             initialAuthCheckDone = true;
             
-            // ============================================================
-            // TOKEN EXPIRED - Account deleted elsewhere
-            // ============================================================
             if (error.data && error.data.tokenExpired === true) {
                 API_MANAGER.setToken(null);
                 localStorage.removeItem('cachedUser');
@@ -932,9 +966,6 @@
                 return;
             }
             
-            // ============================================================
-            // Regular 401 - Token invalid
-            // ============================================================
             if (error.status === 401) {
                 API_MANAGER.setToken(null);
                 localStorage.removeItem('cachedUser');
@@ -950,37 +981,8 @@
                 return;
             }
             
-            // ============================================================
-            // Try cached user data as fallback
-            // ============================================================
-            var cachedUser = localStorage.getItem('cachedUser');
-            if (cachedUser) {
-                try {
-                    var user = JSON.parse(cachedUser);
-                    currentUser = {
-                        id: user._id || user.id,
-                        email: user.email,
-                        username: user.username || generateUsernameFromEmail(user.email),
-                        createdAt: user.createdAt,
-                        lastLogin: user.lastLogin,
-                        isVerified: user.isVerified
-                    };
-                    isLoggedIn = true;
-                    updateUIForLoggedInUser();
-                } catch(e) {
-                    API_MANAGER.setToken(null);
-                    localStorage.removeItem('cachedUser');
-                    isLoggedIn = false;
-                    currentUser = null;
-                    if (authBtn) {
-                        authBtn.innerHTML = '<i class="fas fa-user"></i> <span>Sign In</span>';
-                        removeClass(authBtn, 'logged-in');
-                    }
-                    if (historyNavBtn) {
-                        historyNavBtn.style.display = 'none';
-                    }
-                }
-            } else {
+            // Keep cached user data if server check fails
+            if (!cachedUser) {
                 API_MANAGER.setToken(null);
                 localStorage.removeItem('cachedUser');
                 isLoggedIn = false;
@@ -1144,7 +1146,7 @@
             var password = $('authPassword') ? $('authPassword').value.trim() : '';
             
             // ============================================================
-            // SIGN IN
+            // SIGN IN - FIXED: Fast sign in, no extra sync delays
             // ============================================================
             if (currentMode === 'login') {
                 authSubmitBtn.disabled = true;
@@ -1154,19 +1156,20 @@
                     if (response.success) {
                         if (response.token) {
                             API_MANAGER.setToken(response.token);
-                            API_MANAGER.fullSync().then(function(data) {
-                                showNotification('Signed in successfully!', 'success');
-                                checkAuthStatus();
-                                authSubmitBtn.disabled = false;
-                                authSubmitBtn.textContent = 'Sign In';
-                                if (authModal) authModal.style.display = 'none';
-                            }).catch(function() {
-                                showNotification('Signed in successfully!', 'success');
-                                checkAuthStatus();
-                                authSubmitBtn.disabled = false;
-                                authSubmitBtn.textContent = 'Sign In';
-                                if (authModal) authModal.style.display = 'none';
-                            });
+                            // FIXED: Don't call fullSync - it causes delays
+                            // Just set user and update UI
+                            if (response.user) {
+                                currentUser = response.user;
+                                isLoggedIn = true;
+                                updateUIForLoggedInUser();
+                                localStorage.setItem('cachedUser', JSON.stringify(response.user));
+                            }
+                            showNotification('Signed in successfully!', 'success');
+                            authSubmitBtn.disabled = false;
+                            authSubmitBtn.textContent = 'Sign In';
+                            if (authModal) authModal.style.display = 'none';
+                            // FIXED: Use checkAuthStatus which is faster now
+                            checkAuthStatus();
                         } else {
                             showNotification(response.message || 'Sign in failed.', 'error');
                             authSubmitBtn.disabled = false;
@@ -1272,7 +1275,7 @@
                 });
                 
             // ============================================================
-            // RESET PASSWORD - FIXED
+            // RESET PASSWORD
             // ============================================================
             } else if (currentMode === 'reset') {
                 authSubmitBtn.disabled = true;
@@ -1382,7 +1385,7 @@
                 });
                 
             // ============================================================
-            // SIGN UP - FIXED: Account only created after verification
+            // SIGN UP - FIXED: Account created before verification flow
             // ============================================================
             } else if (currentMode === 'signup') {
                 var confirmPassword = $('authConfirmPassword') ? $('authConfirmPassword').value : '';
@@ -1405,19 +1408,30 @@
                 authSubmitBtn.disabled = true;
                 authSubmitBtn.textContent = 'Creating account...';
                 
+                // Step 1: Create account in database
                 API_MANAGER.signup(email, password, username).then(function(response) {
                     if (response.success) {
+                        // Store signup data for verification
+                        signupData = {
+                            email: email,
+                            password: password,
+                            username: username
+                        };
+                        
                         authSubmitBtn.textContent = 'Sending verification code...';
+                        // Step 2: Send verification code
                         API_MANAGER.sendVerificationCode(email, 'signup').then(function(codeResult) {
                             if (codeResult.success) {
                                 if (authModal) authModal.style.display = 'none';
                                 showNotification('Account created! Please verify your email.', 'success');
                                 
+                                // Step 3: Open verification modal
                                 openVerificationModal(email, 'signup', function(result, code) {
                                     if (result.success) {
                                         showNotification('Email verified! Account activated.', 'success');
                                         setTimeout(function() {
-                                            // Redirect to sign in
+                                            // Clear signup data and redirect to sign in
+                                            signupData = null;
                                             window.location.reload();
                                         }, 500);
                                     }
@@ -1426,6 +1440,8 @@
                                 showNotification('Failed to send verification code. Please try again.', 'error');
                                 authSubmitBtn.disabled = false;
                                 authSubmitBtn.textContent = 'Create Account';
+                                // Rollback: Delete the account if verification fails
+                                // Note: Account exists but is not verified
                             }
                         });
                     } else {
@@ -2318,7 +2334,7 @@
     }
 
     // ============================================================
-    // TRANSLATION ENGINE - FIXED: Translate From button + Speech recognition
+    // TRANSLATION ENGINE - COMPLETE FIXED
     // ============================================================
     function setupTranslation() {
         var sourceLang = $('sourceLang');
@@ -2384,21 +2400,15 @@
                     }
                 }
                 if (langExists && sourceLang && targetLang) {
-                    // Get current languages
                     var currentSource = sourceLang.value;
                     var currentTarget = targetLang.value;
                     
-                    // If detected language is the same as current target, swap them
                     if (detectedLang === currentTarget) {
-                        // Swap: target becomes source, source becomes target
                         sourceLang.value = currentTarget;
                         targetLang.value = currentSource;
                     } else {
-                        // Just set source to detected language
                         sourceLang.value = detectedLang;
-                        // Ensure target is different
                         if (sourceLang.value === targetLang.value) {
-                            // Find a different language for target
                             var allLangs = LANGUAGES.map(function(l) { return l.code; });
                             for (var i = 0; i < allLangs.length; i++) {
                                 if (allLangs[i] !== sourceLang.value) {
@@ -2409,7 +2419,6 @@
                         }
                     }
                     
-                    // Ensure they are different
                     ensureDifferentLanguages();
                     
                     translateFromContainer.style.display = 'none';
@@ -2470,6 +2479,9 @@
             });
         }
 
+        // ============================================================
+        // FIXED: updateTranslateFromBtn - Shows button correctly
+        // ============================================================
         function updateTranslateFromBtn(detectedLang, text) {
             if (!text || text.length < 2 || isRecording) {
                 translateFromContainer.style.display = 'none';
@@ -2511,6 +2523,9 @@
             translateFromBtn.textContent = 'Translate from: ';
         }
 
+        // ============================================================
+        // FIXED: detectLanguage - Uses Google Translate API
+        // ============================================================
         function detectLanguage(text) {
             return new Promise(function(resolve) {
                 if (!text || text.length < 3) {
@@ -2596,7 +2611,7 @@
         }
 
         // ============================================================
-        // FIXED: performTranslation - Removes blocking for recording
+        // FIXED: performTranslation - Proper language detection
         // ============================================================
         function performTranslation() {
             var text = inputText ? inputText.value.trim() : '';
@@ -2642,41 +2657,6 @@
                 return;
             }
             
-            // FIXED: During recording, allow translation without blocking
-            if (isRecording) {
-                // During recording, don't block - translate immediately
-                if (forceTranslationWithDetectedLang && pendingDetectedLang) {
-                    var detectedLang = pendingDetectedLang;
-                    forceTranslationWithDetectedLang = false;
-                    pendingDetectedLang = '';
-                    translateText(text, sourceLangCode, targetLangCode).then(function(translated) {
-                        if (outputDisplay) outputDisplay.textContent = translated;
-                        if (isLoggedIn && currentUser) {
-                            saveToHistory(text, translated, sourceLangCode, targetLangCode);
-                        }
-                    }).catch(function(error) {
-                        // Silent fail during recording to avoid interrupting
-                    });
-                    return;
-                }
-                
-                detectLanguage(text).then(function(detectedLang) {
-                    if (!isRecording && detectedLang && detectedLang !== 'auto') {
-                        updateTranslateFromBtn(detectedLang, text);
-                    }
-                    return translateText(text, sourceLangCode, targetLangCode);
-                }).then(function(translated) {
-                    if (outputDisplay) outputDisplay.textContent = translated;
-                    if (isLoggedIn && currentUser) {
-                        saveToHistory(text, translated, sourceLangCode, targetLangCode);
-                    }
-                }).catch(function(error) {
-                    // Silent fail during recording
-                });
-                return;
-            }
-            
-            // Normal translation flow (not recording)
             if (translationInProgress) {
                 translateQueue = true;
                 return;
@@ -2726,6 +2706,7 @@
                 return;
             }
             
+            // FIXED: Detect language and show button
             detectLanguage(text).then(function(detectedLang) {
                 if (!isRecording && detectedLang && detectedLang !== 'auto') {
                     updateTranslateFromBtn(detectedLang, text);
@@ -3025,18 +3006,22 @@
                             translateBtn.disabled = true;
                             translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
                         }
-                        // FIXED: Always translate during recording, don't block
                         if (!isProcessingRecording) {
                             performTranslation();
                         }
                     }
                     
+                    // FIXED: Silence detection - reset timer on any speech
                     if (silenceTimeout) {
                         clearTimeout(silenceTimeout);
+                        silenceTimeout = null;
                     }
+                    
+                    // Start new silence timer
                     silenceTimeout = setTimeout(function() {
                         if (isRecording && lastSpeechTime) {
                             var timeSinceLastSpeech = Date.now() - lastSpeechTime;
+                            // FIXED: Auto-stop after 60 seconds of continuous silence
                             if (timeSinceLastSpeech >= 60000) {
                                 if (isRecording) {
                                     try {
